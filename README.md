@@ -12,7 +12,7 @@
 - **Text**: dictation and Transcribe (TXT, SRT or VTT).
 - **Tools**: convert a recording to another voice, AI direction (describe how a line should sound; a local AI model sets the delivery), compare voices, fit audio to a length, inspect media files.
 - **Projects**: everything you make, in one list.
-- **Integrations**: an OpenAI-compatible API at `http://127.0.0.1:8765/v1` and an MCP server for AI assistants. The Integrations page shows how to connect them.
+- **Integrations**: an OpenAI-compatible API at `http://127.0.0.1:8765/v1`, an MCP server for AI assistants, and optional phone calls (Twilio callers hear a greeting in your voice; off by default, and only a small separate server is ever exposed). The Integrations page shows how to connect them.
 
 ## Develop
 

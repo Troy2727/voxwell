@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../api';
+import PhoneCard from './PhoneCard';
 
 interface Info {
   api_base: string;
@@ -94,6 +95,8 @@ with open("recording.mp3", "rb") as f:
           of <code>127.0.0.1</code>.
         </p>
       </div>
+
+      <PhoneCard />
     </section>
   );
 }
