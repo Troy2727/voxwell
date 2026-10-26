@@ -8,6 +8,7 @@ from voxwell.features.batch import watch as batch_watch
 from voxwell.features.batch.router import router as batch
 from voxwell.features.dictation.router import router as dictation
 from voxwell.features.dubbing.router import router as dubbing
+from voxwell.features.gallery.router import router as gallery
 from voxwell.features.projects.router import router as projects
 from voxwell.features.stories.router import router as stories
 from voxwell.features.transcription.router import router as transcription
@@ -28,6 +29,7 @@ FEATURES = [
     Feature("voice_cloning", voice_cloning),
     Feature("voice_design", voice_design),
     Feature("voices", voices),
+    Feature("gallery", gallery),
     Feature("stories", stories),
     Feature("audiobook", audiobook),
     Feature("dubbing", dubbing),
