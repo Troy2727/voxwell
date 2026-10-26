@@ -9,15 +9,11 @@ interface Info {
 function Snippet({ code }: { code: string }) {
   const [copied, setCopied] = useState(false);
   return (
-    <div style={{ position: 'relative' }}>
-      <pre style={{ margin: 0, padding: 12, paddingRight: 72, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflowX: 'auto', fontSize: 13 }}>
+    <div className="row" style={{ alignItems: 'flex-start' }}>
+      <pre style={{ flex: 1, minWidth: 0, margin: 0, padding: 12, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflowX: 'auto', fontSize: 13 }}>
         {code}
       </pre>
-      <button
-        className="secondary"
-        style={{ position: 'absolute', top: 6, right: 6 }}
-        onClick={() => navigator.clipboard.writeText(code).then(() => setCopied(true))}
-      >
+      <button className="secondary" onClick={() => navigator.clipboard.writeText(code).then(() => setCopied(true))}>
         {copied ? 'Copied' : 'Copy'}
       </button>
     </div>
