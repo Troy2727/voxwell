@@ -19,6 +19,13 @@ LANGUAGES = {
 _model = None
 _lock = threading.Lock()
 
+# Chatterbox sometimes keeps talking after the text ends: made-up words, up to seconds of them
+# (3 of 21 test clips). Its own end checks miss this, so generation is also stopped this many
+# frames (25 per second) after its attention reaches the end of the text. Checked on 21 clips
+# (short, long, slow, Spanish), transcribed back: 15 left no extra words and cut no last word;
+# 25 still let 1-2 stray syllables through in 2 of them.
+TAIL_FRAMES = 15
+
 
 def _pick_device() -> str:
     import torch
@@ -53,13 +60,36 @@ def _torch_load_to_cpu():
         torch.load = original
 
 
+def _limit_tail(analyzer_cls) -> None:
+    """Make the analyzer force the end-of-speech token TAIL_FRAMES frames after the text ends.
+
+    Chatterbox creates a new AlignmentStreamAnalyzer per generation and calls step() once per
+    frame; forcing the stop token is what its own checks do too.
+    """
+    original = analyzer_cls.step
+    if getattr(original, "voxwell_tail_limit", False):
+        return
+
+    def step(self, logits, next_token=None):
+        logits = original(self, logits, next_token)
+        if self.completed_at is not None and self.curr_frame_pos - self.completed_at > TAIL_FRAMES:
+            logits = logits.new_full(logits.shape, -(2**15))
+            logits[..., self.eos_idx] = 2**15
+        return logits
+
+    step.voxwell_tail_limit = True
+    analyzer_cls.step = step
+
+
 def _load_model():
     """Load and cache the model for this process."""
     global _model
     with _lock:
         if _model is None:
+            from chatterbox.models.t3.inference.alignment_stream_analyzer import AlignmentStreamAnalyzer
             from chatterbox.mtl_tts import ChatterboxMultilingualTTS
 
+            _limit_tail(AlignmentStreamAnalyzer)
             with _torch_load_to_cpu():
                 _model = ChatterboxMultilingualTTS.from_pretrained(device=_pick_device())
         return _model

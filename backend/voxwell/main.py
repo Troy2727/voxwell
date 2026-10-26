@@ -1,4 +1,6 @@
 import os
+import sys
+import threading
 from contextlib import asynccontextmanager
 from dataclasses import asdict
 
@@ -50,7 +52,26 @@ for feature in FEATURES:
 app.include_router(openai_api.router, prefix="/v1")
 
 
+def _stop_when_stdin_closes(server) -> None:
+    """Stop the server once stdin reaches end-of-file.
+
+    The desktop app keeps our stdin open. Its `uv run` wrapper can be killed without killing
+    this process (Windows does not kill child processes with their parent), but the OS closes
+    the app's end of the pipe however the app ends, crashes included.
+    """
+
+    def watch():
+        sys.stdin.buffer.read()
+        server.should_exit = True
+
+    threading.Thread(target=watch, daemon=True, name="voxwell-parent-watch").start()
+
+
 def run():
     import uvicorn
 
-    uvicorn.run(app, host="127.0.0.1", port=int(os.environ.get("VOXWELL_PORT", "8765")))
+    server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=int(os.environ.get("VOXWELL_PORT", "8765"))))
+    # Only when started by the app: a terminal's stdin must not stop a server started by hand.
+    if os.environ.get("VOXWELL_EXIT_WITH_PARENT") == "1":
+        _stop_when_stdin_closes(server)
+    server.run()

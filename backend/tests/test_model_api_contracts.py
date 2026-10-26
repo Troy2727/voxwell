@@ -52,6 +52,45 @@ def test_chatterbox_checkpoints_load_without_cuda(monkeypatch):
     assert torch.load is before  # restored afterwards
 
 
+def test_tail_limit_stops_speech_shortly_after_the_text_ends():
+    torch = pytest.importorskip("torch")
+    from voxwell.features.voice_cloning import engine
+
+    class Analyzer:  # the parts of AlignmentStreamAnalyzer the limit uses
+        def __init__(self):
+            self.completed_at, self.curr_frame_pos, self.eos_idx = None, 0, 2
+
+        def step(self, logits, next_token=None):
+            self.curr_frame_pos += 1
+            return logits
+
+    engine._limit_tail(Analyzer)
+    engine._limit_tail(Analyzer)  # applying it twice must not stack
+    a = Analyzer()
+    picks = []
+    for frame in range(100):
+        if frame == 40:
+            a.completed_at = a.curr_frame_pos  # attention reached the end of the text
+        picks.append(int(a.step(torch.zeros(1, 4)).argmax()))
+    stop_frames = [f for f, tok in enumerate(picks) if tok == a.eos_idx]
+    assert stop_frames[0] == 40 + engine.TAIL_FRAMES  # never earlier: the last word must survive
+    assert all(tok == 0 for tok in picks[:stop_frames[0]])
+
+
+def test_tail_limit_matches_installed_analyzer():
+    asa = pytest.importorskip("chatterbox.models.t3.inference.alignment_stream_analyzer")
+    t3 = pytest.importorskip("chatterbox.models.t3.t3")
+    import inspect
+
+    cls = asa.AlignmentStreamAnalyzer
+    assert list(inspect.signature(cls.step).parameters)[:3] == ["self", "logits", "next_token"]
+    init = inspect.getsource(cls.__init__)
+    for field in ("self.completed_at", "self.curr_frame_pos", "self.eos_idx"):
+        assert field in init, f"chatterbox renamed {field}; update engine._limit_tail"
+    # Chatterbox builds the analyzer (and so the limit) only for the multilingual model, the one we use.
+    assert "is_multilingual" in inspect.getsource(t3.T3.inference)
+
+
 def test_faster_whisper_calls_match_installed_api(monkeypatch, tmp_path):
     fw = pytest.importorskip("faster_whisper")
     from voxwell.features.dictation import engine
