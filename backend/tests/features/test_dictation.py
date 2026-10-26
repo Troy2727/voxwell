@@ -87,3 +87,10 @@ def test_engine_transcribe_with_fake_model(monkeypatch, tmp_path):
     monkeypatch.setattr(engine, "_load_model", lambda: Model())
     t = engine.transcribe(tmp_path / "a.wav")
     assert t.text == "hi there" and t.language == "en" and t.segments[0].end == 1.5
+
+
+def test_status_reports_ready_when_faster_whisper_is_installed():
+    import importlib.util
+
+    expected = importlib.util.find_spec("faster_whisper") is not None
+    assert client.get("/api/dictation/status").json() == {"ready": expected}

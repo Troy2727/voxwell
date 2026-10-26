@@ -107,6 +107,14 @@ def test_empty_upload_leaves_no_job_folder(mocked, isolated_data_dir):
     assert not list((isolated_data_dir / "dubbing" / "jobs").glob("*"))
 
 
+def test_subtitles_served_as_utf8(mocked, monkeypatch):
+    monkeypatch.setattr(translator, "translate", lambda texts, s, t: ["clonación"] * len(texts))
+    jid = post().json()["id"]
+    res = client.get(f"/api/dubbing/jobs/{jid}/subtitles")
+    assert "charset=utf-8" in res.headers["content-type"]
+    assert "clonación" in res.text
+
+
 def test_library_voice_used_as_reference(mocked):
     voice = voices.save_voice("Ann", wav_bytes(1.0), "upload")
     assert post(voice=voice.id).status_code == 200

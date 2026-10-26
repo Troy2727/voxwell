@@ -1,5 +1,6 @@
 """Speech synthesis engine. Shared contract: dubbing calls synthesize(); keep its signature."""
 
+import contextlib
 import io
 import threading
 import wave
@@ -29,6 +30,29 @@ def _pick_device() -> str:
     return "cpu"
 
 
+@contextlib.contextmanager
+def _torch_load_to_cpu():
+    """Make torch.load default to map_location="cpu" for the duration.
+
+    chatterbox-tts 0.1.6 calls torch.load() without map_location on checkpoints saved from
+    CUDA, which fails on CPU-only and Apple machines. Loading to CPU is always safe: the
+    library moves each module to the chosen device right after loading it.
+    """
+    import torch
+
+    original = torch.load
+
+    def load(*args, **kwargs):
+        kwargs.setdefault("map_location", "cpu")
+        return original(*args, **kwargs)
+
+    torch.load = load
+    try:
+        yield
+    finally:
+        torch.load = original
+
+
 def _load_model():
     """Load and cache the model for this process."""
     global _model
@@ -36,7 +60,8 @@ def _load_model():
         if _model is None:
             from chatterbox.mtl_tts import ChatterboxMultilingualTTS
 
-            _model = ChatterboxMultilingualTTS.from_pretrained(device=_pick_device())
+            with _torch_load_to_cpu():
+                _model = ChatterboxMultilingualTTS.from_pretrained(device=_pick_device())
         return _model
 
 

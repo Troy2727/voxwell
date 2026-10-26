@@ -83,4 +83,4 @@ def job_video(job_id: str):
 
 @router.get("/jobs/{job_id}/subtitles")
 def job_subtitles(job_id: str):
-    return _output(job_id, "subtitles", "application/x-subrip", "subtitles.srt")
+    return _output(job_id, "subtitles", "application/x-subrip; charset=utf-8", "subtitles.srt")

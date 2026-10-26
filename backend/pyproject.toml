@@ -28,7 +28,11 @@ override-dependencies = [
     "pykakasi; sys_platform == 'never'",
 ]
 # onnx>=1.18 imports ml_dtypes features that need numpy>=1.26, which chatterbox-tts forbids.
-constraint-dependencies = ["onnx<1.18"]
+constraint-dependencies = [
+    "onnx<1.18",
+    # resemble-perth (chatterbox's audio watermarker) imports pkg_resources, removed in setuptools 81.
+    "setuptools<81",
+]
 
 # CUDA builds on Windows/Linux (they fall back to CPU without an NVIDIA GPU); macOS uses the
 # default PyPI build, which supports Apple MPS.

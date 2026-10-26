@@ -1,3 +1,4 @@
+import importlib.util
 import os
 import tempfile
 from dataclasses import asdict
@@ -13,7 +14,7 @@ router = APIRouter(tags=["dictation"])
 
 @router.get("/status")
 def status():
-    return {"ready": False}
+    return {"ready": importlib.util.find_spec("faster_whisper") is not None}
 
 
 @router.post("/transcribe")

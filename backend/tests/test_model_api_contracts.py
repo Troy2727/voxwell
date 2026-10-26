@@ -30,6 +30,28 @@ def test_chatterbox_calls_match_installed_api(monkeypatch):
     assert engine.LANGUAGES.keys() == mtl.SUPPORTED_LANGUAGES.keys() - {"ja"}
 
 
+def test_chatterbox_watermarker_imports():
+    pytest.importorskip("chatterbox.mtl_tts")
+    import perth
+
+    # perth swallows its ImportError and sets this to None; Chatterbox then fails at load time.
+    assert perth.PerthImplicitWatermarker is not None
+
+
+def test_chatterbox_checkpoints_load_without_cuda(monkeypatch):
+    torch = pytest.importorskip("torch")
+    from voxwell.features.voice_cloning import engine
+
+    calls = []
+    monkeypatch.setattr(torch, "load", lambda *a, **k: calls.append(k))
+    before = torch.load
+    with engine._torch_load_to_cpu():
+        torch.load("ve.pt", weights_only=True)  # how chatterbox 0.1.6 calls it
+        torch.load("conds.pt", map_location="cuda")  # explicit choices are kept
+    assert calls == [{"weights_only": True, "map_location": "cpu"}, {"map_location": "cuda"}]
+    assert torch.load is before  # restored afterwards
+
+
 def test_faster_whisper_calls_match_installed_api(monkeypatch, tmp_path):
     fw = pytest.importorskip("faster_whisper")
     from voxwell.features.dictation import engine
