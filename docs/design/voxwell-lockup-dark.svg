@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 360" role="img" aria-labelledby="title description">
+  <title id="title">Voxwell Voice Studio</title>
+  <desc id="description">A warm orange V holding a white well with a navy sound signal, alongside the Voxwell wordmark, for dark backgrounds.</desc>
+  <defs>
+    <linearGradient id="v-gradient" x1="70" y1="70" x2="290" y2="330" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F47735"/>
+      <stop offset="1" stop-color="#F3A92E"/>
+    </linearGradient>
+    <linearGradient id="well-gradient" x1="186" y1="80" x2="186" y2="292" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#F5F1EC"/>
+    </linearGradient>
+    <clipPath id="well-clip">
+      <path d="M98 125Q186 165 274 125L186 292Z"/>
+    </clipPath>
+    <style>
+      .sound-ring { transform-box: fill-box; transform-origin: center; animation: sound-pulse 2.4s ease-out infinite; }
+      .sound-ring.second { animation-delay: 1.2s; }
+      @keyframes sound-pulse {
+        0% { transform: scale(.5); opacity: .9; }
+        75%, 100% { transform: scale(1.4); opacity: 0; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .sound-ring { animation: none; opacity: .35; }
+      }
+    </style>
+  </defs>
+
+  <g transform="translate(28 16)">
+    <path d="M98 125Q186 165 274 125L186 292Z" fill="url(#well-gradient)"/>
+    <g clip-path="url(#well-clip)">
+      <circle class="sound-ring" cx="186" cy="190" r="26" fill="none" stroke="#F3A92E" stroke-width="5"/>
+      <circle class="sound-ring second" cx="186" cy="190" r="26" fill="none" stroke="#FDBA74" stroke-width="5"/>
+    </g>
+    <circle cx="186" cy="190" r="16" fill="#182433"/>
+    <path d="M62 48 176 294 Q180 303 186 303 Q192 303 196 294 L310 48" fill="none" stroke="url(#v-gradient)" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <g font-family="Aptos, Inter, Arial, sans-serif">
+    <text x="394" y="205" fill="#F5F1EC" font-size="96" font-weight="700" textLength="500" lengthAdjust="spacing">VOXWELL</text>
+    <text x="398" y="268" fill="#F3A92E" font-size="34" font-weight="500" letter-spacing="10">VOICE STUDIO</text>
+  </g>
+</svg>

@@ -1,0 +1,464 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Voxwell — Sign in</title>
+<style>
+  :root {
+    --bg: #0A0F16; --panel: #0F141C; --navy: #182433; --field: #141C28; --orange: #F47735; --amber: #F3A92E;
+    --ink: #171717; --text: #F5F1EC; --muted: #AEB8C6; --line: rgba(255,255,255,.08);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; padding: 40px 16px; background: var(--bg); color: var(--text);
+    font-family: Aptos, Inter, "Segoe UI", system-ui, sans-serif; -webkit-font-smoothing: antialiased;
+  }
+  ::selection { background: rgba(244,119,53,.4); }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  .shell {
+    max-width: 1280px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr));
+    border: 1px solid var(--line); border-radius: 20px; overflow: hidden; background: var(--panel);
+  }
+
+  /* Left: form */
+  .form-side { padding: 56px clamp(20px, 6vw, 64px); display: flex; flex-direction: column; align-items: center; }
+  .form-wrap { width: 100%; max-width: 420px; }
+  .brand { display: flex; justify-content: center; align-items: center; gap: 12px; margin-bottom: 40px; }
+  .brand b { display: block; font-weight: 700; letter-spacing: .08em; font-size: 22px; line-height: 1; }
+  .brand small { display: block; font-size: 10.5px; letter-spacing: .34em; color: var(--amber); margin-top: 5px; }
+  h1 { text-align: center; font-size: 36px; font-weight: 700; letter-spacing: -.02em; margin: 0 0 8px; }
+  .sub { text-align: center; margin: 0 0 32px; color: #D6DCE4; font-size: 17px; }
+
+  .google {
+    width: 100%; min-height: 50px; display: inline-flex; align-items: center; justify-content: center; gap: 12px;
+    font: inherit; font-size: 15px; font-weight: 600; color: #E3E3E3; cursor: pointer;
+    background: #131314; border: 1px solid #8E918F; border-radius: 10px; transition: background .15s;
+  }
+  .google:hover { background: #1C1D1F; }
+  .google:focus-visible { outline: none; box-shadow: 0 0 0 4px rgba(244,119,53,.4); }
+  .google[aria-busy="true"] { opacity: .7; cursor: progress; }
+  .divider { display: flex; align-items: center; gap: 16px; margin: 24px 0; color: var(--muted); font-size: 14px; }
+  .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: #2A3A52; }
+
+  .field { display: grid; gap: 8px; margin-bottom: 18px; }
+  .field.hidden { display: none; }
+  label { font-size: 13px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #E3E7EC; }
+  .input-wrap { position: relative; }
+  input {
+    width: 100%; min-width: 0; font: inherit; font-size: 15px; color: var(--text); min-height: 48px; padding: 12px 16px;
+    background: var(--field); border: 1px solid #2A3A52; border-radius: 10px; outline: none; transition: border-color .15s, box-shadow .15s;
+  }
+  input::placeholder { color: #8994A3; }
+  input:focus-visible { border-color: var(--orange); box-shadow: 0 0 0 4px rgba(244,119,53,.22); }
+  input[type="password"], input.pw { padding-right: 52px; }
+  .eye {
+    position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 44px; height: 44px;
+    display: grid; place-items: center; background: none; border: 0; border-radius: 8px; color: var(--muted); cursor: pointer;
+  }
+  .eye:hover { color: var(--text); }
+  .eye .off, .eye[aria-pressed="true"] .on { display: none; }
+  .eye[aria-pressed="true"] .off { display: block; }
+  .eye:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(244,119,53,.45); }
+
+  .row { display: flex; justify-content: flex-end; margin: -6px 0 24px; font-size: 14px; }
+  .row.hidden { display: none; }
+  a { color: var(--amber); }
+  a:hover { color: #FFC86B; }
+  .muted-link { color: var(--muted); text-decoration: none; }
+  .muted-link:hover { color: var(--text); }
+
+  .primary {
+    width: 100%; min-height: 52px; display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+    font: inherit; font-size: 15px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink); cursor: pointer;
+    background: linear-gradient(135deg, var(--orange), #F68E32 60%, var(--amber)); border: 0; border-radius: 10px; transition: filter .15s, transform .15s;
+  }
+  .primary:hover { filter: brightness(1.06); }
+  .primary:active { transform: translateY(1px); }
+  .primary:focus-visible { outline: none; box-shadow: 0 0 0 4px rgba(244,119,53,.4); }
+  .primary .spinner { display: none; }
+  .primary[aria-busy="true"] .spinner { display: block; }
+  .primary[aria-busy="true"] .arrow { display: none; }
+
+  .switch { margin: 24px 0 0; text-align: center; color: var(--muted); font-size: 15px; }
+  .switch button { font: inherit; font-weight: 600; color: var(--amber); background: none; border: 0; padding: 4px; cursor: pointer; text-decoration: underline; }
+  .switch button:hover { color: #FFC86B; }
+  .local { margin: 28px 0 0; display: flex; justify-content: center; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
+
+  /* Right: brand panel */
+  .brand-side { border-left: 1px solid var(--line); padding: 56px clamp(20px, 4vw, 48px); display: flex; flex-direction: column; gap: 28px; }
+  .headline { font-size: clamp(34px, 4vw, 48px); font-weight: 700; letter-spacing: -.02em; line-height: 1.05; margin: 0; }
+  .headline span { color: var(--orange); }
+  .pitch { margin: 0; max-width: 460px; color: #D6DCE4; font-size: 17px; line-height: 1.55; }
+  .stage {
+    position: relative; height: 300px; border-radius: 16px; overflow: hidden; border: 1px solid var(--line);
+    background: radial-gradient(420px 220px at 50% 55%, rgba(244,119,53,.18), transparent 70%), #0B1018;
+  }
+  .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .stage .halo {
+    position: absolute; left: 50%; top: 50%; width: 260px; height: 260px; transform: translate(-50%, -50%);
+    background: radial-gradient(closest-side, rgba(10,15,22,.85), rgba(10,15,22,0)); pointer-events: none;
+  }
+  .stage .mark { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); filter: drop-shadow(0 0 24px rgba(244,119,53,.45)); }
+  .tools-title { margin: 4px 0 0; font-size: 20px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; }
+  .tools-title span { color: var(--orange); }
+  .tools { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
+  .tools li {
+    display: grid; justify-items: center; gap: 10px; padding: 18px 8px; border-radius: 12px;
+    background: var(--navy); border: 1px solid var(--line); font-size: 14px; font-weight: 600;
+  }
+  .tools svg { color: var(--orange); }
+
+  @media (max-width: 960px) { .brand-side { border-left: 0; border-top: 1px solid var(--line); } }
+
+  .ring { transform-box: fill-box; transform-origin: center; animation: pulse 1.6s ease-out infinite; }
+  .ring.b { animation-delay: .8s; }
+  @keyframes pulse { 0% { transform: scale(.4); opacity: .9; } 100% { transform: scale(1.3); opacity: 0; } }
+  .sound-ring { transform-box: fill-box; transform-origin: center; animation: sound-pulse 2.4s ease-out infinite; }
+  .sound-ring.second { animation-delay: 1.2s; }
+  @keyframes sound-pulse { 0% { transform: scale(.5); opacity: .9; } 75%, 100% { transform: scale(1.4); opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .ring { animation: none; opacity: .5; } .sound-ring { animation: none; opacity: .35; } }
+</style>
+</head>
+<body>
+<main class="shell">
+  <section class="form-side" aria-labelledby="title">
+    <div class="form-wrap">
+      <div class="brand">
+        <img src="voxwell-lockup-dark.svg" alt="Voxwell Voice Studio" width="304" height="114">
+      </div>
+
+      <h1 id="title">Welcome Back</h1>
+      <p class="sub" id="sub">Sign in to your studio</p>
+
+      <button class="google" id="google" type="button" aria-busy="false">
+        <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true">
+          <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+          <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+          <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+          <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+        </svg>
+        <span id="googleLabel">Continue with Google</span>
+      </button>
+      <div class="divider">or</div>
+
+      <form id="form" novalidate>
+        <div class="field hidden" id="nameField">
+          <label for="name">Name</label>
+          <input id="name" name="name" autocomplete="name" placeholder="Enter your name">
+        </div>
+        <div class="field">
+          <label for="email">Email address</label>
+          <input id="email" name="email" type="email" autocomplete="email" placeholder="Enter your email" required>
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <div class="input-wrap">
+            <input id="password" name="password" type="password" autocomplete="current-password" placeholder="Enter your password" required>
+            <button class="eye" id="eye" type="button" aria-label="Show password" aria-pressed="false">
+              <svg class="on" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+              <svg class="off" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.7 5.1A10.4 10.4 0 0 1 12 5c6.5 0 10 7 10 7a17.6 17.6 0 0 1-2.9 3.9M6.6 6.6C3.7 8.4 2 12 2 12s3.5 7 10 7a9.7 9.7 0 0 0 5.4-1.6M9.9 9.9a3 3 0 0 0 4.2 4.2M2 2l20 20"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="row" id="forgot"><a href="#" class="muted-link">Forgot password?</a></div>
+
+        <button class="primary" id="submit" type="submit" aria-busy="false">
+          <svg class="spinner" width="22" height="22" viewBox="0 0 40 40" aria-hidden="true">
+            <circle class="ring" cx="20" cy="20" r="14" fill="none" stroke="#171717" stroke-width="2.5"/>
+            <circle class="ring b" cx="20" cy="20" r="14" fill="none" stroke="#171717" stroke-width="2.5"/>
+            <circle cx="20" cy="20" r="4" fill="#171717"/>
+          </svg>
+          <span id="submitLabel">Sign in</span>
+          <svg class="arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </button>
+      </form>
+
+      <p class="switch"><span id="switchText">New to Voxwell?</span> <button type="button" id="switchBtn">Create an account</button></p>
+      <p class="local">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+        Your voices stay on your device.
+      </p>
+      <p class="sr-only" id="status" aria-live="polite"></p>
+    </div>
+  </section>
+
+  <aside class="brand-side" aria-label="About Voxwell">
+    <h2 class="headline">Your Voice. <span>Every Language.</span></h2>
+    <p class="pitch">Clone, design and dub voices across 646 languages — all running on your own machine.</p>
+
+    <div class="stage" aria-hidden="true">
+      <canvas id="wave"></canvas>
+      <div class="halo"></div>
+      <svg class="mark" width="132" height="132" viewBox="40 26 292 298">
+        <defs>
+          <linearGradient id="vv" x1="70" y1="70" x2="290" y2="330" gradientUnits="userSpaceOnUse"><stop stop-color="#F47735"/><stop offset="1" stop-color="#F3A92E"/></linearGradient>
+          <linearGradient id="vw" x1="186" y1="80" x2="186" y2="292" gradientUnits="userSpaceOnUse"><stop stop-color="#FFFFFF"/><stop offset="1" stop-color="#F5F1EC"/></linearGradient>
+          <clipPath id="vc"><path d="M98 125Q186 165 274 125L186 292Z"/></clipPath>
+        </defs>
+        <path d="M98 125Q186 165 274 125L186 292Z" fill="url(#vw)"/>
+        <g clip-path="url(#vc)">
+          <circle class="sound-ring" cx="186" cy="190" r="26" fill="none" stroke="#F3A92E" stroke-width="5"/>
+          <circle class="sound-ring second" cx="186" cy="190" r="26" fill="none" stroke="#FDBA74" stroke-width="5"/>
+        </g>
+        <circle cx="186" cy="190" r="16" fill="#182433"/>
+        <path d="M62 48 176 294 Q180 303 186 303 Q192 303 196 294 L310 48" fill="none" stroke="url(#vv)" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+
+    <p class="tools-title"><span>4 tools.</span> One studio.</p>
+    <ul class="tools">
+      <li>
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v5M8 22h8"/></svg>
+        Clone
+      </li>
+      <li>
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg>
+        Design
+      </li>
+      <li>
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="15" height="14" rx="2"/><path d="m22 8-5 4 5 4V8Z"/></svg>
+        Dub
+      </li>
+      <li>
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7V5h16v2M9 19h6M12 5v14"/></svg>
+        Dictate
+      </li>
+    </ul>
+  </aside>
+</main>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  /* Sign in / sign up */
+  const copy = {
+    signin: { title: 'Welcome Back', sub: 'Sign in to your studio', button: 'Sign in', busy: 'Signing in…', pw: 'current-password', switchText: 'New to Voxwell?', switchBtn: 'Create an account', doc: 'Voxwell — Sign in' },
+    signup: { title: 'Join the Studio', sub: 'Create your account and start creating voices', button: 'Create account', busy: 'Creating account…', pw: 'new-password', switchText: 'Already have an account?', switchBtn: 'Sign in', doc: 'Voxwell — Sign up' },
+  };
+  let mode = 'signin';
+  function setMode(next) {
+    mode = next;
+    const c = copy[mode];
+    $('nameField').classList.toggle('hidden', mode !== 'signup');
+    $('forgot').classList.toggle('hidden', mode !== 'signin');
+    $('password').setAttribute('autocomplete', c.pw);
+    $('title').textContent = c.title;
+    $('sub').textContent = c.sub;
+    $('submitLabel').textContent = c.button;
+    $('switchText').textContent = c.switchText;
+    $('switchBtn').textContent = c.switchBtn;
+    document.title = c.doc;
+    (mode === 'signup' ? $('name') : $('email')).focus();
+  }
+  $('switchBtn').addEventListener('click', () => setMode(mode === 'signin' ? 'signup' : 'signin'));
+  if (location.hash === '#signup') { setMode('signup'); document.activeElement.blur(); }
+
+  /* Show / hide password */
+  $('eye').addEventListener('click', () => {
+    const shown = $('password').type === 'text';
+    $('password').type = shown ? 'password' : 'text';
+    $('password').classList.add('pw');
+    $('eye').setAttribute('aria-pressed', String(!shown));
+    $('eye').setAttribute('aria-label', shown ? 'Show password' : 'Hide password');
+  });
+
+  /* Submit: the logo's signal is the loader (demo only, no real auth) */
+  $('form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const btn = $('submit');
+    if (btn.getAttribute('aria-busy') === 'true') return;
+    btn.setAttribute('aria-busy', 'true');
+    $('submitLabel').textContent = copy[mode].busy;
+    $('status').textContent = copy[mode].busy;
+    energy = 1;
+    setTimeout(() => {
+      btn.setAttribute('aria-busy', 'false');
+      $('submitLabel').textContent = copy[mode].button;
+      $('status').textContent = '';
+    }, 1800);
+  });
+
+  /* Google button (demo only, not connected to Google) */
+  $('google').addEventListener('click', () => {
+    const btn = $('google');
+    if (btn.getAttribute('aria-busy') === 'true') return;
+    btn.setAttribute('aria-busy', 'true');
+    $('googleLabel').textContent = 'Connecting to Google…';
+    $('status').textContent = 'Connecting to Google…';
+    energy = 1;
+    setTimeout(() => {
+      btn.setAttribute('aria-busy', 'false');
+      $('googleLabel').textContent = 'Continue with Google';
+      $('status').textContent = '';
+    }, 1800);
+  });
+
+  /* Brand wave inside the stage: WebGL plasma lines, 2D canvas fallback; both react to typing */
+  const canvas = $('wave');
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let energy = 0;
+  document.addEventListener('input', () => { energy = Math.min(1, energy + .3); });
+
+  const plasmaFrag = `
+    precision highp float;
+    uniform vec2 iResolution; uniform float iTime; uniform float uEnergy;
+    const float overallSpeed = 0.2;
+    const float gridSmoothWidth = 0.015;
+    const float scale = 3.0; // zoomed in from 5.0: the stage is far narrower than a full screen
+    const vec4 lineColor = vec4(0.957, 0.467, 0.208, 1.0);
+    const float minLineWidth = 0.01;
+    const float maxLineWidth = 0.2;
+    const float lineSpeed = 1.0 * overallSpeed;
+    const float lineAmplitude = 1.0;
+    const float lineFrequency = 0.2;
+    const float warpSpeed = 0.2 * overallSpeed;
+    const float warpFrequency = 0.5;
+    const float warpAmplitude = 1.0;
+    const float offsetFrequency = 0.5;
+    const float offsetSpeed = 1.33 * overallSpeed;
+    const float minOffsetSpread = 0.6;
+    const float maxOffsetSpread = 2.0;
+    const int linesPerGroup = 16;
+    #define drawCircle(pos, radius, coord) smoothstep(radius + gridSmoothWidth, radius, length(coord - (pos)))
+    #define drawSmoothLine(pos, halfWidth, t) smoothstep(halfWidth, 0.0, abs(pos - (t)))
+    #define drawCrispLine(pos, halfWidth, t) smoothstep(halfWidth + gridSmoothWidth, halfWidth, abs(pos - (t)))
+    float random(float t) { return (cos(t) + cos(t * 1.3 + 1.3) + cos(t * 1.4 + 1.4)) / 3.0; }
+    float getPlasmaY(float x, float horizontalFade, float offset) {
+      return random(x * lineFrequency + iTime * lineSpeed) * horizontalFade * lineAmplitude * (1.0 + uEnergy * 0.8) + offset;
+    }
+    void main() {
+      vec2 fragCoord = gl_FragCoord.xy;
+      vec2 uv = fragCoord.xy / iResolution.xy;
+      vec2 space = (fragCoord - iResolution.xy / 2.0) / iResolution.x * 2.0 * scale;
+      float horizontalFade = 1.0 - (cos(uv.x * 6.28) * 0.5 + 0.5);
+      float verticalFade = 1.0 - (cos(uv.y * 6.28) * 0.5 + 0.5);
+      space.y += random(space.x * warpFrequency + iTime * warpSpeed) * warpAmplitude * (0.5 + horizontalFade);
+      space.x += random(space.y * warpFrequency + iTime * warpSpeed + 2.0) * warpAmplitude * horizontalFade;
+      vec4 lines = vec4(0.0);
+      for (int l = 0; l < linesPerGroup; l++) {
+        float normalizedLineIndex = float(l) / float(linesPerGroup);
+        float offsetTime = iTime * offsetSpeed;
+        float offsetPosition = float(l) + space.x * offsetFrequency;
+        float rand = random(offsetPosition + offsetTime) * 0.5 + 0.5;
+        float halfWidth = mix(minLineWidth, maxLineWidth, rand * horizontalFade) / 2.0;
+        float offset = random(offsetPosition + offsetTime * (1.0 + normalizedLineIndex)) * mix(minOffsetSpread, maxOffsetSpread, horizontalFade);
+        float linePosition = getPlasmaY(space.x, horizontalFade, offset);
+        float line = drawSmoothLine(linePosition, halfWidth, space.y) / 2.0 + drawCrispLine(linePosition, halfWidth * 0.15, space.y);
+        float circleX = mod(float(l) + iTime * lineSpeed, 25.0) - 12.0;
+        vec2 circlePosition = vec2(circleX, getPlasmaY(circleX, horizontalFade, offset));
+        float circle = drawCircle(circlePosition, 0.01, space) * 4.0;
+        lines += (line + circle) * lineColor * rand;
+      }
+      vec4 fragColor = mix(vec4(0.059, 0.078, 0.110, 1.0), vec4(0.094, 0.141, 0.200, 1.0), uv.x);
+      fragColor *= verticalFade;
+      fragColor.a = 1.0;
+      fragColor += lines * (1.0 + uEnergy * 0.6);
+      gl_FragColor = fragColor;
+    }`;
+
+  function startPlasma() {
+    const gl = canvas.getContext('webgl');
+    if (!gl) return false;
+    const compile = (type, src) => {
+      const s = gl.createShader(type);
+      gl.shaderSource(s, src);
+      gl.compileShader(s);
+      return gl.getShaderParameter(s, gl.COMPILE_STATUS) ? s : null;
+    };
+    const vs = compile(gl.VERTEX_SHADER, 'attribute vec2 p; void main(){ gl_Position = vec4(p, 0., 1.); }');
+    const fs = compile(gl.FRAGMENT_SHADER, plasmaFrag);
+    if (!vs || !fs) return false;
+    const prog = gl.createProgram();
+    gl.attachShader(prog, vs);
+    gl.attachShader(prog, fs);
+    gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return false;
+    gl.useProgram(prog);
+    gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+    const loc = gl.getAttribLocation(prog, 'p');
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    const uTime = gl.getUniformLocation(prog, 'iTime');
+    const uRes = gl.getUniformLocation(prog, 'iResolution');
+    const uEnergy = gl.getUniformLocation(prog, 'uEnergy');
+    const t0 = performance.now();
+
+    function frame() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      const w = Math.round(canvas.clientWidth * dpr), h = Math.round(canvas.clientHeight * dpr);
+      if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; gl.viewport(0, 0, w, h); }
+      energy *= .965;
+      gl.uniform1f(uTime, 6 + (performance.now() - t0) / 1000);
+      gl.uniform2f(uRes, w, h);
+      gl.uniform1f(uEnergy, energy);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      if (!reduceMotion) requestAnimationFrame(frame);
+    }
+    frame();
+    if (reduceMotion) window.addEventListener('resize', frame);
+    return true;
+  }
+
+  if (!startPlasma()) startLines();
+
+  function startLines() {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  const layers = [
+    { amp: 34, freq: 1.4, speed: .6,   phase: 0,   alpha: .9,  width: 2.5, y: .5 },
+    { amp: 24, freq: 2.2, speed: -.45, phase: 1.7, alpha: .45, width: 2,   y: .52 },
+    { amp: 46, freq: 1.0, speed: .3,   phase: 3.1, alpha: .25, width: 1.5, y: .48 },
+    { amp: 16, freq: 3.1, speed: .9,   phase: .6,  alpha: .3,  width: 1.5, y: .54 },
+  ];
+  let w = 0, h = 0, t = 0;
+
+  function resize() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    w = canvas.clientWidth; h = canvas.clientHeight;
+    canvas.width = w * dpr; canvas.height = h * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, w, h);
+    const stroke = ctx.createLinearGradient(0, 0, w, 0);
+    stroke.addColorStop(0, 'rgba(244,119,53,0)');
+    stroke.addColorStop(.2, '#F47735');
+    stroke.addColorStop(.8, '#F3A92E');
+    stroke.addColorStop(1, 'rgba(243,169,46,0)');
+    for (const L of layers) {
+      ctx.beginPath();
+      for (let x = 0; x <= w; x += 4) {
+        const u = x / w;
+        const envelope = Math.sin(Math.PI * u);
+        const breathe = .75 + .25 * Math.sin(t * .7 + L.phase);
+        const y = h * L.y + Math.sin(u * Math.PI * 2 * L.freq + t * L.speed + L.phase) * L.amp * (1 + energy * 1.6) * envelope * breathe;
+        x ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+      }
+      ctx.globalAlpha = L.alpha;
+      ctx.lineWidth = L.width;
+      ctx.strokeStyle = stroke;
+      ctx.shadowColor = 'rgba(244,119,53,.6)';
+      ctx.shadowBlur = 14;
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function loop() {
+    t += .016;
+    energy *= .965;
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  resize();
+  window.addEventListener('resize', () => { resize(); if (reduceMotion) draw(); });
+  if (reduceMotion) draw(); else requestAnimationFrame(loop);
+  }
+</script>
+</body>
+</html>
