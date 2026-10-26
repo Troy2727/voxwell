@@ -123,10 +123,12 @@ export default function PhoneCard() {
           <Button disabled={busy} onClick={() => save(true)}><Phone /> Turn on</Button>
         )}
         <Button variant="outline" disabled={busy} onClick={() => save(phone.enabled)}><Save /> Save</Button>
-        <Muted>
-          {status}
-          {phone.enabled && !phone.greeting_ready && ' · record a greeting, or calls just hang up'}
-        </Muted>
+        {phone.enabled && (
+          <Muted>
+            {status}
+            {!phone.greeting_ready && ' · record a greeting, or calls just hang up'}
+          </Muted>
+        )}
       </div>
       <ErrorAlert message={error} />
       {phone.calls.length > 0 && (

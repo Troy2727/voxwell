@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, type LucideIcon } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -53,6 +53,19 @@ export function ErrorAlert({ message }: { message: string }) {
       <AlertCircle />
       <AlertDescription className="break-words">{message}</AlertDescription>
     </Alert>
+  );
+}
+
+/** Nothing to show yet: an icon, a short title and what to do next. */
+export function EmptyState({ icon: Icon, title, children }: { icon: LucideIcon; title: string; children?: ReactNode }) {
+  return (
+    <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed px-6 py-10 text-center">
+      <div className="bg-muted text-muted-foreground mb-1 flex size-10 items-center justify-center rounded-full">
+        <Icon className="size-5" />
+      </div>
+      <p className="font-medium">{title}</p>
+      {children && <p className="text-muted-foreground max-w-sm text-sm">{children}</p>}
+    </div>
   );
 }
 

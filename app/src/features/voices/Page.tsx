@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Pencil } from 'lucide-react';
+import { Library, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiUrl, listVoices, sendJson, type Voice } from '../../api';
 import { AudioResult } from '@/components/audio-result';
 import { ConfirmButton } from '@/components/confirm-button';
-import { ErrorAlert, message, Muted, Page as PageLayout } from '@/components/page';
+import { EmptyState, ErrorAlert, message, Page as PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -29,11 +29,9 @@ export default function Page() {
       <ErrorAlert message={error} />
       {voices === null && <Skeleton className="h-32 w-full" />}
       {voices?.length === 0 && !error && (
-        <Card>
-          <CardContent>
-            <Muted>No saved voices yet. Upload one in Voice cloning or design one in Voice design.</Muted>
-          </CardContent>
-        </Card>
+        <EmptyState icon={Library} title="No saved voices yet">
+          Upload one in Voice cloning, design one in Voice design or add one from the Gallery.
+        </EmptyState>
       )}
       {voices?.map((v) => (
         <VoiceCard key={v.id} voice={v} onChanged={refresh} onError={(e) => setError(message(e))} />

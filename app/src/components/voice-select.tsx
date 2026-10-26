@@ -21,7 +21,14 @@ export function VoiceSelect({ voices, value, onChange, disabled, defaultLabel = 
   ];
   return (
     <div className={disabled ? 'pointer-events-none opacity-50' : undefined} aria-disabled={disabled}>
-      <VoicePicker voices={options} value={value} onValueChange={onChange} placeholder="Choose a voice" />
+      <VoicePicker
+        voices={options}
+        value={value}
+        onValueChange={onChange}
+        placeholder="Choose a voice"
+        // Look like the other dropdowns (SelectTrigger), not like a button.
+        className="border-input dark:bg-input/30 dark:hover:bg-input/50 bg-transparent px-3 font-normal hover:bg-transparent"
+      />
     </div>
   );
 }

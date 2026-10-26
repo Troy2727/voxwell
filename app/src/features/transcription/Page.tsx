@@ -4,7 +4,7 @@ import { api, apiUrl } from '../../api';
 import { ChoiceSelect } from '@/components/choice-select';
 import { FileDrop } from '@/components/file-drop';
 import { JobProgress } from '@/components/job-progress';
-import { ErrorAlert, Field, message, Muted, Page as PageLayout, Section } from '@/components/page';
+import { EmptyState, ErrorAlert, Field, message, Page as PageLayout, Section } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -149,7 +149,7 @@ export default function Page() {
       <div className="flex flex-col gap-2">
         <h2 className="text-muted-foreground text-sm font-medium tracking-wide uppercase">Your transcripts</h2>
         {list === null && <Skeleton className="h-12 w-full" />}
-        {list?.length === 0 && <Muted>Nothing transcribed yet.</Muted>}
+        {list?.length === 0 && <EmptyState icon={FileText} title="Nothing transcribed yet">Your transcripts are listed here.</EmptyState>}
         {list?.map((j) => (
           <button
             key={j.id}

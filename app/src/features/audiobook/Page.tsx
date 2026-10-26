@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { Download, Headphones, Play } from 'lucide-react';
+import { BookOpen, Download, Headphones, Play } from 'lucide-react';
 import { api, apiUrl, listVoices, sendJson, type Voice } from '../../api';
 import { AudioResult } from '@/components/audio-result';
 import { ChoiceSelect } from '@/components/choice-select';
 import { FileDrop } from '@/components/file-drop';
 import { JobProgress } from '@/components/job-progress';
-import { ErrorAlert, Field, message, Muted, Page as PageLayout, Section } from '@/components/page';
+import { EmptyState, ErrorAlert, Field, message, Muted, Page as PageLayout, Section } from '@/components/page';
 import { VoiceSelect } from '@/components/voice-select';
 import {
   AlertDialog,
@@ -113,7 +113,7 @@ export default function Page() {
       <div className="flex flex-col gap-2">
         <h2 className="text-muted-foreground text-sm font-medium tracking-wide uppercase">Your books</h2>
         {books === null && <Skeleton className="h-12 w-full" />}
-        {books?.length === 0 && <Muted>No books yet. Import one above.</Muted>}
+        {books?.length === 0 && <EmptyState icon={BookOpen} title="No books yet">Import an EPUB, TXT or Markdown file above.</EmptyState>}
         {books?.map((b) => (
           <button
             key={b.id}

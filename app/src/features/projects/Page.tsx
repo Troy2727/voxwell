@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { Download, Pencil } from 'lucide-react';
+import { Download, FolderOpen, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, apiUrl, sendJson } from '../../api';
 import { AudioResult } from '@/components/audio-result';
 import { ConfirmButton } from '@/components/confirm-button';
 import { JobProgress } from '@/components/job-progress';
-import { ErrorAlert, message, Muted, Page as PageLayout } from '@/components/page';
+import { EmptyState, ErrorAlert, message, Muted, Page as PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -103,11 +103,9 @@ export default function Page() {
       <ErrorAlert message={error} />
       {items === null && <Skeleton className="h-32 w-full" />}
       {items?.length === 0 && !error && (
-        <Card>
-          <CardContent>
-            <Muted>Nothing here yet. Speech, stories and audiobooks you make, videos you dub and files you transcribe appear here.</Muted>
-          </CardContent>
-        </Card>
+        <EmptyState icon={FolderOpen} title="Nothing here yet">
+          Speech, stories and audiobooks you make, videos you dub and files you transcribe appear here.
+        </EmptyState>
       )}
       {items?.map((item) => (
         <ProjectCard key={`${item.kind}-${item.id}`} item={item} onChanged={refresh} onError={(e) => setError(message(e))} />
