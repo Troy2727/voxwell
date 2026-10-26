@@ -9,6 +9,15 @@ client = TestClient(app)
 FEATURE_IDS = ["voice_cloning", "voice_design", "voices", "dubbing", "dictation", "transcription", "projects"]
 
 
+def test_https_trusts_the_os_certificate_store():
+    """Model downloads/cache checks must work behind TLS-inspecting networks (see main.py)."""
+    import ssl
+
+    import truststore
+
+    assert ssl.SSLContext is truststore.SSLContext
+
+
 def test_health_lists_all_features():
     assert client.get("/api/health").json()["features"] == FEATURE_IDS
 

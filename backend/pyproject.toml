@@ -9,6 +9,7 @@ dependencies = [
     "uvicorn>=0.30",
     "python-multipart>=0.0.9",
     "platformdirs>=4",
+    "truststore>=0.10",  # trust the OS certificate store (corporate proxies, antivirus TLS inspection)
     # Models (imported lazily by each feature).
     "chatterbox-tts==0.1.6",
     "parler-tts @ git+https://github.com/huggingface/parler-tts.git",

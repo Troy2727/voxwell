@@ -1,11 +1,17 @@
 import os
 from dataclasses import asdict
 
+import truststore
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from voxwell import voices
 from voxwell.features import FEATURES
+
+# Model downloads must work behind TLS-inspecting proxies and antivirus, whose certificates
+# live in the OS store, not in Python's bundled one. huggingface_hub does not fall back to the
+# local model cache on SSL errors, so without this even downloaded models fail to load there.
+truststore.inject_into_ssl()
 
 app = FastAPI(title="Voxwell")
 # The renderer runs on the Vite dev server or from file:// (origin "null").
