@@ -1,8 +1,8 @@
-<img src="docs/logo.svg" alt="" width="88" />
-
-# Voxwell
-
-Voice cloning, voice design, video dubbing and dictation that run entirely on your own machine. MIT licensed.
+<div align="center">
+  <img src="docs/logo.svg" alt="" width="88" />
+  <h1>Voxwell</h1>
+  <p>Voice cloning, voice design, video dubbing and dictation that run entirely on your own machine. MIT licensed.</p>
+</div>
 
 ## Develop
 
