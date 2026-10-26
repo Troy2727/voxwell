@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from voxwell import voices
 from voxwell.features import FEATURES
+from voxwell.features.integrations import openai_api
 
 # Model downloads must work behind TLS-inspecting proxies and antivirus, whose certificates
 # live in the OS store, not in Python's bundled one. huggingface_hub does not fall back to the
@@ -45,6 +46,8 @@ def get_voices():
 
 for feature in FEATURES:
     app.include_router(feature.router, prefix=f"/api/{feature.id}")
+# OpenAI-compatible audio API, at the path OpenAI clients expect (base URL .../v1).
+app.include_router(openai_api.router, prefix="/v1")
 
 
 def run():

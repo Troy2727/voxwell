@@ -1,0 +1,239 @@
+import io
+import json
+import shutil
+import urllib.error
+import wave
+
+import pytest
+from fastapi.testclient import TestClient
+
+from voxwell import voices
+from voxwell.features.dictation import engine as stt
+from voxwell.features.dictation.engine import AudioError, Segment, Transcript
+from voxwell.features.integrations import mcp_server
+from voxwell.features.voice_cloning import engine as tts
+from voxwell.main import app
+
+client = TestClient(app)
+needs_ffmpeg = pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg is not installed")
+RATE = 24000
+
+
+def wav_bytes(seconds: float = 1.0) -> bytes:
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(RATE)
+        w.writeframes(b"\x10\x00\xf0\xff" * int(seconds * RATE / 2))
+    return buf.getvalue()
+
+
+def seconds(data: bytes) -> float:
+    with wave.open(io.BytesIO(data)) as w:
+        return w.getnframes() / w.getframerate()
+
+
+@pytest.fixture
+def fake_tts(monkeypatch):
+    calls = []
+    monkeypatch.setattr(tts, "synthesize", lambda t, l, r=None: calls.append((t, l, r and r.stem)) or wav_bytes())
+    return calls
+
+
+@pytest.fixture
+def fake_stt(monkeypatch):
+    t = Transcript("Hello there. Bye.", "en", [Segment(0.0, 1.0, "Hello there."), Segment(1.5, 2.0, "Bye.")])
+    monkeypatch.setattr(stt, "transcribe", lambda p, language=None, on_progress=None: t)
+
+
+def speech(**body):
+    return client.post("/v1/audio/speech", json={"input": "Hello there.", "response_format": "wav", **body})
+
+
+# --- /v1/audio/speech ----------------------------------------------------------------------
+
+
+def test_models():
+    assert {m["id"] for m in client.get("/v1/models").json()["data"]} >= {"tts-1", "whisper-1"}
+
+
+def test_speech_wav(fake_tts):
+    r = speech(model="tts-1", voice="alloy")
+    assert r.status_code == 200 and r.headers["content-type"] == "audio/wav"
+    assert seconds(r.content) == pytest.approx(1.0, abs=0.01)
+    assert fake_tts == [("Hello there.", "en", None)]  # OpenAI voice names use the default voice
+
+
+def test_voice_by_name_or_id(fake_tts):
+    v = voices.save_voice("Narrator Anna", wav_bytes(), "upload")
+    speech(voice="narrator anna")
+    speech(voice=v.id, language="es")
+    assert fake_tts == [("Hello there.", "en", v.id), ("Hello there.", "es", v.id)]
+
+
+def test_unknown_voice_lists_saved_voices(fake_tts):
+    voices.save_voice("Anna", wav_bytes(), "upload")
+    r = speech(voice="Bob")
+    assert r.status_code == 400
+    assert r.json()["error"] == {"message": "Unknown voice 'Bob'. Saved voices: Anna.", "type": "invalid_request_error", "param": "voice"}
+
+
+def test_long_input_is_spoken_in_pieces(fake_tts):
+    text = " ".join(f"This is sentence number {i} of a long text." for i in range(20))
+    r = speech(input=text)
+    assert r.status_code == 200 and len(fake_tts) > 1
+    assert " ".join(c[0] for c in fake_tts).split() == text.split()
+
+
+def test_pcm_is_raw_samples(fake_tts):
+    r = speech(response_format="pcm")
+    assert r.content == wav_bytes()[44:]
+
+
+@needs_ffmpeg
+@pytest.mark.parametrize("fmt,magic", [("mp3", (b"ID3", b"\xff\xfb", b"\xff\xf3")), ("flac", (b"fLaC",)), ("opus", (b"OggS",))])
+def test_encoded_formats(fake_tts, fmt, magic):
+    r = speech(response_format=fmt)
+    assert r.status_code == 200 and r.content.startswith(magic)
+
+
+@needs_ffmpeg
+def test_speed(fake_tts):
+    assert seconds(speech(speed=2.0).content) == pytest.approx(0.5, abs=0.05)
+
+
+@pytest.mark.parametrize("body,param", [
+    ({"input": ""}, "input"), ({"input": "x" * 4097}, "input"), ({"response_format": "midi"}, "response_format"),
+    ({"speed": 9}, "speed"), ({"language": "xx"}, "language"),
+])
+def test_speech_rejects(fake_tts, body, param):
+    r = speech(**body)
+    assert r.status_code == 400 and r.json()["error"]["param"] == param and fake_tts == []
+
+
+# --- /v1/audio/transcriptions --------------------------------------------------------------
+
+
+def transcribe(fmt="json", data=b"audio"):
+    return client.post("/v1/audio/transcriptions", files={"file": ("a.mp3", data)}, data={"model": "whisper-1", "response_format": fmt})
+
+
+@pytest.mark.parametrize("fmt,expected", [
+    ("json", {"text": "Hello there. Bye."}),
+    ("text", "Hello there. Bye."),
+    ("srt", "1\n00:00:00,000 --> 00:00:01,000\nHello there.\n"),
+    ("vtt", "WEBVTT\n\n00:00:00.000 --> 00:00:01.000\nHello there.\n"),
+])
+def test_transcription_formats(fake_stt, fmt, expected):
+    r = transcribe(fmt)
+    assert r.status_code == 200
+    if isinstance(expected, dict):
+        assert r.json() == expected
+    else:
+        assert r.text.startswith(expected)
+
+
+def test_verbose_json(fake_stt):
+    body = transcribe("verbose_json").json()
+    assert body["language"] == "en" and body["duration"] == 2.0
+    assert body["segments"][1] == {"id": 1, "start": 1.5, "end": 2.0, "text": "Bye."}
+
+
+def test_transcription_errors(monkeypatch, fake_stt):
+    assert transcribe(data=b"").status_code == 400
+    assert transcribe("pdf").status_code == 400
+
+    def bad(*a, **k):
+        raise AudioError("Could not decode the audio.")
+
+    monkeypatch.setattr(stt, "transcribe", bad)
+    r = transcribe()
+    assert r.status_code == 400 and r.json()["error"]["message"] == "Could not decode the audio."
+
+
+# --- integrations info ---------------------------------------------------------------------
+
+
+def test_info():
+    body = client.get("/api/integrations/info").json()
+    assert body["api_base"] == "http://127.0.0.1:8765/v1"
+    assert body["mcp"]["args"][-1] == "voxwell-mcp" and body["mcp"]["args"][2].endswith("backend")
+    assert body["mcp"]["env"]["UV_SYSTEM_CERTS"] == "1"  # uv must work behind TLS-inspecting networks
+
+
+# --- MCP server ----------------------------------------------------------------------------
+
+
+@pytest.fixture
+def mcp(monkeypatch):
+    """Route the MCP server's HTTP calls into the app, so tool calls run end to end."""
+
+    def request(path, data=None, headers=None):
+        r = client.request("POST" if data else "GET", path, content=data, headers=headers or {})
+        if r.status_code >= 400:
+            raise mcp_server.ToolError(r.json().get("error", {}).get("message", r.text))
+        return r.content
+
+    monkeypatch.setattr(mcp_server, "_request", request)
+
+    def call(method, params=None, msg_id=1):
+        return mcp_server.handle({"jsonrpc": "2.0", "id": msg_id, "method": method, "params": params or {}})
+
+    return call
+
+
+def tool(mcp, name, **arguments):
+    return mcp("tools/call", {"name": name, "arguments": arguments})["result"]
+
+
+def test_mcp_handshake_and_tool_list(mcp):
+    init = mcp("initialize", {"protocolVersion": "2025-03-26", "capabilities": {}, "clientInfo": {"name": "test"}})
+    assert init["result"]["protocolVersion"] == "2025-03-26" and "tools" in init["result"]["capabilities"]
+    assert mcp_server.handle({"jsonrpc": "2.0", "method": "notifications/initialized"}) is None
+    assert {t["name"] for t in mcp("tools/list")["result"]["tools"]} == {"list_voices", "speak", "transcribe"}
+    assert mcp("ping")["result"] == {}
+    assert mcp("resources/list")["error"]["code"] == -32601
+
+
+def test_mcp_speak_saves_a_wav(mcp, fake_tts, tmp_path):
+    voices.save_voice("Anna", wav_bytes(), "upload")
+    out = tmp_path / "hello.mp3"  # the extension is corrected to .wav
+    result = tool(mcp, "speak", text="Hi there", voice="Anna", output_path=str(out))
+    assert result["isError"] is False and str(out.with_suffix(".wav")) in result["content"][0]["text"]
+    assert seconds(out.with_suffix(".wav").read_bytes()) == pytest.approx(1.0, abs=0.01)
+
+
+def test_mcp_speak_default_location(mcp, fake_tts, isolated_data_dir):
+    result = tool(mcp, "speak", text="Hi")
+    assert result["isError"] is False and len(list((isolated_data_dir / "mcp").glob("speech-*.wav"))) == 1
+
+
+def test_mcp_transcribe_and_list_voices(mcp, fake_stt, tmp_path):
+    f = tmp_path / "talk.mp3"
+    f.write_bytes(b"audio")
+    assert tool(mcp, "transcribe", file_path=str(f))["content"][0]["text"] == "Hello there. Bye."
+    assert "No saved voices" in tool(mcp, "list_voices")["content"][0]["text"]
+
+
+def test_mcp_tool_errors_are_reported_not_raised(mcp, fake_tts, tmp_path):
+    assert tool(mcp, "speak", text="Hi", voice="Nobody")["isError"] is True
+    assert tool(mcp, "transcribe", file_path=str(tmp_path / "missing.wav"))["content"][0]["text"].startswith("File not found")
+    assert mcp("tools/call", {"name": "nope"})["error"]["code"] == -32602
+
+
+def test_mcp_when_voxwell_is_closed(monkeypatch):
+    def refuse(*a, **k):
+        raise urllib.error.URLError("connection refused")
+
+    monkeypatch.setattr(mcp_server.urllib.request, "urlopen", refuse)
+    result = mcp_server.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "list_voices"}})
+    assert result["result"]["isError"] and "not running" in result["result"]["content"][0]["text"]
+
+
+def test_mcp_stdio_loop(monkeypatch, capsys):
+    lines = [json.dumps({"jsonrpc": "2.0", "id": 7, "method": "ping"}), "not json", ""]
+    monkeypatch.setattr(mcp_server.sys, "stdin", io.StringIO("\n".join(lines) + "\n"))
+    mcp_server.main()
+    out = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+    assert out == [{"jsonrpc": "2.0", "id": 7, "result": {}}, {"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "Parse error"}}]

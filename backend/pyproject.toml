@@ -51,6 +51,7 @@ allow-direct-references = true
 
 [project.scripts]
 voxwell = "voxwell.main:run"
+voxwell-mcp = "voxwell.features.integrations.mcp_server:main"
 
 [dependency-groups]
 dev = ["pytest>=8", "httpx>=0.27"]

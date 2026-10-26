@@ -4,12 +4,15 @@ const { spawn } = require('node:child_process');
 const dictation = require('./dictation.cjs');
 
 const BACKEND_PORT = process.env.VOXWELL_PORT || '8765';
+// uv must trust the OS certificate store, or installing/updating dependencies fails behind
+// TLS-inspecting proxies and antivirus.
+const UV_TLS = { UV_SYSTEM_CERTS: '1' };
 let backend;
 
 function startBackend() {
   backend = spawn('uv', ['run', 'voxwell'], {
     cwd: path.join(__dirname, '..', '..', 'backend'),
-    env: { ...process.env, VOXWELL_PORT: BACKEND_PORT },
+    env: { ...UV_TLS, ...process.env, VOXWELL_PORT: BACKEND_PORT },
     stdio: 'inherit',
   });
 }

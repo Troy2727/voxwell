@@ -8,7 +8,7 @@ client = TestClient(app)
 
 FEATURE_IDS = [
     "voice_cloning", "voice_design", "voices", "gallery", "stories", "audiobook", "dubbing", "batch", "dictation",
-    "transcription", "projects",
+    "transcription", "tools", "integrations", "projects",
 ]
 
 
