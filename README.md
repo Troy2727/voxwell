@@ -1,3 +1,5 @@
+<img src="docs/logo.svg" alt="" width="88" />
+
 # Voxwell
 
 Voice cloning, voice design, video dubbing and dictation that run entirely on your own machine. MIT licensed.

@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Voxwell">
+  <defs>
+    <linearGradient id="v-gradient" x1="70" y1="70" x2="290" y2="330" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F47735"/>
+      <stop offset="1" stop-color="#F3A92E"/>
+    </linearGradient>
+    <style>
+      .voice-ball { transform-box: fill-box; transform-origin: center bottom; animation: ball-bounce 1.2s infinite; }
+      @keyframes ball-bounce {
+        0%, 100% { transform: translateY(0) scale(1.25, .8); animation-timing-function: ease-out; }
+        12% { transform: translateY(-6px) scale(.92, 1.1); animation-timing-function: ease-out; }
+        50% { transform: translateY(-14px) scale(1); animation-timing-function: ease-in; }
+        88% { transform: translateY(-5px) scale(.94, 1.08); animation-timing-function: ease-in; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .voice-ball { animation: none; }
+      }
+    </style>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="#1B283B"/>
+  <g transform="translate(256 262) scale(1.22) translate(-186 -176)">
+    <path d="M98 125Q186 165 274 125L186 292Z" fill="#FFFFFF"/>
+    <circle class="voice-ball" cx="186" cy="190" r="22" fill="#182433"/>
+    <path d="M62 48 176 294 Q180 303 186 303 Q192 303 196 294 L310 48" fill="none" stroke="url(#v-gradient)" stroke-width="44" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

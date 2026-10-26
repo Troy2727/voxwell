@@ -18,7 +18,8 @@ body { margin: 0; }
 
 .shell { display: flex; height: 100vh; }
 .sidebar { width: 220px; padding: 16px; background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 4px; }
-.brand { font-weight: 700; font-size: 20px; color: var(--accent); margin-bottom: 16px; }
+.brand { font-weight: 700; font-size: 20px; color: var(--accent); margin-bottom: 16px; display: flex; align-items: center; gap: 10px; }
+.brand img { width: 28px; height: 28px; }
 .nav { text-align: left; background: none; border: none; color: var(--muted); padding: 8px 12px; border-radius: var(--radius); cursor: pointer; }
 .nav.active, .nav:hover { background: var(--border); color: var(--text); }
 .status { margin-top: auto; font-size: 12px; color: var(--muted); }

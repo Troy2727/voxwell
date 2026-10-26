@@ -15,7 +15,10 @@ export default function App() {
   return (
     <div className="shell">
       <nav className="sidebar">
-        <div className="brand">Voxwell</div>
+        <div className="brand">
+          <img src="favicon.svg" alt="" />
+          Voxwell
+        </div>
         {FEATURES.map((f) => (
           <button key={f.id} className={f.id === active ? 'nav active' : 'nav'} onClick={() => setActive(f.id)}>
             {f.title}
