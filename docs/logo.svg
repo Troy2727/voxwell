@@ -27,7 +27,7 @@
       @keyframes ball-bounce {
         0%, 100% { transform: translateY(0) scale(1.3, .75); animation-timing-function: ease-out; }
         12% { transform: translateY(-8px) scale(.9, 1.12); animation-timing-function: ease-out; }
-        50% { transform: translateY(-24px) scale(1); animation-timing-function: ease-in; }
+        50% { transform: translateY(-18px) scale(1); animation-timing-function: ease-in; }
         88% { transform: translateY(-6px) scale(.92, 1.1); animation-timing-function: ease-in; }
       }
       @media (prefers-reduced-motion: reduce) {
