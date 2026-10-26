@@ -10,7 +10,7 @@
 - **Speech**: Stories (a script with a voice per speaker) and Audiobook (EPUB, TXT or Markdown, chapter by chapter, with resume).
 - **Video**: dub videos into another language, one at a time, in a batch, or by watching a folder.
 - **Text**: dictation and Transcribe (TXT, SRT or VTT).
-- **Tools**: convert a recording to another voice, compare voices, fit audio to a length, inspect media files.
+- **Tools**: convert a recording to another voice, AI direction (describe how a line should sound; a local AI model sets the delivery), compare voices, fit audio to a length, inspect media files.
 - **Projects**: everything you make, in one list.
 - **Integrations**: an OpenAI-compatible API at `http://127.0.0.1:8765/v1` and an MCP server for AI assistants. The Integrations page shows how to connect them.
 

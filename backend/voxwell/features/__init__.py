@@ -3,20 +3,22 @@ from dataclasses import dataclass
 
 from fastapi import APIRouter
 
-from voxwell.features.audiobook.router import router as audiobook
+# Routers are imported under *_router names: binding a feature's own name (e.g. `tools`) here
+# would replace the voxwell.features.tools package attribute with its router object.
+from voxwell.features.audiobook.router import router as audiobook_router
 from voxwell.features.batch import watch as batch_watch
-from voxwell.features.batch.router import router as batch
-from voxwell.features.dictation.router import router as dictation
-from voxwell.features.dubbing.router import router as dubbing
-from voxwell.features.gallery.router import router as gallery
-from voxwell.features.integrations.router import router as integrations
-from voxwell.features.projects.router import router as projects
-from voxwell.features.stories.router import router as stories
-from voxwell.features.tools.router import router as tools
-from voxwell.features.transcription.router import router as transcription
-from voxwell.features.voice_cloning.router import router as voice_cloning
-from voxwell.features.voice_design.router import router as voice_design
-from voxwell.features.voices.router import router as voices
+from voxwell.features.batch.router import router as batch_router
+from voxwell.features.dictation.router import router as dictation_router
+from voxwell.features.dubbing.router import router as dubbing_router
+from voxwell.features.gallery.router import router as gallery_router
+from voxwell.features.integrations.router import router as integrations_router
+from voxwell.features.projects.router import router as projects_router
+from voxwell.features.stories.router import router as stories_router
+from voxwell.features.tools.router import router as tools_router
+from voxwell.features.transcription.router import router as transcription_router
+from voxwell.features.voice_cloning.router import router as voice_cloning_router
+from voxwell.features.voice_design.router import router as voice_design_router
+from voxwell.features.voices.router import router as voices_router
 
 
 @dataclass(frozen=True)
@@ -28,17 +30,17 @@ class Feature:
 
 
 FEATURES = [
-    Feature("voice_cloning", voice_cloning),
-    Feature("voice_design", voice_design),
-    Feature("voices", voices),
-    Feature("gallery", gallery),
-    Feature("stories", stories),
-    Feature("audiobook", audiobook),
-    Feature("dubbing", dubbing),
-    Feature("batch", batch, batch_watch.start),
-    Feature("dictation", dictation),
-    Feature("transcription", transcription),
-    Feature("tools", tools),
-    Feature("integrations", integrations),
-    Feature("projects", projects),
+    Feature("voice_cloning", voice_cloning_router),
+    Feature("voice_design", voice_design_router),
+    Feature("voices", voices_router),
+    Feature("gallery", gallery_router),
+    Feature("stories", stories_router),
+    Feature("audiobook", audiobook_router),
+    Feature("dubbing", dubbing_router),
+    Feature("batch", batch_router, batch_watch.start),
+    Feature("dictation", dictation_router),
+    Feature("transcription", transcription_router),
+    Feature("tools", tools_router),
+    Feature("integrations", integrations_router),
+    Feature("projects", projects_router),
 ]

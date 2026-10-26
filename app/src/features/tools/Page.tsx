@@ -4,6 +4,7 @@ import { LANGUAGES } from '../voice_cloning/languages';
 
 const TOOLS = [
   { id: 'convert', title: 'Convert voice', hint: 'Re-speak a recording in one of your saved voices. The words and timing stay the same.' },
+  { id: 'direct', title: 'AI direction', hint: 'Say how a line should sound, in your own words. A local AI turns it into settings you can adjust.' },
   { id: 'compare', title: 'Compare voices', hint: 'Hear the same sentence in several voices, side by side.' },
   { id: 'fit', title: 'Fit length', hint: 'Speed audio up or slow it down to an exact length, without changing the pitch.' },
   { id: 'probe', title: 'File info', hint: 'See the format, length and streams of an audio or video file.' },
@@ -34,6 +35,7 @@ export default function Page() {
         <h2 style={{ margin: 0 }}>{current.title}</h2>
         <p className="meta" style={{ margin: 0 }}>{current.hint}</p>
         {tool === 'convert' && <Convert voices={voices} />}
+        {tool === 'direct' && <Direct voices={voices} />}
         {tool === 'compare' && <Compare voices={voices} />}
         {tool === 'fit' && <Fit />}
         {tool === 'probe' && <Probe />}
@@ -110,6 +112,107 @@ function Convert({ voices }: { voices: Voice[] }) {
       </div>
       {error && <p className="error">{error}</p>}
       {url && <Result url={url} name="converted.wav" />}
+    </>
+  );
+}
+
+const PACES = ['slow', 'normal', 'fast'] as const;
+const EXAMPLE_NOTES = ['whisper it, sad and slow', 'excited, like a game show host', 'bored and tired'];
+
+function Direct({ voices }: { voices: Voice[] }) {
+  const [text, setText] = useState('I never thought I would see this place again.');
+  const [language, setLanguage] = useState('en');
+  const [voice, setVoice] = useState('');
+  const [note, setNote] = useState('');
+  const [intensity, setIntensity] = useState(0.5);
+  const [pace, setPace] = useState<(typeof PACES)[number]>('normal');
+  const [summary, setSummary] = useState('');
+  const [busy, setBusy] = useState<'interpret' | 'speak' | null>(null);
+  const [url, setUrl] = useState('');
+  const [error, setError] = useState('');
+
+  async function interpret() {
+    setBusy('interpret');
+    setError('');
+    try {
+      const s = await sendJson<{ intensity: number; pace: (typeof PACES)[number]; summary: string }>('/api/tools/direction/interpret', 'POST', { note });
+      setIntensity(s.intensity);
+      setPace(s.pace);
+      setSummary(s.summary);
+    } catch (e) {
+      setError(message(e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function speak() {
+    setBusy('speak');
+    setError('');
+    setUrl('');
+    try {
+      const res = await sendJson<{ url: string }>('/api/tools/direction/speak', 'POST', { text, language, voice_id: voice || null, intensity, pace });
+      setUrl(res.url);
+    } catch (e) {
+      setError(message(e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <>
+      <label className="field">
+        Line
+        <textarea rows={2} maxLength={300} value={text} onChange={(e) => setText(e.target.value)} />
+      </label>
+      <div className="row">
+        <label className="field" style={{ flex: 1 }}>
+          Voice
+          <VoiceSelect voices={voices} value={voice} allowDefault onChange={setVoice} />
+        </label>
+        <label className="field">
+          Language
+          <select value={language} onChange={(e) => setLanguage(e.target.value)}>
+            {LANGUAGES.map(([code, label]) => (
+              <option key={code} value={code}>{label}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <label className="field">
+        Direction
+        <input value={note} maxLength={300} onChange={(e) => setNote(e.target.value)} placeholder="e.g. whisper it, sad and slow" />
+      </label>
+      <div className="row" style={{ flexWrap: 'wrap' }}>
+        {EXAMPLE_NOTES.map((n) => (
+          <button key={n} className="secondary" onClick={() => setNote(n)}>{n}</button>
+        ))}
+        <button className="primary" disabled={busy !== null || !note.trim()} onClick={interpret}>
+          {busy === 'interpret' ? 'Thinking…' : 'Interpret'}
+        </button>
+      </div>
+      {busy === 'interpret' && <small className="meta">The first time downloads the AI model (about 3 GB).</small>}
+      {summary && <p className="meta" style={{ margin: 0 }}>The AI heard: “{summary}”. Adjust below if needed.</p>}
+      <label className="field">
+        Energy: {intensity < 0.35 ? 'quiet' : intensity > 0.65 ? 'loud' : 'natural'}
+        <input type="range" min={0} max={1} step={0.05} value={intensity} onChange={(e) => setIntensity(Number(e.target.value))} />
+      </label>
+      <label className="field">
+        Pace
+        <select value={pace} onChange={(e) => setPace(e.target.value as (typeof PACES)[number])}>
+          {PACES.map((p) => (
+            <option key={p} value={p}>{p[0].toUpperCase() + p.slice(1)}</option>
+          ))}
+        </select>
+      </label>
+      <div className="row">
+        <button className="primary" disabled={busy !== null || !text.trim()} onClick={speak}>
+          {busy === 'speak' ? 'Speaking…' : 'Speak'}
+        </button>
+      </div>
+      {error && <p className="error">{error}</p>}
+      {url && <Result url={url} name="directed.wav" />}
     </>
   );
 }

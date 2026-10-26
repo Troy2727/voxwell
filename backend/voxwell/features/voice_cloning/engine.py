@@ -80,15 +80,24 @@ def _to_wav(samples, sample_rate: int) -> bytes:
     return buf.getvalue()
 
 
-def synthesize(text: str, language: str, reference_audio: Path | None = None) -> bytes:
+def synthesize(
+    text: str,
+    language: str,
+    reference_audio: Path | None = None,
+    *,
+    exaggeration: float = 0.5,
+    cfg_weight: float = 0.5,
+) -> bytes:
     """Return WAV bytes of `text` spoken in the voice of `reference_audio` (a default voice if None).
 
-    `language` is an ISO 639-1 code such as "en".
+    `language` is an ISO 639-1 code such as "en". `exaggeration` (0.25-2) sets emotional
+    intensity; a lower `cfg_weight` (0-1) gives slower, more deliberate delivery. The defaults
+    are Chatterbox's own.
     """
     if language not in LANGUAGES:
         raise ValueError(f"Unsupported language '{language}'.")
     model = _load_model()
-    kwargs = {"language_id": language}
+    kwargs = {"language_id": language, "exaggeration": exaggeration, "cfg_weight": cfg_weight}
     if reference_audio is not None:
         kwargs["audio_prompt_path"] = str(reference_audio)
     with _lock:

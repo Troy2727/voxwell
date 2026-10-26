@@ -21,6 +21,18 @@ def test_https_trusts_the_os_certificate_store():
     assert ssl.SSLContext is truststore.SSLContext
 
 
+@pytest.mark.parametrize("feature", FEATURE_IDS)
+def test_feature_packages_are_not_shadowed_by_their_routers(feature):
+    """voxwell.features.<id> must stay the package (string-based patching and imports rely on it)."""
+    import importlib
+    import types
+
+    import voxwell.features as features
+
+    importlib.import_module(f"voxwell.features.{feature}")
+    assert isinstance(getattr(features, feature), types.ModuleType)
+
+
 def test_health_lists_all_features():
     assert client.get("/api/health").json()["features"] == FEATURE_IDS
 

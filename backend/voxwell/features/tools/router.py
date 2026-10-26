@@ -1,5 +1,5 @@
-"""Tools: voice conversion, speech-rate fit and file info. (Compare voices is a page that calls
-voice cloning once per voice.)"""
+"""Tools: voice conversion, AI direction, speech-rate fit and file info. (Compare voices is a page
+that calls /speak once per voice.)"""
 
 import importlib.util
 import io
@@ -8,6 +8,7 @@ import shutil
 import tempfile
 import time
 import uuid
+from dataclasses import asdict
 from pathlib import Path
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
@@ -16,7 +17,7 @@ from pydantic import BaseModel
 
 from voxwell import voices
 from voxwell.features.dubbing.ffmpeg import DubbingError, ffmpeg_path
-from voxwell.features.tools import engine
+from voxwell.features.tools import direction, engine
 from voxwell.features.voice_cloning import engine as cloning_engine
 from voxwell.paths import data_dir
 
@@ -120,6 +121,75 @@ def speak(req: SpeakRequest):
     output_id, out = _new_output()
     out.write_bytes(wav)
     return _result(output_id)
+
+
+class DirectionRequest(BaseModel):
+    note: str
+
+
+class DirectedSpeakRequest(SpeakRequest):
+    intensity: float = 0.5  # 0..1, from /direction/interpret or the sliders
+    pace: str = "normal"
+
+
+MAX_NOTE = 300
+PACE_TEMPO = {"slow": 0.9, "normal": 1.0, "fast": 1.15}
+PACE_CFG = {"slow": 0.3, "normal": 0.5, "fast": 0.5}  # lower CFG = more deliberate delivery
+
+
+def exaggeration_for(intensity: float) -> float:
+    """0..1 intensity -> Chatterbox exaggeration: 0.3 (flat) .. 0.5 (natural) .. 1.4 (theatrical)."""
+    i = min(max(intensity, 0.0), 1.0)
+    return 0.3 + i * 0.4 if i <= 0.5 else 0.5 + (i - 0.5) * 1.8
+
+
+@router.post("/direction/interpret")
+def interpret(req: DirectionRequest):
+    note = req.note.strip()
+    if not note or len(note) > MAX_NOTE:
+        raise HTTPException(422, f"Write a direction of 1 to {MAX_NOTE} characters.")
+    try:
+        return asdict(direction.interpret(note))
+    except direction.DirectionError as exc:
+        raise HTTPException(422, str(exc))
+    except Exception as exc:
+        raise HTTPException(500, f"The AI director failed: {exc}")
+
+
+@router.post("/direction/speak")
+def directed_speak(req: DirectedSpeakRequest):
+    text = req.text.strip()
+    if not text or len(text) > MAX_COMPARE_TEXT:
+        raise HTTPException(422, f"Write 1 to {MAX_COMPARE_TEXT} characters.")
+    if req.language not in cloning_engine.LANGUAGES:
+        raise HTTPException(422, f"Unsupported language '{req.language}'.")
+    if req.pace not in PACE_TEMPO:
+        raise HTTPException(422, "Pace must be slow, normal or fast.")
+    reference = None
+    if req.voice_id:
+        try:
+            reference = voices.voice_audio_path(req.voice_id)
+        except KeyError:
+            raise HTTPException(422, "Unknown voice.")
+    try:
+        wav = cloning_engine.synthesize(
+            text, req.language, reference, exaggeration=exaggeration_for(req.intensity), cfg_weight=PACE_CFG[req.pace]
+        )
+    except Exception as exc:
+        raise HTTPException(500, f"Speech synthesis failed: {exc}")
+    output_id, out = _new_output()
+    tempo = PACE_TEMPO[req.pace]
+    if tempo != 1.0 and _ffmpeg_ready():  # without ffmpeg, pace comes from the CFG setting alone
+        source = out.with_suffix(".source.wav")
+        source.write_bytes(wav)
+        seconds = (len(wav) - 44) / 2 / int.from_bytes(wav[24:28], "little")
+        try:
+            engine.fit(source, seconds, seconds / tempo, out)
+        finally:
+            source.unlink(missing_ok=True)
+    else:
+        out.write_bytes(wav)
+    return _result(output_id, exaggeration=round(exaggeration_for(req.intensity), 2), tempo=tempo if _ffmpeg_ready() else 1.0)
 
 
 @router.post("/fit")
