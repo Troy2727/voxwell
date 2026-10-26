@@ -1,5 +1,14 @@
 import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { api, apiUrl, listVoices, Voice } from '../../api';
+import { AudioResult } from '@/components/audio-result';
+import { ChoiceSelect } from '@/components/choice-select';
+import { FileDrop } from '@/components/file-drop';
+import { ErrorAlert, Field, message, Page as PageLayout, Section } from '@/components/page';
+import { VoiceSelect } from '@/components/voice-select';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { LANGUAGES } from './languages';
 
 export default function Page() {
@@ -36,8 +45,9 @@ export default function Page() {
       setVoiceId(voice.id);
       setName('');
       setFile(null);
+      toast.success(`Saved "${voice.name}"`);
     } catch (e) {
-      setError((e as Error).message);
+      setError(message(e));
     } finally {
       setUploading(false);
     }
@@ -55,76 +65,48 @@ export default function Page() {
       });
       setAudioUrl(apiUrl(res.url));
     } catch (e) {
-      setError((e as Error).message);
+      setError(message(e));
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <section className="page">
-      <h1>Voice cloning</h1>
-
-      <div className="card">
-        <h2>Add a voice</h2>
-        <label className="field">
-          Name
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="My voice" />
-        </label>
-        <label className="field">
-          Reference clip (WAV, MP3, FLAC or OGG; a few seconds of clean speech)
-          <input key={uploading ? 'u' : 'i'} type="file" accept=".wav,.mp3,.flac,.ogg,audio/*" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-        </label>
-        <div className="row">
-          <button className="primary" disabled={uploading || !file || !name.trim()} onClick={upload}>
+    <PageLayout title="Voice cloning" description="Clone a voice from a short clip, then make it say anything.">
+      <Section title="Add a voice" description="A few seconds of clean speech: WAV, MP3, FLAC or OGG.">
+        <Field label="Name" htmlFor="clone-name">
+          <Input id="clone-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="My voice" />
+        </Field>
+        <Field label="Reference clip">
+          <FileDrop file={file} onFile={setFile} accept=".wav,.mp3,.flac,.ogg,audio/*" disabled={uploading} />
+        </Field>
+        <div>
+          <Button disabled={uploading || !file || !name.trim()} onClick={upload}>
             {uploading ? 'Uploading…' : 'Upload voice'}
-          </button>
+          </Button>
         </div>
-      </div>
+      </Section>
 
-      <div className="card">
-        <h2>Generate speech</h2>
-        <label className="field">
-          Voice
-          <select value={voiceId} onChange={(e) => setVoiceId(e.target.value)} disabled={voices === null}>
-            <option value="">Default voice</option>
-            {(voices ?? []).map((v) => (
-              <option key={v.id} value={v.id}>
-                {v.name} ({v.source === 'design' ? 'designed' : 'uploaded'})
-              </option>
-            ))}
-          </select>
-          {voices !== null && voices.length === 0 && <span>No saved voices yet. Upload one above.</span>}
-        </label>
-        <label className="field">
-          Language
-          <select value={language} onChange={(e) => setLanguage(e.target.value)}>
-            {LANGUAGES.map(([code, label]) => (
-              <option key={code} value={code}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="field">
-          Text
-          <textarea rows={5} maxLength={2000} value={text} onChange={(e) => setText(e.target.value)} />
-        </label>
-        <div className="row">
-          <button className="primary" disabled={busy || !text.trim()} onClick={generate}>
-            {busy ? 'Generating…' : 'Generate'}
-          </button>
+      <Section title="Generate speech">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Voice" hint={voices !== null && voices.length === 0 ? 'No saved voices yet. Upload one above.' : undefined}>
+            <VoiceSelect voices={voices} value={voiceId} onChange={setVoiceId} disabled={voices === null} />
+          </Field>
+          <Field label="Language">
+            <ChoiceSelect options={LANGUAGES} value={language} onChange={setLanguage} />
+          </Field>
         </div>
-        {error && <div className="error">{error}</div>}
-        {audioUrl && (
-          <>
-            <audio controls src={audioUrl} />
-            <a href={audioUrl} download="voxwell-speech.wav">
-              Download WAV
-            </a>
-          </>
-        )}
-      </div>
-    </section>
+        <Field label="Text" htmlFor="clone-text" hint={`${text.length} / 2000`}>
+          <Textarea id="clone-text" rows={5} maxLength={2000} value={text} onChange={(e) => setText(e.target.value)} placeholder="Type what the voice should say…" />
+        </Field>
+        <div>
+          <Button disabled={busy || !text.trim()} onClick={generate}>
+            {busy ? 'Generating…' : 'Generate'}
+          </Button>
+        </div>
+        <ErrorAlert message={error} />
+        {audioUrl && <AudioResult src={audioUrl} download="voxwell-speech.wav" />}
+      </Section>
+    </PageLayout>
   );
 }

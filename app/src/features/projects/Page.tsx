@@ -1,5 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
+import { Download, Pencil } from 'lucide-react';
+import { toast } from 'sonner';
 import { api, apiUrl, sendJson } from '../../api';
+import { AudioResult } from '@/components/audio-result';
+import { ConfirmButton } from '@/components/confirm-button';
+import { JobProgress } from '@/components/job-progress';
+import { ErrorAlert, message, Muted, Page as PageLayout } from '@/components/page';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface Base {
   id: string;
@@ -63,7 +74,6 @@ const KIND_LABELS: Record<Item['kind'], string> = {
 };
 const PREVIEW_LENGTH = 300;
 
-const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const working = (item: Item) => item.kind !== 'speech' && (item.state === 'queued' || item.state === 'running');
 
 export default function Page() {
@@ -89,19 +99,20 @@ export default function Page() {
   }, []);
 
   return (
-    <section className="page">
-      <h1>Projects</h1>
-      {error && <p className="error">{error}</p>}
-      {items === null && <p className="meta">Loading…</p>}
+    <PageLayout title="Projects" description="Everything you made, newest first.">
+      <ErrorAlert message={error} />
+      {items === null && <Skeleton className="h-32 w-full" />}
       {items?.length === 0 && !error && (
-        <div className="card">
-          <p>Nothing here yet. Speech, stories and audiobooks you make, videos you dub and files you transcribe appear here.</p>
-        </div>
+        <Card>
+          <CardContent>
+            <Muted>Nothing here yet. Speech, stories and audiobooks you make, videos you dub and files you transcribe appear here.</Muted>
+          </CardContent>
+        </Card>
       )}
       {items?.map((item) => (
         <ProjectCard key={`${item.kind}-${item.id}`} item={item} onChanged={refresh} onError={(e) => setError(message(e))} />
       ))}
-    </section>
+    </PageLayout>
   );
 }
 
@@ -111,12 +122,13 @@ function ProjectCard({ item, onChanged, onError }: { item: Item; onChanged: () =
   const [busy, setBusy] = useState(false);
   const path = `/api/projects/items/${item.kind}/${item.id}`;
 
-  async function run(action: () => Promise<unknown>) {
+  async function run(action: () => Promise<unknown>, done: string) {
     setBusy(true);
     try {
       await action();
       setEditing(false);
       onChanged();
+      toast.success(done);
     } catch (e) {
       onError(e);
     } finally {
@@ -124,60 +136,59 @@ function ProjectCard({ item, onChanged, onError }: { item: Item; onChanged: () =
     }
   }
 
-  const rename = () => run(() => sendJson(path, 'PATCH', { title }));
-  const remove = () => {
-    if (window.confirm(`Delete "${item.title}"? This cannot be undone.`)) void run(() => sendJson(path, 'DELETE'));
-  };
+  const rename = () => run(() => sendJson(path, 'PATCH', { title }), 'Renamed');
+  const remove = () => run(() => sendJson(path, 'DELETE'), `Deleted "${item.title}"`);
 
   return (
-    <div className="card">
-      {editing ? (
-        <div className="row">
-          <input value={title} maxLength={100} onChange={(e) => setTitle(e.target.value)} style={{ flex: 1 }} autoFocus />
-          <button className="primary" disabled={busy || !title.trim()} onClick={rename}>
-            Save
-          </button>
-          <button className="secondary" disabled={busy} onClick={() => setEditing(false)}>
-            Cancel
-          </button>
+    <Card className="gap-3 py-4">
+      <CardContent className="flex flex-col gap-3 px-4">
+        {editing ? (
+          <div className="flex items-center gap-2">
+            <Input value={title} maxLength={100} onChange={(e) => setTitle(e.target.value)} className="flex-1" autoFocus />
+            <Button disabled={busy || !title.trim()} onClick={rename}>Save</Button>
+            <Button variant="outline" disabled={busy} onClick={() => setEditing(false)}>Cancel</Button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <h2 className="flex-1 truncate font-semibold">{item.title}</h2>
+            <Button variant="ghost" size="sm" disabled={busy} onClick={() => { setTitle(item.title); setEditing(true); }}>
+              <Pencil /> Rename
+            </Button>
+            <ConfirmButton title={`Delete "${item.title}"?`} disabled={busy || working(item)} onConfirm={remove}>
+              Delete
+            </ConfirmButton>
+          </div>
+        )}
+        <div className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
+          <Badge variant="secondary">{KIND_LABELS[item.kind]}</Badge>
+          {[item.language.toUpperCase(), item.voice, new Date(item.created * 1000).toLocaleString()].filter(Boolean).join(' · ')}
         </div>
-      ) : (
-        <h2 style={{ margin: 0 }}>{item.title}</h2>
-      )}
-      <div className="meta">
-        {[KIND_LABELS[item.kind], item.language.toUpperCase(), item.voice, new Date(item.created * 1000).toLocaleString()]
-          .filter(Boolean)
-          .join(' · ')}
-      </div>
 
-      {item.kind === 'speech' && <SpeechBody item={item} />}
-      {item.kind === 'story' && <StoryBody item={item} />}
-      {item.kind === 'audiobook' && <AudiobookBody item={item} />}
-      {item.kind === 'dub' && <DubBody item={item} />}
-      {item.kind === 'transcript' && <TranscriptBody item={item} />}
+        {item.kind === 'speech' && <SpeechBody item={item} />}
+        {item.kind === 'story' && <StoryBody item={item} />}
+        {item.kind === 'audiobook' && <AudiobookBody item={item} />}
+        {item.kind === 'dub' && <DubBody item={item} />}
+        {item.kind === 'transcript' && <TranscriptBody item={item} />}
+      </CardContent>
+    </Card>
+  );
+}
 
-      {!editing && (
-        <div className="row">
-          <button className="secondary" disabled={busy} onClick={() => { setTitle(item.title); setEditing(true); }}>
-            Rename
-          </button>
-          <button className="secondary danger" disabled={busy || working(item)} onClick={remove}>
-            Delete
-          </button>
-        </div>
-      )}
-    </div>
+function DownloadLink({ href, name, children }: { href: string; name: string; children: React.ReactNode }) {
+  return (
+    <Button asChild variant="secondary" size="sm">
+      <a href={apiUrl(href)} download={name}>
+        <Download /> {children}
+      </a>
+    </Button>
   );
 }
 
 function SpeechBody({ item }: { item: Speech }) {
   return (
     <>
-      {item.text !== item.title && <p className="meta">{item.text}</p>}
-      <audio controls preload="none" src={apiUrl(item.audio_url)} />
-      <a href={apiUrl(item.audio_url)} download={`${item.title}.wav`}>
-        Download WAV
-      </a>
+      {item.text !== item.title && <Muted>{item.text}</Muted>}
+      <AudioResult src={apiUrl(item.audio_url)} download={`${item.title}.wav`} lazy />
     </>
   );
 }
@@ -186,15 +197,15 @@ function AudiobookBody({ item }: { item: Audiobook }) {
   if (item.state === 'queued' || item.state === 'running' || item.state === 'error') return <Progress item={item} />;
   return (
     <>
-      <p className="meta">
+      <Muted>
         {item.chapters_done} of {item.chapters.length} chapters rendered
         {item.state === 'paused' && ' · paused; resume it in Audiobook'}
         {item.state === 'draft' && item.chapters_done === 0 && ' · open Audiobook to render it'}
-      </p>
+      </Muted>
       {item.chapters_done > 0 && (
-        <a href={apiUrl(item.download_url)} download={`${item.title}.zip`}>
-          Download chapters (ZIP)
-        </a>
+        <div>
+          <DownloadLink href={item.download_url} name={`${item.title}.zip`}>Download chapters (ZIP)</DownloadLink>
+        </div>
       )}
     </>
   );
@@ -204,23 +215,15 @@ function StoryBody({ item }: { item: Story }) {
   if (item.state !== 'done') return <Progress item={item} />;
   return (
     <>
-      <p className="meta">Speakers: {item.speakers.join(', ')}</p>
-      <audio controls preload="none" src={apiUrl(item.audio_url)} />
-      <a href={apiUrl(item.audio_url)} download={`${item.title}.wav`}>
-        Download WAV
-      </a>
+      <Muted>Speakers: {item.speakers.join(', ')}</Muted>
+      <AudioResult src={apiUrl(item.audio_url)} download={`${item.title}.wav`} lazy />
     </>
   );
 }
 
 function Progress({ item }: { item: Story | Audiobook | Dub | Transcript }) {
-  if (item.state === 'error') return <p className="error">{item.error}</p>;
-  return (
-    <>
-      <div>{item.step}</div>
-      <progress max={100} value={item.percent} style={{ width: '100%' }} />
-    </>
-  );
+  if (item.state === 'error') return <ErrorAlert message={item.error ?? 'Failed'} />;
+  return <JobProgress step={item.step} percent={item.percent} />;
 }
 
 function TranscriptBody({ item }: { item: Transcript }) {
@@ -228,12 +231,12 @@ function TranscriptBody({ item }: { item: Transcript }) {
   const preview = item.text.length > PREVIEW_LENGTH ? item.text.slice(0, PREVIEW_LENGTH - 1) + '…' : item.text;
   return (
     <>
-      <p className="meta">{preview}</p>
-      <div className="row">
+      <Muted>{preview}</Muted>
+      <div className="flex flex-wrap gap-2">
         {(['txt', 'srt', 'vtt'] as const).map((fmt) => (
-          <a key={fmt} href={apiUrl(item.exports[fmt])} download={`${item.title}.${fmt}`}>
+          <DownloadLink key={fmt} href={item.exports[fmt]} name={`${item.title}.${fmt}`}>
             Download {fmt.toUpperCase()}
-          </a>
+          </DownloadLink>
         ))}
       </div>
     </>
@@ -245,13 +248,9 @@ function DubBody({ item }: { item: Dub }) {
   return (
     <>
       <video controls preload="none" src={apiUrl(item.video_url)} />
-      <div className="row">
-        <a href={apiUrl(item.video_url)} download={`${item.title}.mp4`}>
-          Download video
-        </a>
-        <a href={apiUrl(item.subtitles_url)} download={`${item.title}.srt`}>
-          Download subtitles
-        </a>
+      <div className="flex flex-wrap gap-2">
+        <DownloadLink href={item.video_url} name={`${item.title}.mp4`}>Download video</DownloadLink>
+        <DownloadLink href={item.subtitles_url} name={`${item.title}.srt`}>Download subtitles</DownloadLink>
       </div>
     </>
   );

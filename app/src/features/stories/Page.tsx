@@ -1,5 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
+import { Play } from 'lucide-react';
 import { api, apiUrl, listVoices, sendJson, type Voice } from '../../api';
+import { AudioResult } from '@/components/audio-result';
+import { ChoiceSelect } from '@/components/choice-select';
+import { JobProgress } from '@/components/job-progress';
+import { ErrorAlert, Field, message, Muted, Page as PageLayout, Section } from '@/components/page';
+import { VoiceSelect } from '@/components/voice-select';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { LANGUAGES } from '../voice_cloning/languages';
 
 interface Story {
@@ -18,7 +27,6 @@ The door creaked open, slowly.
 Anna: That was not the wind.`;
 
 const DEFAULT_VOICE = 'default';
-const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 export default function Page() {
   const [voices, setVoices] = useState<Voice[]>([]);
@@ -86,75 +94,60 @@ export default function Page() {
   const working = story?.state === 'queued' || story?.state === 'running';
 
   return (
-    <section className="page">
-      <h1>Stories</h1>
-      <div className="card">
-        <div className="row">
-          <label className="field" style={{ flex: 1 }}>
-            Title (optional)
-            <input value={title} maxLength={100} onChange={(e) => setTitle(e.target.value)} />
-          </label>
-          <label className="field">
-            Language
-            <select value={language} onChange={(e) => setLanguage(e.target.value)}>
-              {LANGUAGES.map(([code, label]) => (
-                <option key={code} value={code}>{label}</option>
-              ))}
-            </select>
-          </label>
+    <PageLayout title="Stories" description="Write a script with several speakers and give each one a voice.">
+      <Section title="Script">
+        <div className="grid gap-4 sm:grid-cols-[1fr_200px]">
+          <Field label="Title (optional)" htmlFor="story-title">
+            <Input id="story-title" value={title} maxLength={100} onChange={(e) => setTitle(e.target.value)} />
+          </Field>
+          <Field label="Language">
+            <ChoiceSelect options={LANGUAGES} value={language} onChange={setLanguage} />
+          </Field>
         </div>
-        <label className="field">
-          Script: one line each, as “Name: what they say”. Lines without a name are read by the Narrator.
-          <textarea rows={10} value={script} placeholder={EXAMPLE} onChange={(e) => setScript(e.target.value)} />
-        </label>
+        <Field label="Script" htmlFor="story-script" hint="One line each, as “Name: what they say”. Lines without a name are read by the Narrator.">
+          <Textarea id="story-script" rows={10} value={script} placeholder={EXAMPLE} onChange={(e) => setScript(e.target.value)} className="font-mono text-sm" />
+        </Field>
         {!script && (
-          <div className="row">
-            <button className="secondary" onClick={() => setScript(EXAMPLE)}>Use the example</button>
+          <div>
+            <Button variant="outline" size="sm" onClick={() => setScript(EXAMPLE)}>Use the example</Button>
           </div>
         )}
-        {scriptError && <p className="error">{scriptError}</p>}
-      </div>
+        <ErrorAlert message={scriptError} />
+      </Section>
 
       {speakers.length > 0 && !scriptError && (
-        <div className="card">
-          <h2>Cast</h2>
-          <p className="meta">{lineCount} line(s). Give each speaker a voice from Saved voices.</p>
+        <Section title="Cast" description={`${lineCount} line(s). Give each speaker a voice from Saved voices.`}>
           {speakers.map((speaker) => (
-            <label key={speaker} className="row">
-              <span style={{ minWidth: 140 }}>{speaker}</span>
-              <select value={cast[speaker] ?? DEFAULT_VOICE} onChange={(e) => setCast({ ...cast, [speaker]: e.target.value })} style={{ flex: 1 }}>
-                <option value={DEFAULT_VOICE}>Default voice</option>
-                {voices.map((v) => (
-                  <option key={v.id} value={v.id}>{v.name}</option>
-                ))}
-              </select>
-            </label>
+            <div key={speaker} className="grid items-center gap-2 sm:grid-cols-[160px_1fr]">
+              <span className="truncate text-sm font-medium">{speaker}</span>
+              <VoiceSelect
+                voices={voices}
+                value={cast[speaker] && cast[speaker] !== DEFAULT_VOICE ? cast[speaker] : ''}
+                onChange={(id) => setCast({ ...cast, [speaker]: id || DEFAULT_VOICE })}
+              />
+            </div>
           ))}
-          {voices.length === 0 && <small className="meta">No saved voices yet; everyone uses the default voice.</small>}
-          <div className="row">
-            <button className="primary" disabled={working} onClick={generate}>
-              {working ? 'Generating…' : 'Generate story'}
-            </button>
+          {voices.length === 0 && <Muted className="text-xs">No saved voices yet; everyone uses the default voice.</Muted>}
+          <div>
+            <Button disabled={working} onClick={generate}>
+              <Play /> {working ? 'Generating…' : 'Generate story'}
+            </Button>
           </div>
-        </div>
+        </Section>
       )}
 
-      {error && <p className="error">{error}</p>}
+      <ErrorAlert message={error} />
       {story && working && (
-        <div className="card">
-          <div>{story.step}</div>
-          <progress max={100} value={story.percent} style={{ width: '100%' }} />
-          <small className="meta">You can leave this page; the story appears in Projects when it is ready.</small>
-        </div>
+        <Section title="Generating">
+          <JobProgress step={story.step} percent={story.percent} hint="You can leave this page; the story appears in Projects when it is ready." />
+        </Section>
       )}
-      {story?.state === 'error' && <p className="error">{story.error}</p>}
+      {story?.state === 'error' && <ErrorAlert message={story.error ?? 'Failed'} />}
       {story?.state === 'done' && (
-        <div className="card">
-          <h2 style={{ margin: 0 }}>{story.title}</h2>
-          <audio controls src={apiUrl(story.audio_url)} />
-          <a href={apiUrl(story.audio_url)} download={`${story.title}.wav`}>Download WAV</a>
-        </div>
+        <Section title={story.title}>
+          <AudioResult src={apiUrl(story.audio_url)} download={`${story.title}.wav`} />
+        </Section>
       )}
-    </section>
+    </PageLayout>
   );
 }

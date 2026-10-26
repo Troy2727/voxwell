@@ -1,5 +1,11 @@
 import { useEffect, useState } from 'react';
+import { Check, Headphones, Plus } from 'lucide-react';
 import { api, apiUrl, sendJson, type Voice } from '../../api';
+import { AudioResult } from '@/components/audio-result';
+import { ErrorAlert, message, Page as PageLayout } from '@/components/page';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface Preset {
   id: string;
@@ -10,8 +16,6 @@ interface Preset {
   ready: boolean;
   audio_url: string | null;
 }
-
-const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 export default function Page() {
   const [presets, setPresets] = useState<Preset[] | null>(null);
@@ -28,29 +32,30 @@ export default function Page() {
   const categories = [...new Set(presets?.map((p) => p.category))];
 
   return (
-    <section className="page">
-      <h1>Gallery</h1>
-      <p className="meta">
-        Ready-made voices, created on your computer from a description. Listen to one, then add it to Saved voices
-        to use it anywhere. The first listen takes a little while.
-      </p>
-      {error && <p className="error">{error}</p>}
-      {presets === null && <p className="meta">Loading…</p>}
+    <PageLayout
+      title="Gallery"
+      description="Ready-made voices, created on your computer from a description. Listen to one, then add it to Saved voices to use it anywhere. The first listen takes a little while."
+    >
+      <ErrorAlert message={error} />
+      {presets === null && <Skeleton className="h-40 w-full" />}
       {categories.map((category) => (
-        <div key={category} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <h2 style={{ margin: '8px 0 0' }}>{category}</h2>
-          {presets?.filter((p) => p.category === category).map((p) => (
-            <PresetCard key={p.id} preset={p} onUpdated={replace} />
-          ))}
+        <div key={category} className="flex flex-col gap-3">
+          <h2 className="text-muted-foreground text-sm font-medium tracking-wide uppercase">{category}</h2>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {presets?.filter((p) => p.category === category).map((p) => (
+              <PresetCard key={p.id} preset={p} onUpdated={replace} />
+            ))}
+          </div>
         </div>
       ))}
-    </section>
+    </PageLayout>
   );
 }
 
 function PresetCard({ preset, onUpdated }: { preset: Preset; onUpdated: (p: Preset) => void }) {
   const [busy, setBusy] = useState<'listen' | 'add' | null>(null);
   const [added, setAdded] = useState<Voice | null>(null);
+  const [listened, setListened] = useState(false);
   const [error, setError] = useState('');
 
   async function listen() {
@@ -58,6 +63,7 @@ function PresetCard({ preset, onUpdated }: { preset: Preset; onUpdated: (p: Pres
     setError('');
     try {
       onUpdated(await sendJson<Preset>(`/api/gallery/presets/${preset.id}/sample`, 'POST'));
+      setListened(true);
     } catch (e) {
       setError(message(e));
     } finally {
@@ -78,28 +84,36 @@ function PresetCard({ preset, onUpdated }: { preset: Preset; onUpdated: (p: Pres
   }
 
   return (
-    <div className="card">
-      <h2 style={{ margin: 0 }}>{preset.name}</h2>
-      <p className="meta" style={{ margin: 0 }}>{preset.description}</p>
-      {preset.audio_url ? (
-        <audio controls autoPlay={busy === null && !added} src={apiUrl(preset.audio_url)} />
-      ) : (
-        <p className="meta" style={{ margin: 0 }}>“{preset.sample}”</p>
-      )}
-      <div className="row">
+    <Card className="gap-4">
+      <CardHeader>
+        <CardTitle>{preset.name}</CardTitle>
+        <CardDescription>{preset.description}</CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-1 flex-col gap-3">
+        {preset.audio_url ? (
+          <AudioResult src={apiUrl(preset.audio_url)} autoPlay={listened} />
+        ) : (
+          <p className="text-muted-foreground text-sm italic">“{preset.sample}”</p>
+        )}
+        <ErrorAlert message={error} />
+      </CardContent>
+      <CardFooter className="flex-wrap gap-2">
         {!preset.ready && (
-          <button className="primary" disabled={busy !== null} onClick={listen}>
-            {busy === 'listen' ? 'Creating the voice…' : 'Listen'}
-          </button>
+          <Button disabled={busy !== null} onClick={listen}>
+            <Headphones /> {busy === 'listen' ? 'Creating the voice…' : 'Listen'}
+          </Button>
         )}
-        {preset.ready && (
-          <button className="secondary" disabled={busy !== null} onClick={add}>
-            {busy === 'add' ? 'Adding…' : 'Add to my voices'}
-          </button>
+        {preset.ready && !added && (
+          <Button variant="outline" disabled={busy !== null} onClick={add}>
+            <Plus /> {busy === 'add' ? 'Adding…' : 'Add to my voices'}
+          </Button>
         )}
-        {added && <span className="meta">Added as “{added.name}” in Saved voices.</span>}
-      </div>
-      {error && <p className="error">{error}</p>}
-    </div>
+        {added && (
+          <span className="text-success flex items-center gap-1 text-sm">
+            <Check className="size-4" /> Added as “{added.name}” in Saved voices.
+          </span>
+        )}
+      </CardFooter>
+    </Card>
   );
 }

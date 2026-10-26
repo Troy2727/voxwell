@@ -1,5 +1,18 @@
 import { useEffect, useState } from 'react';
+import { ArrowRightLeft, Plus, Sparkles, Timer, Trash2, Volume2 } from 'lucide-react';
 import { api, apiUrl, listVoices, sendJson, type Voice } from '../../api';
+import { AudioResult } from '@/components/audio-result';
+import { ChoiceSelect } from '@/components/choice-select';
+import { FileDrop } from '@/components/file-drop';
+import { ErrorAlert, Field, message, Muted, Page as PageLayout } from '@/components/page';
+import { VoiceSelect } from '@/components/voice-select';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Slider } from '@/components/ui/slider';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
 import { LANGUAGES } from '../voice_cloning/languages';
 
 const TOOLS = [
@@ -11,7 +24,6 @@ const TOOLS = [
 ] as const;
 
 type ToolId = (typeof TOOLS)[number]['id'];
-const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 export default function Page() {
   const [tool, setTool] = useState<ToolId>('convert');
@@ -19,55 +31,38 @@ export default function Page() {
   useEffect(() => {
     listVoices().then(setVoices, () => setVoices([]));
   }, []);
-  const current = TOOLS.find((t) => t.id === tool)!;
 
   return (
-    <section className="page">
-      <h1>Tools</h1>
-      <div className="row" style={{ flexWrap: 'wrap' }}>
+    <PageLayout title="Tools" description="Small jobs for audio you already have.">
+      <Tabs value={tool} onValueChange={(v) => setTool(v as ToolId)}>
+        <TabsList className="h-auto flex-wrap">
+          {TOOLS.map((t) => (
+            <TabsTrigger key={t.id} value={t.id}>{t.title}</TabsTrigger>
+          ))}
+        </TabsList>
         {TOOLS.map((t) => (
-          <button key={t.id} className={t.id === tool ? 'nav active' : 'nav'} onClick={() => setTool(t.id)}>
-            {t.title}
-          </button>
+          <TabsContent key={t.id} value={t.id}>
+            <Card>
+              <CardHeader>
+                <CardTitle>{t.title}</CardTitle>
+                <CardDescription>{t.hint}</CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-4">
+                {t.id === 'convert' && <Convert voices={voices} />}
+                {t.id === 'direct' && <Direct voices={voices} />}
+                {t.id === 'compare' && <Compare voices={voices} />}
+                {t.id === 'fit' && <Fit />}
+                {t.id === 'probe' && <Probe />}
+              </CardContent>
+            </Card>
+          </TabsContent>
         ))}
-      </div>
-      <div className="card">
-        <h2 style={{ margin: 0 }}>{current.title}</h2>
-        <p className="meta" style={{ margin: 0 }}>{current.hint}</p>
-        {tool === 'convert' && <Convert voices={voices} />}
-        {tool === 'direct' && <Direct voices={voices} />}
-        {tool === 'compare' && <Compare voices={voices} />}
-        {tool === 'fit' && <Fit />}
-        {tool === 'probe' && <Probe />}
-      </div>
-    </section>
+      </Tabs>
+    </PageLayout>
   );
 }
 
-function Result({ url, name }: { url: string; name: string }) {
-  return (
-    <>
-      <audio controls src={apiUrl(url)} />
-      <a href={apiUrl(url)} download={name}>Download WAV</a>
-    </>
-  );
-}
-
-function VoiceSelect({ voices, value, onChange, allowDefault = false }: {
-  voices: Voice[];
-  value: string;
-  onChange: (v: string) => void;
-  allowDefault?: boolean;
-}) {
-  return (
-    <select value={value} onChange={(e) => onChange(e.target.value)}>
-      {allowDefault ? <option value="">Default voice</option> : <option value="">Choose a voice…</option>}
-      {voices.map((v) => (
-        <option key={v.id} value={v.id}>{v.name}</option>
-      ))}
-    </select>
-  );
-}
+const Result = ({ url, name }: { url: string; name: string }) => <AudioResult src={apiUrl(url)} download={name} />;
 
 function Convert({ voices }: { voices: Voice[] }) {
   const [file, setFile] = useState<File | null>(null);
@@ -95,28 +90,26 @@ function Convert({ voices }: { voices: Voice[] }) {
 
   return (
     <>
-      <label className="field">
-        Recording (WAV, MP3, FLAC or OGG)
-        <input type="file" accept=".wav,.mp3,.flac,.ogg,audio/*" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-      </label>
-      <label className="field">
-        New voice
-        <VoiceSelect voices={voices} value={voice} onChange={setVoice} />
-      </label>
-      {voices.length === 0 && <small className="meta">Add a voice in Voice cloning, Voice design or Gallery first.</small>}
-      <div className="row">
-        <button className="primary" disabled={busy || !file || !voice} onClick={run}>
-          {busy ? 'Converting…' : 'Convert'}
-        </button>
-        {busy && <span className="meta">The first time downloads the conversion model.</span>}
+      <Field label="Recording" hint="WAV, MP3, FLAC or OGG">
+        <FileDrop file={file} onFile={setFile} accept=".wav,.mp3,.flac,.ogg,audio/*" disabled={busy} />
+      </Field>
+      <Field label="New voice" hint={voices.length === 0 ? 'Add a voice in Voice cloning, Voice design or Gallery first.' : undefined}>
+        <VoiceSelect voices={voices} value={voice} onChange={setVoice} defaultLabel={null} />
+      </Field>
+      <div className="flex flex-wrap items-center gap-3">
+        <Button disabled={busy || !file || !voice} onClick={run}>
+          <ArrowRightLeft /> {busy ? 'Converting…' : 'Convert'}
+        </Button>
+        {busy && <Muted>The first time downloads the conversion model.</Muted>}
       </div>
-      {error && <p className="error">{error}</p>}
+      <ErrorAlert message={error} />
       {url && <Result url={url} name="converted.wav" />}
     </>
   );
 }
 
 const PACES = ['slow', 'normal', 'fast'] as const;
+const PACE_OPTIONS = PACES.map((p) => [p, p[0].toUpperCase() + p.slice(1)] as const);
 const EXAMPLE_NOTES = ['whisper it, sad and slow', 'excited, like a game show host', 'bored and tired'];
 
 function Direct({ voices }: { voices: Voice[] }) {
@@ -162,56 +155,44 @@ function Direct({ voices }: { voices: Voice[] }) {
 
   return (
     <>
-      <label className="field">
-        Line
-        <textarea rows={2} maxLength={300} value={text} onChange={(e) => setText(e.target.value)} />
-      </label>
-      <div className="row">
-        <label className="field" style={{ flex: 1 }}>
-          Voice
-          <VoiceSelect voices={voices} value={voice} allowDefault onChange={setVoice} />
-        </label>
-        <label className="field">
-          Language
-          <select value={language} onChange={(e) => setLanguage(e.target.value)}>
-            {LANGUAGES.map(([code, label]) => (
-              <option key={code} value={code}>{label}</option>
-            ))}
-          </select>
-        </label>
+      <Field label="Line" htmlFor="direct-line">
+        <Textarea id="direct-line" rows={2} maxLength={300} value={text} onChange={(e) => setText(e.target.value)} />
+      </Field>
+      <div className="grid gap-4 sm:grid-cols-[1fr_200px]">
+        <Field label="Voice">
+          <VoiceSelect voices={voices} value={voice} onChange={setVoice} />
+        </Field>
+        <Field label="Language">
+          <ChoiceSelect options={LANGUAGES} value={language} onChange={setLanguage} />
+        </Field>
       </div>
-      <label className="field">
-        Direction
-        <input value={note} maxLength={300} onChange={(e) => setNote(e.target.value)} placeholder="e.g. whisper it, sad and slow" />
-      </label>
-      <div className="row" style={{ flexWrap: 'wrap' }}>
+      <Field label="Direction" htmlFor="direct-note">
+        <Input id="direct-note" value={note} maxLength={300} onChange={(e) => setNote(e.target.value)} placeholder="e.g. whisper it, sad and slow" />
+      </Field>
+      <div className="flex flex-wrap gap-2">
         {EXAMPLE_NOTES.map((n) => (
-          <button key={n} className="secondary" onClick={() => setNote(n)}>{n}</button>
+          <Button key={n} variant="secondary" size="sm" onClick={() => setNote(n)}>{n}</Button>
         ))}
-        <button className="primary" disabled={busy !== null || !note.trim()} onClick={interpret}>
-          {busy === 'interpret' ? 'Thinking…' : 'Interpret'}
-        </button>
+        <Button size="sm" disabled={busy !== null || !note.trim()} onClick={interpret}>
+          <Sparkles /> {busy === 'interpret' ? 'Thinking…' : 'Interpret'}
+        </Button>
       </div>
-      {busy === 'interpret' && <small className="meta">The first time downloads the AI model (about 3 GB).</small>}
-      {summary && <p className="meta" style={{ margin: 0 }}>The AI heard: “{summary}”. Adjust below if needed.</p>}
-      <label className="field">
-        Energy: {intensity < 0.35 ? 'quiet' : intensity > 0.65 ? 'loud' : 'natural'}
-        <input type="range" min={0} max={1} step={0.05} value={intensity} onChange={(e) => setIntensity(Number(e.target.value))} />
-      </label>
-      <label className="field">
-        Pace
-        <select value={pace} onChange={(e) => setPace(e.target.value as (typeof PACES)[number])}>
-          {PACES.map((p) => (
-            <option key={p} value={p}>{p[0].toUpperCase() + p.slice(1)}</option>
-          ))}
-        </select>
-      </label>
-      <div className="row">
-        <button className="primary" disabled={busy !== null || !text.trim()} onClick={speak}>
-          {busy === 'speak' ? 'Speaking…' : 'Speak'}
-        </button>
+      {busy === 'interpret' && <Muted className="text-xs">The first time downloads the AI model (about 3 GB).</Muted>}
+      {summary && <Muted>The AI heard: “{summary}”. Adjust below if needed.</Muted>}
+      <div className="grid gap-4 rounded-lg border p-4 sm:grid-cols-[1fr_200px]">
+        <Field label={<>Energy <Badge variant="secondary">{intensity < 0.35 ? 'quiet' : intensity > 0.65 ? 'loud' : 'natural'}</Badge></>}>
+          <Slider min={0} max={1} step={0.05} value={[intensity]} onValueChange={([v]) => setIntensity(v)} aria-label="Energy" className="py-2" />
+        </Field>
+        <Field label="Pace">
+          <ChoiceSelect options={PACE_OPTIONS} value={pace} onChange={(v) => setPace(v as (typeof PACES)[number])} />
+        </Field>
       </div>
-      {error && <p className="error">{error}</p>}
+      <div>
+        <Button disabled={busy !== null || !text.trim()} onClick={speak}>
+          <Volume2 /> {busy === 'speak' ? 'Speaking…' : 'Speak'}
+        </Button>
+      </div>
+      <ErrorAlert message={error} />
       {url && <Result url={url} name="directed.wav" />}
     </>
   );
@@ -248,44 +229,46 @@ function Compare({ voices }: { voices: Voice[] }) {
 
   return (
     <>
-      <label className="field">
-        Text
-        <textarea rows={2} maxLength={300} value={text} onChange={(e) => setText(e.target.value)} />
-      </label>
-      <label className="field">
-        Language
-        <select value={language} onChange={(e) => setLanguage(e.target.value)}>
-          {LANGUAGES.map(([code, label]) => (
-            <option key={code} value={code}>{label}</option>
-          ))}
-        </select>
-      </label>
-      {chosen.map((voice, i) => (
-        <div key={i} className="field">
-          Voice {i + 1}
-          <div className="row">
-            <VoiceSelect voices={voices} value={voice} allowDefault onChange={(v) => setChosen(chosen.map((c, j) => (j === i ? v : c)))} />
-            {chosen.length > 2 && (
-              <button className="secondary" disabled={busy !== null} onClick={() => setChosen(chosen.filter((_, j) => j !== i))}>
-                Remove
-              </button>
+      <div className="grid gap-4 sm:grid-cols-[1fr_200px]">
+        <Field label="Text" htmlFor="compare-text">
+          <Textarea id="compare-text" rows={2} maxLength={300} value={text} onChange={(e) => setText(e.target.value)} />
+        </Field>
+        <Field label="Language">
+          <ChoiceSelect options={LANGUAGES} value={language} onChange={setLanguage} />
+        </Field>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {chosen.map((voice, i) => (
+          <div key={i} className="flex flex-col gap-2 rounded-lg border p-3">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">Voice {i + 1}</span>
+              {busy === i && <Muted className="text-xs">Speaking…</Muted>}
+              {chosen.length > 2 && (
+                <Button variant="ghost" size="icon" className="ml-auto size-7" aria-label="Remove" disabled={busy !== null} onClick={() => setChosen(chosen.filter((_, j) => j !== i))}>
+                  <Trash2 />
+                </Button>
+              )}
+            </div>
+            <VoiceSelect voices={voices} value={voice} onChange={(v) => setChosen(chosen.map((c, j) => (j === i ? v : c)))} />
+            {results[i] && (
+              <div aria-label={name(voice)}>
+                <AudioResult src={apiUrl(results[i])} />
+              </div>
             )}
           </div>
-          {busy === i && <span className="meta">Speaking…</span>}
-          {results[i] && <audio controls src={apiUrl(results[i])} aria-label={name(voice)} />}
-        </div>
-      ))}
-      <div className="row">
-        {chosen.length < MAX_COMPARE && (
-          <button className="secondary" disabled={busy !== null} onClick={() => setChosen([...chosen, ''])}>
-            Add a voice
-          </button>
-        )}
-        <button className="primary" disabled={busy !== null || !text.trim()} onClick={run}>
-          {busy !== null ? 'Comparing…' : 'Compare'}
-        </button>
+        ))}
       </div>
-      {error && <p className="error">{error}</p>}
+      <div className="flex flex-wrap gap-2">
+        {chosen.length < MAX_COMPARE && (
+          <Button variant="outline" disabled={busy !== null} onClick={() => setChosen([...chosen, ''])}>
+            <Plus /> Add a voice
+          </Button>
+        )}
+        <Button disabled={busy !== null || !text.trim()} onClick={run}>
+          {busy !== null ? 'Comparing…' : 'Compare'}
+        </Button>
+      </div>
+      <ErrorAlert message={error} />
     </>
   );
 }
@@ -316,23 +299,21 @@ function Fit() {
 
   return (
     <>
-      <label className="field">
-        Audio (WAV, MP3, FLAC or OGG)
-        <input type="file" accept=".wav,.mp3,.flac,.ogg,audio/*" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-      </label>
-      <label className="field">
-        New length in seconds
-        <input type="number" min={0.1} step={0.1} value={seconds} onChange={(e) => setSeconds(e.target.value)} placeholder="e.g. 12.5" />
-      </label>
-      <div className="row">
-        <button className="primary" disabled={busy || !file || !(Number(seconds) > 0)} onClick={run}>
-          {busy ? 'Fitting…' : 'Fit'}
-        </button>
+      <Field label="Audio" hint="WAV, MP3, FLAC or OGG">
+        <FileDrop file={file} onFile={setFile} accept=".wav,.mp3,.flac,.ogg,audio/*" disabled={busy} />
+      </Field>
+      <div className="flex flex-wrap items-end gap-3">
+        <Field label="New length in seconds" htmlFor="fit-seconds" className="w-48">
+          <Input id="fit-seconds" type="number" min={0.1} step={0.1} value={seconds} onChange={(e) => setSeconds(e.target.value)} placeholder="e.g. 12.5" />
+        </Field>
+        <Button disabled={busy || !file || !(Number(seconds) > 0)} onClick={run}>
+          <Timer /> {busy ? 'Fitting…' : 'Fit'}
+        </Button>
       </div>
-      {error && <p className="error">{error}</p>}
+      <ErrorAlert message={error} />
       {result && (
         <>
-          <p className="meta">Was {result.original_seconds.toFixed(2)} s, now {Number(seconds).toFixed(2)} s.</p>
+          <Muted>Was {result.original_seconds.toFixed(2)} s, now {Number(seconds).toFixed(2)} s.</Muted>
           <Result url={result.url} name="fitted.wav" />
         </>
       )}
@@ -372,22 +353,24 @@ function Probe() {
 
   return (
     <>
-      <label className="field">
-        Audio or video file
-        <input type="file" accept="audio/*,video/*,.mkv" disabled={busy} onChange={(e) => e.target.files?.[0] && run(e.target.files[0])} />
-      </label>
-      {busy && <p className="meta">Reading…</p>}
-      {error && <p className="error">{error}</p>}
+      <FileDrop
+        file={null}
+        onFile={(f) => f && run(f)}
+        accept="audio/*,video/*,.mkv"
+        disabled={busy}
+        label={busy ? 'Reading…' : 'Drop an audio or video file here or click to choose'}
+      />
+      <ErrorAlert message={error} />
       {info && (
-        <div className="field">
-          <span>{info.format}</span>
+        <div className="flex flex-col gap-1 rounded-lg border p-4 text-sm">
+          <span className="font-medium">{info.format}</span>
           <span>
             {info.duration !== null && `${info.duration.toFixed(2)} s`}
             {info.size !== null && ` · ${megabytes(info.size)}`}
             {info.bit_rate !== null && ` · ${Math.round(info.bit_rate / 1000)} kb/s`}
           </span>
           {info.streams.map((s, i) => (
-            <span key={i} className="meta">
+            <span key={i} className="text-muted-foreground">
               {s.type === 'video' ? 'Video' : s.type === 'audio' ? 'Audio' : 'Subtitles'}: {s.codec}
               {s.width && ` · ${s.width}×${s.height}`}
               {s.fps && ` · ${s.fps} fps`}

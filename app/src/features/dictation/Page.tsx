@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Copy, Mic, Square } from 'lucide-react';
 import { apiUrl } from '../../api';
+import { ChoiceSelect } from '@/components/choice-select';
+import { ErrorAlert, Field, Muted, Page as PageLayout, Section } from '@/components/page';
+import { Button } from '@/components/ui/button';
+import { LiveWaveform } from '@/components/ui/live-waveform';
+import { MicSelector } from '@/components/ui/mic-selector';
 
 interface TranscribeResult {
   text: string;
@@ -7,7 +13,7 @@ interface TranscribeResult {
 }
 
 const LANGUAGES: [string, string][] = [
-  ['', 'Auto-detect'], ['en', 'English'], ['es', 'Spanish'], ['fr', 'French'], ['de', 'German'],
+  ['auto', 'Auto-detect'], ['en', 'English'], ['es', 'Spanish'], ['fr', 'French'], ['de', 'German'],
   ['it', 'Italian'], ['pt', 'Portuguese'], ['nl', 'Dutch'], ['ru', 'Russian'], ['zh', 'Chinese'],
   ['ja', 'Japanese'], ['ko', 'Korean'], ['ar', 'Arabic'], ['hi', 'Hindi'], ['tr', 'Turkish'],
 ];
@@ -19,18 +25,22 @@ const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '
 export default function Page() {
   const [phase, setPhase] = useState<Phase>('idle');
   const [elapsed, setElapsed] = useState(0);
-  const [language, setLanguage] = useState('');
+  const [language, setLanguage] = useState('auto');
+  const [device, setDevice] = useState('');
+  const [muted, setMuted] = useState(false);
   const [text, setText] = useState('');
   const [history, setHistory] = useState<string[]>([]);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
 
   const recorder = useRef<MediaRecorder | null>(null);
-  const timer = useRef<number>();
+  const timer = useRef<number | undefined>(undefined);
   const viaShortcut = useRef(false);
   const phaseRef = useRef<Phase>('idle');
   const languageRef = useRef(language);
   languageRef.current = language;
+  const deviceRef = useRef(device);
+  deviceRef.current = device;
 
   const setPhaseBoth = (p: Phase) => {
     phaseRef.current = p;
@@ -42,7 +52,7 @@ export default function Page() {
     try {
       const form = new FormData();
       form.append('file', blob, 'recording.webm');
-      if (languageRef.current) form.append('language', languageRef.current);
+      if (languageRef.current !== 'auto') form.append('language', languageRef.current);
       const res = await fetch(apiUrl('/api/dictation/transcribe'), { method: 'POST', body: form });
       if (!res.ok) {
         let msg = `${res.status}`;
@@ -75,7 +85,7 @@ export default function Page() {
       viaShortcut.current = fromShortcut;
       let stream: MediaStream;
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream = await navigator.mediaDevices.getUserMedia({ audio: deviceRef.current ? { deviceId: { exact: deviceRef.current } } : true });
       } catch (e) {
         const name = e instanceof DOMException ? e.name : '';
         setError(
@@ -142,65 +152,73 @@ export default function Page() {
 
   const recording = phase === 'recording';
   return (
-    <section className="page">
-      <h1>Dictation</h1>
-      <div className="card">
-        <div className="row">
-          <button className="primary" disabled={phase === 'transcribing'} onClick={() => toggle(false)}>
-            {recording ? 'Stop' : 'Record'}
-          </button>
-          {recording && <span aria-live="polite">● Recording {fmt(elapsed)}</span>}
-          {phase === 'transcribing' && <span aria-live="polite">Transcribing…</span>}
-          <label className="field">
-            Language
-            <select value={language} disabled={phase !== 'idle'} onChange={(e) => setLanguage(e.target.value)}>
-              {LANGUAGES.map(([code, name]) => (
-                <option key={code} value={code}>
-                  {name}
-                </option>
-              ))}
-            </select>
-          </label>
+    <PageLayout title="Dictation" description="Speak and get text, all on this computer.">
+      <Section title="Record">
+        <div className="bg-muted/30 flex flex-col items-center gap-4 rounded-xl border p-6">
+          <LiveWaveform active={recording} processing={phase === 'transcribing'} deviceId={device || undefined} height={64} mode="static" className="w-full" />
+          <div className="flex items-center gap-3">
+            <Button
+              size="lg"
+              variant={recording ? 'destructive' : 'default'}
+              className="rounded-full px-6"
+              disabled={phase === 'transcribing' || muted}
+              onClick={() => toggle(false)}
+            >
+              {recording ? <Square /> : <Mic />} {recording ? 'Stop' : 'Record'}
+            </Button>
+            {recording && <span aria-live="polite" className="text-destructive text-sm tabular-nums">● Recording {fmt(elapsed)}</span>}
+            {phase === 'transcribing' && <span aria-live="polite" className="text-muted-foreground text-sm">Transcribing…</span>}
+          </div>
         </div>
-        <small>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Microphone" hint={muted ? 'Muted: unmute it to record.' : undefined}>
+            <MicSelector value={device} onValueChange={setDevice} muted={muted} onMutedChange={setMuted} disabled={phase !== 'idle'} className="w-full justify-start border sm:w-full" />
+          </Field>
+          <Field label="Language">
+            <ChoiceSelect options={LANGUAGES} value={language} disabled={phase !== 'idle'} onChange={setLanguage} />
+          </Field>
+        </div>
+        <Muted className="text-xs">
           {window.voxwell
             ? 'Press Ctrl/Cmd+Shift+Space anywhere to start and stop; the text is copied for you to paste.'
             : 'The global shortcut is available in the desktop app.'}
-        </small>
-        {error && (
-          <p className="error" role="alert">
-            {error}
-          </p>
-        )}
-      </div>
+        </Muted>
+        <div role="alert">
+          <ErrorAlert message={error} />
+        </div>
+      </Section>
 
-      <div className="card">
-        <h2>Result</h2>
+      <Section title="Result">
         {text ? (
           <>
-            <p>{text}</p>
-            <div className="row">
-              <button onClick={() => copy(text)}>{copied ? 'Copied' : 'Copy'}</button>
+            <p className="leading-relaxed">{text}</p>
+            <div>
+              <Button variant="outline" size="sm" onClick={() => copy(text)}>
+                <Copy /> {copied ? 'Copied' : 'Copy'}
+              </Button>
             </div>
           </>
         ) : (
-          <p>Nothing yet. Press Record and speak.</p>
+          <Muted>Nothing yet. Press Record and speak.</Muted>
         )}
-      </div>
+      </Section>
 
-      <div className="card">
-        <h2>Recent</h2>
+      <Section title="Recent">
         {history.length === 0 ? (
-          <p>No transcripts yet.</p>
+          <Muted>No transcripts yet.</Muted>
         ) : (
-          history.map((h, i) => (
-            <div className="row" key={i}>
-              <span style={{ flex: 1 }}>{h}</span>
-              <button onClick={() => copy(h)}>Copy</button>
-            </div>
-          ))
+          <div className="divide-y">
+            {history.map((h, i) => (
+              <div className="flex items-start gap-3 py-2 text-sm" key={i}>
+                <span className="flex-1">{h}</span>
+                <Button variant="ghost" size="sm" onClick={() => copy(h)}>
+                  <Copy /> Copy
+                </Button>
+              </div>
+            ))}
+          </div>
         )}
-      </div>
-    </section>
+      </Section>
+    </PageLayout>
   );
 }

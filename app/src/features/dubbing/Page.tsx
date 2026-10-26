@@ -1,5 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
+import { Captions, Download, Languages } from 'lucide-react';
 import { api, apiUrl, listVoices, type Voice } from '../../api';
+import { ChoiceSelect } from '@/components/choice-select';
+import { FileDrop } from '@/components/file-drop';
+import { JobProgress } from '@/components/job-progress';
+import { ErrorAlert, Field, message, Muted, Page as PageLayout, Section } from '@/components/page';
+import { VoiceSelect } from '@/components/voice-select';
+import { Button } from '@/components/ui/button';
 import { LANGUAGES } from './languages';
 
 interface JobStatus {
@@ -10,13 +17,15 @@ interface JobStatus {
   error: string | null;
 }
 
+const ORIGINAL = 'original';
+
 export default function Page() {
   const [file, setFile] = useState<File | null>(null);
   const [language, setLanguage] = useState('es');
-  const [voice, setVoice] = useState('original');
+  const [voice, setVoice] = useState(ORIGINAL);
   const [voices, setVoices] = useState<Voice[]>([]);
   const [job, setJob] = useState<JobStatus | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const timer = useRef<number | undefined>(undefined);
 
@@ -35,8 +44,8 @@ export default function Page() {
           setBusy(false);
         }
       },
-      (e: Error) => {
-        setError(e.message);
+      (e) => {
+        setError(message(e));
         setBusy(false);
       },
     );
@@ -44,7 +53,7 @@ export default function Page() {
 
   const start = async () => {
     if (!file) return;
-    setError(null);
+    setError('');
     setJob(null);
     setBusy(true);
     const form = new FormData();
@@ -55,7 +64,7 @@ export default function Page() {
       const { id } = await api<{ id: string }>('/api/dubbing/jobs', { method: 'POST', body: form });
       poll(id);
     } catch (e) {
-      setError((e as Error).message);
+      setError(message(e));
       setBusy(false);
     }
   };
@@ -63,58 +72,51 @@ export default function Page() {
   const failed = job?.state === 'error';
 
   return (
-    <section className="page">
-      <h1>Dubbing</h1>
-      <div className="card">
-        <label className="field">
-          Video
-          <input type="file" accept="video/*,.mkv" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-        </label>
-        <div className="row">
-          <label className="field">
-            Target language
-            <select value={language} onChange={(e) => setLanguage(e.target.value)}>
-              {LANGUAGES.map(([code, name]) => (
-                <option key={code} value={code}>{name}</option>
-              ))}
-            </select>
-          </label>
-          <label className="field">
-            Voice
-            <select value={voice} onChange={(e) => setVoice(e.target.value)}>
-              <option value="original">Original speaker</option>
-              {voices.map((v) => (
-                <option key={v.id} value={v.id}>{v.name}</option>
-              ))}
-            </select>
-          </label>
+    <PageLayout title="Dubbing" description="Translate a video into another language, spoken in the original voice or one of yours.">
+      <Section title="Video">
+        <FileDrop file={file} onFile={setFile} accept="video/*,.mkv" disabled={busy} hint="MP4, MKV, MOV, WebM…" />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Target language">
+            <ChoiceSelect options={LANGUAGES} value={language} onChange={setLanguage} />
+          </Field>
+          <Field label="Voice">
+            <VoiceSelect
+              voices={voices}
+              value={voice === ORIGINAL ? '' : voice}
+              onChange={(id) => setVoice(id || ORIGINAL)}
+              defaultLabel="Original speaker"
+              defaultDescription="Clone the voice in the video"
+            />
+          </Field>
         </div>
-        {voices.length === 0 && <small>No saved voices yet; create one in Voice cloning or Voice design.</small>}
-        <div className="row">
-          <button className="primary" disabled={!file || busy} onClick={start}>
-            {busy ? 'Dubbing…' : 'Start'}
-          </button>
+        {voices.length === 0 && <Muted className="text-xs">No saved voices yet; create one in Voice cloning or Voice design.</Muted>}
+        <div>
+          <Button disabled={!file || busy} onClick={start}>
+            <Languages /> {busy ? 'Dubbing…' : 'Start'}
+          </Button>
         </div>
-      </div>
+      </Section>
 
       {job && !failed && job.state !== 'done' && (
-        <div className="card">
-          <div>{job.step}</div>
-          <progress max={100} value={job.percent} style={{ width: '100%' }} />
-          <small>You can leave this page; the dub keeps going and appears in Projects.</small>
-        </div>
+        <Section title="Dubbing">
+          <JobProgress step={job.step} percent={job.percent} hint="You can leave this page; the dub keeps going and appears in Projects." />
+        </Section>
       )}
-      {(error || failed) && <p className="error">{error ?? job?.error}</p>}
+      <ErrorAlert message={error || (failed ? job?.error ?? 'Failed' : '')} />
 
       {job?.state === 'done' && (
-        <div className="card">
+        <Section title="Dubbed video">
           <video controls src={apiUrl(`/api/dubbing/jobs/${job.id}/video`)} />
-          <div className="row">
-            <a href={apiUrl(`/api/dubbing/jobs/${job.id}/video`)} download="dubbed.mp4">Download video</a>
-            <a href={apiUrl(`/api/dubbing/jobs/${job.id}/subtitles`)} download="subtitles.srt">Download subtitles</a>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild variant="outline">
+              <a href={apiUrl(`/api/dubbing/jobs/${job.id}/video`)} download="dubbed.mp4"><Download /> Download video</a>
+            </Button>
+            <Button asChild variant="outline">
+              <a href={apiUrl(`/api/dubbing/jobs/${job.id}/subtitles`)} download="subtitles.srt"><Captions /> Download subtitles</a>
+            </Button>
           </div>
-        </div>
+        </Section>
       )}
-    </section>
+    </PageLayout>
   );
 }

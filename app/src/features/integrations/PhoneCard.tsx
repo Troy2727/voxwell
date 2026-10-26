@@ -1,5 +1,14 @@
 import { useEffect, useState } from 'react';
+import { Mic, Phone, PhoneOff, Save } from 'lucide-react';
 import { api, apiUrl, listVoices, sendJson, type Voice } from '../../api';
+import { AudioResult } from '@/components/audio-result';
+import { ChoiceSelect } from '@/components/choice-select';
+import { ErrorAlert, Field, message, Muted, Section } from '@/components/page';
+import { VoiceSelect } from '@/components/voice-select';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { LANGUAGES } from '../voice_cloning/languages';
 
 interface Phone {
@@ -15,8 +24,6 @@ interface Phone {
   webhook_url: string;
   calls: { time: number; from: string }[];
 }
-
-const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 /** Opt-in: callers to a Twilio number hear a greeting in a Voxwell voice. Off by default. */
 export default function PhoneCard() {
@@ -61,85 +68,78 @@ export default function PhoneCard() {
       return p;
     });
 
-  if (!phone) return error ? <p className="error">{error}</p> : null;
+  if (!phone) return <ErrorAlert message={error} />;
+
+  const status = phone.enabled ? (phone.gateway_running ? 'On: answering calls' : 'On: starting…') : 'Off';
 
   return (
-    <div className="card">
-      <h2 style={{ margin: 0 }}>Phone calls (Twilio) · optional</h2>
-      <p className="meta" style={{ margin: 0 }}>
-        People who call your Twilio number hear a greeting spoken in one of your voices. This is <strong>off</strong> unless you
-        turn it on. It needs a Twilio account and a tunnel (such as Cloudflare Tunnel or ngrok) that you run yourself; only a
-        small separate server with the greeting is exposed, never the rest of Voxwell, and every call must be signed by Twilio.
-      </p>
-
-      <label className="field">
-        Greeting
-        <textarea rows={2} maxLength={500} value={form.greeting_text} disabled={busy}
+    <Section
+      title="Phone calls (Twilio) · optional"
+      description={
+        <>
+          People who call your Twilio number hear a greeting spoken in one of your voices. This is <strong>off</strong> unless you
+          turn it on. It needs a Twilio account and a tunnel (such as Cloudflare Tunnel or ngrok) that you run yourself; only a
+          small separate server with the greeting is exposed, never the rest of Voxwell, and every call must be signed by Twilio.
+        </>
+      }
+      action={<Badge className={phone.enabled ? 'bg-success text-white' : undefined} variant={phone.enabled ? 'default' : 'secondary'}>{phone.enabled ? 'On' : 'Off'}</Badge>}
+    >
+      <Field label="Greeting" htmlFor="phone-greeting">
+        <Textarea id="phone-greeting" rows={2} maxLength={500} value={form.greeting_text} disabled={busy}
           onChange={(e) => setForm({ ...form, greeting_text: e.target.value })} placeholder="Hi! You've reached Voxwell. Please call back later." />
-      </label>
-      <div className="row">
-        <label className="field" style={{ flex: 1 }}>
-          Voice
-          <select value={form.voice_id} disabled={busy} onChange={(e) => setForm({ ...form, voice_id: e.target.value })}>
-            <option value="">Default voice</option>
-            {voices.map((v) => (
-              <option key={v.id} value={v.id}>{v.name}</option>
-            ))}
-          </select>
-        </label>
-        <label className="field">
-          Language
-          <select value={form.language} disabled={busy} onChange={(e) => setForm({ ...form, language: e.target.value })}>
-            {LANGUAGES.map(([code, label]) => (
-              <option key={code} value={code}>{label}</option>
-            ))}
-          </select>
-        </label>
+      </Field>
+      <div className="grid gap-4 sm:grid-cols-[1fr_200px]">
+        <Field label="Voice">
+          <VoiceSelect voices={voices} value={form.voice_id} disabled={busy} onChange={(voice_id) => setForm({ ...form, voice_id })} />
+        </Field>
+        <Field label="Language">
+          <ChoiceSelect options={LANGUAGES} value={form.language} disabled={busy} onChange={(language) => setForm({ ...form, language })} />
+        </Field>
       </div>
-      <div className="row">
-        <button className="secondary" disabled={busy || !form.greeting_text.trim()} onClick={record}>
-          {busy ? 'Working…' : phone.greeting_ready ? 'Record again' : 'Record greeting'}
-        </button>
-        {phone.greeting_ready && <audio key={audioKey} controls src={apiUrl(`/api/integrations/phone/greeting.wav?v=${audioKey}`)} />}
+      <div>
+        <Button variant="outline" disabled={busy || !form.greeting_text.trim()} onClick={record}>
+          <Mic /> {busy ? 'Working…' : phone.greeting_ready ? 'Record again' : 'Record greeting'}
+        </Button>
       </div>
+      {phone.greeting_ready && <AudioResult key={audioKey} src={apiUrl(`/api/integrations/phone/greeting.wav?v=${audioKey}`)} />}
 
-      <label className="field">
-        1. Run a tunnel to this address, then paste the public https address it gives you
-        <code>{phone.gateway}</code>
-        <input value={form.public_url} disabled={busy} onChange={(e) => setForm({ ...form, public_url: e.target.value })} placeholder="https://your-name.trycloudflare.com" />
-      </label>
-      <label className="field">
-        2. Twilio Auth Token (Twilio Console → Account Info) {phone.auth_token_set && '· saved; type a new one to replace it'}
-        <input type="password" autoComplete="off" value={token} disabled={busy} onChange={(e) => setToken(e.target.value)} />
-      </label>
+      <Field label="1. Run a tunnel to this address, then paste the public https address it gives you" htmlFor="phone-url">
+        <code className="self-start">{phone.gateway}</code>
+        <Input id="phone-url" value={form.public_url} disabled={busy} onChange={(e) => setForm({ ...form, public_url: e.target.value })} placeholder="https://your-name.trycloudflare.com" />
+      </Field>
+      <Field label={<>2. Twilio Auth Token (Twilio Console → Account Info) {phone.auth_token_set && <Muted className="inline text-xs">· saved; type a new one to replace it</Muted>}</>} htmlFor="phone-token">
+        <Input id="phone-token" type="password" autoComplete="off" value={token} disabled={busy} onChange={(e) => setToken(e.target.value)} />
+      </Field>
       {phone.webhook_url && (
-        <div className="field">
-          3. In Twilio, set your number's “A call comes in” webhook to (HTTP POST):
-          <code>{phone.webhook_url}</code>
-        </div>
+        <Field label="3. In Twilio, set your number's “A call comes in” webhook to (HTTP POST):">
+          <code className="self-start break-all">{phone.webhook_url}</code>
+        </Field>
       )}
 
-      <div className="row">
+      <div className="flex flex-wrap items-center gap-2">
         {phone.enabled ? (
-          <button className="secondary" disabled={busy} onClick={() => save(false)}>Turn off</button>
+          <Button variant="outline" disabled={busy} onClick={() => save(false)}><PhoneOff /> Turn off</Button>
         ) : (
-          <button className="primary" disabled={busy} onClick={() => save(true)}>Turn on</button>
+          <Button disabled={busy} onClick={() => save(true)}><Phone /> Turn on</Button>
         )}
-        <button className="secondary" disabled={busy} onClick={() => save(phone.enabled)}>Save</button>
-        <span className="meta">
-          {phone.enabled ? (phone.gateway_running ? 'On: answering calls' : 'On: starting…') : 'Off'}
+        <Button variant="outline" disabled={busy} onClick={() => save(phone.enabled)}><Save /> Save</Button>
+        <Muted>
+          {status}
           {phone.enabled && !phone.greeting_ready && ' · record a greeting, or calls just hang up'}
-        </span>
+        </Muted>
       </div>
-      {error && <p className="error">{error}</p>}
+      <ErrorAlert message={error} />
       {phone.calls.length > 0 && (
-        <div className="field">
-          Recent calls
-          {phone.calls.map((c, i) => (
-            <span key={i} className="meta">{new Date(c.time * 1000).toLocaleString()} · from {c.from}</span>
-          ))}
-        </div>
+        <Field label="Recent calls">
+          <div className="divide-y rounded-lg border px-3">
+            {phone.calls.map((c, i) => (
+              <div key={i} className="text-muted-foreground py-2 text-sm">
+                {new Date(c.time * 1000).toLocaleString()} · from {c.from}
+              </div>
+            ))}
+          </div>
+        </Field>
       )}
-    </div>
+    </Section>
   );
 }

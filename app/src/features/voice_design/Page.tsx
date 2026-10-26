@@ -1,5 +1,12 @@
 import { useState } from 'react';
+import { Sparkles } from 'lucide-react';
+import { toast } from 'sonner';
 import { api, apiUrl, type Voice } from '../../api';
+import { AudioResult } from '@/components/audio-result';
+import { ErrorAlert, Field, message, Page as PageLayout, Section } from '@/components/page';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 
 const EXAMPLES = [
   'Warm, low female voice, slight British accent, calm pace',
@@ -15,8 +22,6 @@ interface Preview {
 const post = <T,>(path: string, body: unknown) =>
   api<T>(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 
-const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
-
 export default function Page() {
   const [description, setDescription] = useState('');
   const [sampleText, setSampleText] = useState('');
@@ -24,13 +29,11 @@ export default function Page() {
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState<Voice | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState('');
 
   async function generate() {
     setLoading(true);
-    setError(null);
-    setSaved(null);
+    setError('');
     try {
       setPreview(await post<Preview>('/api/voice_design/preview', { description, sample_text: sampleText || undefined }));
     } catch (e) {
@@ -43,9 +46,10 @@ export default function Page() {
   async function save() {
     if (!preview) return;
     setSaving(true);
-    setError(null);
+    setError('');
     try {
-      setSaved(await post<Voice>('/api/voice_design/save', { preview_id: preview.preview_id, name }));
+      const saved = await post<Voice>('/api/voice_design/save', { preview_id: preview.preview_id, name });
+      toast.success(`Saved "${saved.name}" to your voices.`);
     } catch (e) {
       setError(message(e));
     } finally {
@@ -54,46 +58,41 @@ export default function Page() {
   }
 
   return (
-    <section className="page">
-      <h1>Voice design</h1>
-      <div className="card">
-        <label className="field">
-          Describe the voice
-          <textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} />
-        </label>
-        <div className="row" style={{ flexWrap: 'wrap' }}>
+    <PageLayout title="Voice design" description="Describe a voice in words and Voxwell creates it.">
+      <Section title="Describe the voice">
+        <Field label="Description" htmlFor="design-description">
+          <Textarea id="design-description" rows={3} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Age, gender, accent, tone, pace…" />
+        </Field>
+        <div className="flex flex-wrap gap-2">
           {EXAMPLES.map((ex) => (
-            <button key={ex} type="button" onClick={() => setDescription(ex)}>
+            <Button key={ex} type="button" variant="secondary" size="sm" className="h-auto py-1.5 text-left whitespace-normal" onClick={() => setDescription(ex)}>
               {ex}
-            </button>
+            </Button>
           ))}
         </div>
-        <label className="field">
-          Sample text (optional)
-          <textarea rows={2} value={sampleText} onChange={(e) => setSampleText(e.target.value)} />
-        </label>
-        <div className="row">
-          <button className="primary" onClick={generate} disabled={loading || !description.trim()}>
-            {loading ? 'Generating...' : preview ? 'Regenerate' : 'Preview'}
-          </button>
+        <Field label="Sample text (optional)" htmlFor="design-sample">
+          <Textarea id="design-sample" rows={2} value={sampleText} onChange={(e) => setSampleText(e.target.value)} />
+        </Field>
+        <div>
+          <Button onClick={generate} disabled={loading || !description.trim()}>
+            <Sparkles /> {loading ? 'Generating...' : preview ? 'Regenerate' : 'Preview'}
+          </Button>
         </div>
-      </div>
-      {error && <p className="error">{error}</p>}
+      </Section>
+      <ErrorAlert message={error} />
       {preview && (
-        <div className="card">
-          <audio controls src={apiUrl(preview.url)} />
-          <div className="row">
-            <label className="field" style={{ flex: 1 }}>
-              Voice name
-              <input value={name} onChange={(e) => setName(e.target.value)} />
-            </label>
-            <button className="primary" onClick={save} disabled={saving || !name.trim()}>
+        <Section title="Preview">
+          <AudioResult src={apiUrl(preview.url)} download="voxwell-voice-preview.wav" />
+          <div className="flex items-end gap-2">
+            <Field label="Voice name" htmlFor="design-name" className="flex-1">
+              <Input id="design-name" value={name} onChange={(e) => setName(e.target.value)} />
+            </Field>
+            <Button onClick={save} disabled={saving || !name.trim()}>
               {saving ? 'Saving...' : 'Save to voices'}
-            </button>
+            </Button>
           </div>
-          {saved && <p>Saved "{saved.name}" to your voices.</p>}
-        </div>
+        </Section>
       )}
-    </section>
+    </PageLayout>
   );
 }

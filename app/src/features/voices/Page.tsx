@@ -1,7 +1,15 @@
 import { useEffect, useState } from 'react';
+import { Pencil } from 'lucide-react';
+import { toast } from 'sonner';
 import { apiUrl, listVoices, sendJson, type Voice } from '../../api';
-
-const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
+import { AudioResult } from '@/components/audio-result';
+import { ConfirmButton } from '@/components/confirm-button';
+import { ErrorAlert, message, Muted, Page as PageLayout } from '@/components/page';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function Page() {
   const [voices, setVoices] = useState<Voice[] | null>(null);
@@ -17,19 +25,20 @@ export default function Page() {
   }, []);
 
   return (
-    <section className="page">
-      <h1>Saved voices</h1>
-      {error && <p className="error">{error}</p>}
-      {voices === null && <p className="meta">Loading…</p>}
+    <PageLayout title="Saved voices" description="Every voice you uploaded or designed. Rename, listen or delete.">
+      <ErrorAlert message={error} />
+      {voices === null && <Skeleton className="h-32 w-full" />}
       {voices?.length === 0 && !error && (
-        <div className="card">
-          <p>No saved voices yet. Upload one in Voice cloning or design one in Voice design.</p>
-        </div>
+        <Card>
+          <CardContent>
+            <Muted>No saved voices yet. Upload one in Voice cloning or design one in Voice design.</Muted>
+          </CardContent>
+        </Card>
       )}
       {voices?.map((v) => (
         <VoiceCard key={v.id} voice={v} onChanged={refresh} onError={(e) => setError(message(e))} />
       ))}
-    </section>
+    </PageLayout>
   );
 }
 
@@ -38,12 +47,13 @@ function VoiceCard({ voice, onChanged, onError }: { voice: Voice; onChanged: () 
   const [name, setName] = useState(voice.name);
   const [busy, setBusy] = useState(false);
 
-  async function run(action: () => Promise<unknown>) {
+  async function run(action: () => Promise<unknown>, done: string) {
     setBusy(true);
     try {
       await action();
       setEditing(false);
       onChanged();
+      toast.success(done);
     } catch (e) {
       onError(e);
     } finally {
@@ -51,40 +61,32 @@ function VoiceCard({ voice, onChanged, onError }: { voice: Voice; onChanged: () 
     }
   }
 
-  const rename = () => run(() => sendJson(`/api/voices/${voice.id}`, 'PATCH', { name }));
-  const remove = () => {
-    if (window.confirm(`Delete "${voice.name}"? This cannot be undone.`)) void run(() => sendJson(`/api/voices/${voice.id}`, 'DELETE'));
-  };
+  const rename = () => run(() => sendJson(`/api/voices/${voice.id}`, 'PATCH', { name }), 'Renamed');
+  const remove = () => run(() => sendJson(`/api/voices/${voice.id}`, 'DELETE'), `Deleted "${voice.name}"`);
 
   return (
-    <div className="card">
-      {editing ? (
-        <div className="row">
-          <input value={name} onChange={(e) => setName(e.target.value)} style={{ flex: 1 }} autoFocus />
-          <button className="primary" disabled={busy || !name.trim()} onClick={rename}>
-            Save
-          </button>
-          <button className="secondary" disabled={busy} onClick={() => setEditing(false)}>
-            Cancel
-          </button>
-        </div>
-      ) : (
-        <div className="row">
-          <h2 style={{ flex: 1, margin: 0 }}>{voice.name}</h2>
-          <span className="meta">{voice.source === 'design' ? 'Designed' : 'Uploaded'}</span>
-        </div>
-      )}
-      <audio controls preload="none" src={apiUrl(`/api/voices/${voice.id}/audio`)} />
-      {!editing && (
-        <div className="row">
-          <button className="secondary" disabled={busy} onClick={() => { setName(voice.name); setEditing(true); }}>
-            Rename
-          </button>
-          <button className="secondary danger" disabled={busy} onClick={remove}>
-            Delete
-          </button>
-        </div>
-      )}
-    </div>
+    <Card className="gap-4 py-4">
+      <CardContent className="flex flex-col gap-3 px-4">
+        {editing ? (
+          <div className="flex items-center gap-2">
+            <Input value={name} onChange={(e) => setName(e.target.value)} className="flex-1" autoFocus />
+            <Button disabled={busy || !name.trim()} onClick={rename}>Save</Button>
+            <Button variant="outline" disabled={busy} onClick={() => setEditing(false)}>Cancel</Button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <h2 className="flex-1 truncate font-semibold">{voice.name}</h2>
+            <Badge variant="secondary">{voice.source === 'design' ? 'Designed' : 'Uploaded'}</Badge>
+            <Button variant="outline" size="sm" disabled={busy} onClick={() => { setName(voice.name); setEditing(true); }}>
+              <Pencil /> Rename
+            </Button>
+            <ConfirmButton title={`Delete "${voice.name}"?`} disabled={busy} onConfirm={remove}>
+              Delete
+            </ConfirmButton>
+          </div>
+        )}
+        <AudioResult src={apiUrl(`/api/voices/${voice.id}/audio`)} lazy />
+      </CardContent>
+    </Card>
   );
 }

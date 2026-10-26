@@ -4,6 +4,8 @@
 
 - `backend/voxwell/features/<feature>/`: one folder per feature (`voice_cloning`, `voice_design`, `voices`, `gallery`, `stories`, `audiobook`, `dubbing`, `batch`, `dictation`, `transcription`, `tools`, `integrations`, `projects`) with its FastAPI `router.py`, mounted at `/api/<feature>/`. `projects` owns no files: it lists, renames and deletes through each feature's own store (`voice_cloning/history.py`, `stories/jobs.py`, `audiobook/books.py`, `dubbing/jobs.py`, `transcription/jobs.py`). A feature can run a background task while the server is up via `Feature.background` (the watch folder uses it).
 - `app/src/features/<feature>/Page.tsx`: the matching React page.
+- `app/src/components/`: Voxwell's shared page pieces (`Page`, `Section`, `Field`, `FileDrop`, `AudioResult`, `VoiceSelect`, `JobProgress`, `ConfirmButton`).
+- `app/src/components/ui/`: UI components copied from shadcn/ui and ElevenLabs UI (both MIT); see its `LICENSES.md`.
 - `app/electron/`: the desktop shell; it starts the backend.
 
 ## Licensing
@@ -30,7 +32,8 @@ Models must allow commercial use for both **code and weights** (MIT, Apache-2.0,
 ## Frontend
 
 - React function components in TypeScript. Talk to the backend through `app/src/api.ts`.
-- Use the shared classes in `app/src/styles.css`. Show loading, error and empty states.
+- Build pages from `app/src/components` and `app/src/components/ui`, styled with Tailwind classes. Use the theme colors (`bg-primary`, `text-muted-foreground`, …) defined in `app/src/styles.css`, never raw color values, so dark and light mode both work. Show loading, error and empty states.
+- To add a shadcn component, run `npx shadcn@latest add <name>` in `app/`. The CLI imports `cn` from the `cn` package; change that to `@/lib/utils` and uninstall `cn`. List the file in `app/src/components/ui/LICENSES.md`, and mark any change you make to a copied file with a `Voxwell:` comment.
 
 ## Cross-platform
 
