@@ -1,0 +1,36 @@
+/* Shared tokens and building blocks. Feature-specific styles live in each feature folder. */
+:root {
+  --bg: #0f1a2e;
+  --panel: #16243d;
+  --border: #26385a;
+  --text: #e8edf5;
+  --muted: #8fa0bb;
+  --accent: #f28c28;
+  --danger: #e5484d;
+  --radius: 8px;
+  font-family: system-ui, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; }
+
+.shell { display: flex; height: 100vh; }
+.sidebar { width: 220px; padding: 16px; background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 4px; }
+.brand { font-weight: 700; font-size: 20px; color: var(--accent); margin-bottom: 16px; }
+.nav { text-align: left; background: none; border: none; color: var(--muted); padding: 8px 12px; border-radius: var(--radius); cursor: pointer; }
+.nav.active, .nav:hover { background: var(--border); color: var(--text); }
+.status { margin-top: auto; font-size: 12px; color: var(--muted); }
+.content { flex: 1; overflow: auto; padding: 32px; }
+
+.page { max-width: 760px; display: flex; flex-direction: column; gap: 16px; }
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.field { display: flex; flex-direction: column; gap: 4px; font-size: 14px; color: var(--muted); }
+.row { display: flex; gap: 8px; align-items: center; }
+.error { color: var(--danger); }
+
+input, select, textarea { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px; font: inherit; }
+button.primary { background: var(--accent); color: #fff; border: none; border-radius: var(--radius); padding: 8px 16px; font-weight: 600; cursor: pointer; }
+button.primary:disabled { opacity: 0.5; cursor: default; }
+audio, video { width: 100%; }

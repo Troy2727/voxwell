@@ -1,0 +1,63 @@
+"""Speech recognition engine. Shared contract: dubbing calls transcribe(); keep its signature."""
+
+import os
+import threading
+from dataclasses import dataclass
+from pathlib import Path
+
+
+@dataclass
+class Segment:
+    start: float  # seconds
+    end: float
+    text: str
+
+
+@dataclass
+class Transcript:
+    text: str
+    language: str  # ISO 639-1 code
+    segments: list[Segment]
+
+
+class AudioError(ValueError):
+    """The audio is empty or cannot be decoded."""
+
+
+DEFAULT_MODEL = "small"
+_model = None
+_lock = threading.Lock()
+
+
+def _load_model():
+    """Load faster-whisper once per process: CUDA (float16) if available, else CPU int8.
+
+    CTranslate2 has no Apple MPS backend, so macOS uses CPU int8.
+    """
+    global _model
+    with _lock:
+        if _model is None:
+            from faster_whisper import WhisperModel
+            import ctranslate2
+
+            size = os.environ.get("VOXWELL_WHISPER_MODEL", DEFAULT_MODEL)
+            if ctranslate2.get_cuda_device_count() > 0:
+                _model = WhisperModel(size, device="cuda", compute_type="float16")
+            else:
+                _model = WhisperModel(size, device="cpu", compute_type="int8")
+        return _model
+
+
+def transcribe(audio_path: Path, language: str | None = None) -> Transcript:
+    """Transcribe an audio file; detect the language when `language` is None."""
+    model = _load_model()
+    try:
+        segments, info = model.transcribe(str(audio_path), language=language or None)
+        parts = [Segment(start=s.start, end=s.end, text=s.text.strip()) for s in segments]
+    except Exception as exc:
+        # PyAV (the decoder) raises its own error types for unreadable audio.
+        if type(exc).__module__.split(".")[0] == "av":
+            raise AudioError("Could not decode the audio.") from exc
+        raise
+    text = " ".join(p.text for p in parts if p.text).strip()
+    return Transcript(text=text, language=info.language, segments=parts)

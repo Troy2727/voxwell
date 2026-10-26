@@ -1,0 +1,61 @@
+[project]
+name = "voxwell"
+version = "0.1.0"
+description = "Voxwell backend"
+license = "MIT"
+requires-python = ">=3.11,<3.12"  # chatterbox-tts 0.1.6 pins numpy<1.26 (no 3.12 wheels)
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+    "python-multipart>=0.0.9",
+    "platformdirs>=4",
+    # Models (imported lazily by each feature).
+    "chatterbox-tts==0.1.6",
+    "parler-tts @ git+https://github.com/huggingface/parler-tts.git",
+    "faster-whisper>=1.0",
+    "transformers==4.46.3",
+    "torch",
+    "torchaudio",  # listed directly so the CUDA index source below applies to it
+    "sentencepiece",
+    "soundfile",
+]
+
+[tool.uv]
+# parler-tts pins transformers==4.46.1; chatterbox-tts 0.1.6 needs 4.46.3 (patch-level bump).
+override-dependencies = [
+    "transformers==4.46.3",
+    # pykakasi is GPL-3.0 (chatterbox-tts uses it only for Japanese); never install it.
+    "pykakasi; sys_platform == 'never'",
+]
+# onnx>=1.18 imports ml_dtypes features that need numpy>=1.26, which chatterbox-tts forbids.
+constraint-dependencies = ["onnx<1.18"]
+
+# CUDA builds on Windows/Linux (they fall back to CPU without an NVIDIA GPU); macOS uses the
+# default PyPI build, which supports Apple MPS.
+[tool.uv.sources]
+torch = [{ index = "pytorch-cu124", marker = "sys_platform != 'darwin'" }]
+torchaudio = [{ index = "pytorch-cu124", marker = "sys_platform != 'darwin'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cu124"
+url = "https://download.pytorch.org/whl/cu124"
+explicit = true
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[project.scripts]
+voxwell = "voxwell.main:run"
+
+[dependency-groups]
+dev = ["pytest>=8", "httpx>=0.27"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["voxwell"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
