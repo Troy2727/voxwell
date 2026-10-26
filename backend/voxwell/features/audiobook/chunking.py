@@ -3,6 +3,7 @@
 import re
 
 MAX_CHARS = 250  # Chatterbox drifts on long inputs; a sentence or two at a time sounds best
+MIN_STANDALONE = 40  # shorter paragraphs are joined to the next one (see chapter_chunks)
 
 # A sentence ends at . ! ? or … (optionally followed by one closing quote/bracket) and a space.
 # Split on the space only, so no text is lost. Abbreviations ("Mr. Smith") may split, but short
@@ -55,5 +56,23 @@ def chunks(paragraph: str) -> list[str]:
 
 
 def chapter_chunks(text: str) -> list[list[str]]:
-    """Chunks for each paragraph of a chapter (paragraphs are separated by blank lines)."""
-    return [c for c in (chunks(p) for p in text.split("\n\n")) if c]
+    """Chunks for each paragraph of a chapter (paragraphs are separated by blank lines).
+
+    A very short paragraph (usually a heading such as "The Ship") is spoken together with the
+    next one: on its own, Chatterbox tends to loop or ramble on title-like phrases ("The ship.
+    The ship."), and no generation setting prevents it reliably.
+    """
+    merged, carry = [], ""
+    for paragraph in (p.strip() for p in text.split("\n\n")):
+        if not paragraph:
+            continue
+        if carry:
+            paragraph = f"{carry} {paragraph}"
+            carry = ""
+        if len(paragraph) < MIN_STANDALONE:
+            carry = paragraph if paragraph[-1] in ".!?…:;" else paragraph + "."
+        else:
+            merged.append(paragraph)
+    if carry:  # a short last paragraph has nothing to join; speak it as it is
+        merged.append(carry)
+    return [c for c in (chunks(p) for p in merged) if c]

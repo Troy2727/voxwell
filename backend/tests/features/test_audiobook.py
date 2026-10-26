@@ -133,7 +133,26 @@ def test_long_text_is_split_without_losing_words():
 
 
 def test_paragraphs_stay_separate():
-    assert chapter_chunks("One.\n\nTwo.") == [["One."], ["Two."]]
+    one, two = "The keeper climbed the long stairs slowly.", "Below him the sea was quiet and very dark."
+    assert chapter_chunks(f"{one}\n\n{two}") == [[one], [two]]
+
+
+def test_short_headings_are_spoken_with_the_next_paragraph():
+    """Alone, title-like phrases make Chatterbox loop ("The ship. The ship.")."""
+    text = "Chapter 3\n\nThe Ship\n\nFar out, a small ship fought the wind all night long."
+    assert chapter_chunks(text) == [["Chapter 3. The Ship. Far out, a small ship fought the wind all night long."]]
+
+
+def test_a_short_last_paragraph_is_still_spoken():
+    long = "The keeper climbed the long stairs slowly."
+    assert chapter_chunks(f"{long}\n\nThe End") == [[long], ["The End."]]
+
+
+def test_pauses_between_sentences_and_paragraphs(fake):
+    audio = books.render_text([["a", "b"], ["c"]], "en", None)
+    with wave.open(io.BytesIO(audio)) as w:
+        seconds = w.getnframes() / w.getframerate()
+    assert seconds == pytest.approx(3 * 0.5 + books.SENTENCE_PAUSE + books.PARAGRAPH_PAUSE, abs=0.01)
 
 
 # --- the API -------------------------------------------------------------------------------
@@ -152,11 +171,8 @@ def test_import_and_render_selected_chapters(fake):
     done = client.post(f"/api/audiobook/books/{book['id']}/render").json()
     assert done["state"] == "done" and done["percent"] == 100
     assert [c["status"] for c in done["chapters"]] == ["pending", "done"]
-    assert fake == [("The Storm", "fr", narrator.id), ("Waves hit the rocks.", "fr", narrator.id)]
-
-    audio = client.get(done["chapters"][1]["audio_url"])
-    with wave.open(io.BytesIO(audio.content)) as w:
-        assert w.getnframes() / w.getframerate() == pytest.approx(0.5 + books.PARAGRAPH_PAUSE + 0.5, abs=0.01)
+    assert fake == [("The Storm. Waves hit the rocks.", "fr", narrator.id)]  # heading joined
+    assert client.get(done["chapters"][1]["audio_url"]).content[:4] == b"RIFF"
 
 
 def test_resume_after_voxwell_closed(fake, monkeypatch):
@@ -164,7 +180,7 @@ def test_resume_after_voxwell_closed(fake, monkeypatch):
     real_synth = engine.synthesize
 
     def crash_in_chapter_two(text, language, reference_audio=None):
-        if text == "The Storm":
+        if text.startswith("The Storm"):
             raise KeyboardInterrupt  # stands in for the app closing mid-render
         return real_synth(text, language, reference_audio)
 
@@ -180,7 +196,7 @@ def test_resume_after_voxwell_closed(fake, monkeypatch):
     fake.clear()
     resumed = client.post(f"/api/audiobook/books/{book['id']}/render").json()
     assert resumed["state"] == "done"
-    assert [c[0] for c in fake] == ["The Storm", "Waves hit the rocks."]  # chapter one not redone
+    assert [c[0] for c in fake] == ["The Storm. Waves hit the rocks."]  # chapter one not redone
 
 
 def test_changing_voice_rerenders_everything(fake):
@@ -204,7 +220,7 @@ def test_preview(fake):
     book = upload().json()
     r = client.post(f"/api/audiobook/books/{book['id']}/preview", json={"chapter": 0})
     assert r.status_code == 200 and client.get(r.json()["url"]).content[:4] == b"RIFF"
-    assert [c[0] for c in fake] == ["Chapter One: Arrival", "The keeper climbed the stairs.", "It was cold & dark."]
+    assert [c[0] for c in fake] == ["Chapter One: Arrival. The keeper climbed the stairs.", "It was cold & dark."]
     assert client.post(f"/api/audiobook/books/{book['id']}/preview", json={"chapter": 9}).status_code == 404
 
 
