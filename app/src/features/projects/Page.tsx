@@ -35,9 +35,19 @@ interface Transcript extends Base {
   exports: Record<'txt' | 'srt' | 'vtt', string>;
 }
 
-type Item = Speech | Dub | Transcript;
+interface Story extends Base {
+  kind: 'story';
+  state: Dub['state'];
+  step: string;
+  percent: number;
+  error: string | null;
+  speakers: string[];
+  audio_url: string;
+}
 
-const KIND_LABELS: Record<Item['kind'], string> = { speech: 'Speech', dub: 'Dub', transcript: 'Transcript' };
+type Item = Speech | Story | Dub | Transcript;
+
+const KIND_LABELS: Record<Item['kind'], string> = { speech: 'Speech', story: 'Story', dub: 'Dub', transcript: 'Transcript' };
 const PREVIEW_LENGTH = 300;
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -72,7 +82,7 @@ export default function Page() {
       {items === null && <p className="meta">Loading…</p>}
       {items?.length === 0 && !error && (
         <div className="card">
-          <p>Nothing here yet. Speech you generate, videos you dub and files you transcribe appear here.</p>
+          <p>Nothing here yet. Speech and stories you generate, videos you dub and files you transcribe appear here.</p>
         </div>
       )}
       {items?.map((item) => (
@@ -128,6 +138,7 @@ function ProjectCard({ item, onChanged, onError }: { item: Item; onChanged: () =
       </div>
 
       {item.kind === 'speech' && <SpeechBody item={item} />}
+      {item.kind === 'story' && <StoryBody item={item} />}
       {item.kind === 'dub' && <DubBody item={item} />}
       {item.kind === 'transcript' && <TranscriptBody item={item} />}
 
@@ -157,7 +168,20 @@ function SpeechBody({ item }: { item: Speech }) {
   );
 }
 
-function Progress({ item }: { item: Dub | Transcript }) {
+function StoryBody({ item }: { item: Story }) {
+  if (item.state !== 'done') return <Progress item={item} />;
+  return (
+    <>
+      <p className="meta">Speakers: {item.speakers.join(', ')}</p>
+      <audio controls preload="none" src={apiUrl(item.audio_url)} />
+      <a href={apiUrl(item.audio_url)} download={`${item.title}.wav`}>
+        Download WAV
+      </a>
+    </>
+  );
+}
+
+function Progress({ item }: { item: Story | Dub | Transcript }) {
   if (item.state === 'error') return <p className="error">{item.error}</p>;
   return (
     <>

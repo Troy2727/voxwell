@@ -1,13 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, apiUrl, listVoices, Voice } from '../../api';
-
-const LANGUAGES: [string, string][] = [
-  ['ar', 'Arabic'], ['zh', 'Chinese'], ['da', 'Danish'], ['nl', 'Dutch'], ['en', 'English'],
-  ['fi', 'Finnish'], ['fr', 'French'], ['de', 'German'], ['el', 'Greek'], ['he', 'Hebrew'],
-  ['hi', 'Hindi'], ['it', 'Italian'], ['ko', 'Korean'], ['ms', 'Malay'],
-  ['no', 'Norwegian'], ['pl', 'Polish'], ['pt', 'Portuguese'], ['ru', 'Russian'],
-  ['es', 'Spanish'], ['sw', 'Swahili'], ['sv', 'Swedish'], ['tr', 'Turkish'],
-];
+import { LANGUAGES } from './languages';
 
 export default function Page() {
   const [voices, setVoices] = useState<Voice[] | null>(null);

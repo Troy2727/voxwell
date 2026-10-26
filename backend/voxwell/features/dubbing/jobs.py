@@ -39,6 +39,7 @@ class Job:
 
 _jobs: dict[str, Job] = {}
 _lock = threading.Lock()
+_one_at_a_time = threading.Lock()  # dubs share the models and GPU, so they wait their turn
 
 
 def _save(job: Job) -> None:
@@ -125,21 +126,23 @@ def _update(job: Job, step: str, percent: int) -> None:
 
 
 def _work(job: Job) -> None:
-    job.state = "running"
-    _save(job)
-    try:
-        job.outputs = pipeline.run(job.dir, job.video, job.target, job.voice, lambda s, p: _update(job, s, p))
-        job.state, job.step, job.percent = "done", "Done", 100
-    except DubbingError as exc:
-        job.state, job.error = "error", str(exc)
-    except NotImplementedError:
-        job.state, job.error = "error", f"{job.step} is not available yet."
-    except Exception as exc:  # surface any engine failure as a job error, without a traceback
-        job.state, job.error = "error", f"{job.step} failed: {exc}"
-    _cleanup(job)
-    _save(job)
+    with _one_at_a_time:
+        job.state = "running"
+        _save(job)
+        try:
+            job.outputs = pipeline.run(job.dir, job.video, job.target, job.voice, lambda s, p: _update(job, s, p))
+            job.state, job.step, job.percent = "done", "Done", 100
+        except DubbingError as exc:
+            job.state, job.error = "error", str(exc)
+        except NotImplementedError:
+            job.state, job.error = "error", f"{job.step} is not available yet."
+        except Exception as exc:  # surface any engine failure as a job error, without a traceback
+            job.state, job.error = "error", f"{job.step} failed: {exc}"
+        _cleanup(job)
+        _save(job)
 
 
 def start(job: Job) -> None:
+    job.step = "Waiting for other dubs"
     _save(job)
     threading.Thread(target=_work, args=(job,), daemon=True).start()

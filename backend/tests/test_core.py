@@ -6,7 +6,9 @@ from voxwell.main import app
 
 client = TestClient(app)
 
-FEATURE_IDS = ["voice_cloning", "voice_design", "voices", "dubbing", "dictation", "transcription", "projects"]
+FEATURE_IDS = [
+    "voice_cloning", "voice_design", "voices", "stories", "dubbing", "batch", "dictation", "transcription", "projects",
+]
 
 
 def test_https_trusts_the_os_certificate_store():

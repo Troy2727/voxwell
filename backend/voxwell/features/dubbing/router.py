@@ -1,6 +1,7 @@
 import re
 import shutil
 from pathlib import Path
+from typing import BinaryIO
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
@@ -29,32 +30,44 @@ def status():
         return {"ready": False, "reason": str(exc), "languages": sorted(LANGUAGES)}
 
 
+def check_settings(target_language: str, voice: str) -> str:
+    """Validate a dub's language and voice; returns the normalized language code."""
+    target = target_language.strip().lower()
+    if target not in LANGUAGES:
+        raise HTTPException(422, f"Unsupported target language '{target_language}'.")
+    if voice != "original":
+        try:
+            voices.voice_audio_path(voice)
+        except KeyError:
+            raise HTTPException(422, f"Unknown voice '{voice}'.")
+    return target
+
+
+def start_dub(source: BinaryIO, filename: str, target_language: str, voice: str) -> jobs.Job:
+    """Validate, copy `source` into a new job and queue it. Used by uploads and Batch."""
+    target = check_settings(target_language, voice)
+    name = Path(filename or "")
+    ext = name.suffix.lower()  # only the extension is used as a path, never the name
+    if ext not in VIDEO_EXTS:
+        raise HTTPException(422, f"Unsupported video type '{ext}'. Use one of: {', '.join(sorted(VIDEO_EXTS))}.")
+    title = name.stem.strip()[:100] or "Dub"  # display only
+    job = jobs.create(data_dir("dubbing", "jobs"), ext, target, voice, title)
+    with job.video.open("wb") as out:
+        shutil.copyfileobj(source, out)
+    if job.video.stat().st_size == 0:
+        jobs.discard(job)
+        raise HTTPException(422, "The file is empty.")
+    jobs.start(job)
+    return job
+
+
 @router.post("/jobs")
 def create_job(
     file: UploadFile = File(...),
     target_language: str = Form(...),
     voice: str = Form("original"),
 ):
-    target = target_language.strip().lower()
-    if target not in LANGUAGES:
-        raise HTTPException(422, f"Unsupported target language '{target_language}'.")
-    ext = Path(file.filename or "").suffix.lower()  # only the extension is used, never the name
-    if ext not in VIDEO_EXTS:
-        raise HTTPException(422, f"Unsupported video type '{ext}'. Use one of: {', '.join(sorted(VIDEO_EXTS))}.")
-    if voice != "original":
-        try:
-            voices.voice_audio_path(voice)
-        except KeyError:
-            raise HTTPException(422, f"Unknown voice '{voice}'.")
-    title = Path(file.filename or "").stem.strip()[:100] or "Dub"  # display only
-    job = jobs.create(data_dir("dubbing", "jobs"), ext, target, voice, title)
-    with job.video.open("wb") as out:
-        shutil.copyfileobj(file.file, out)
-    if job.video.stat().st_size == 0:
-        jobs.discard(job)
-        raise HTTPException(422, "The uploaded file is empty.")
-    jobs.start(job)
-    return {"id": job.id}
+    return {"id": start_dub(file.file, file.filename or "", target_language, voice).id}
 
 
 def _job(job_id: str) -> jobs.Job:

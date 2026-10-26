@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, apiUrl, listVoices, type Voice } from '../../api';
+import { LANGUAGES } from './languages';
 
 interface JobStatus {
   id: string;
@@ -8,13 +9,6 @@ interface JobStatus {
   percent: number;
   error: string | null;
 }
-
-const LANGUAGES: [string, string][] = [
-  ['en', 'English'], ['es', 'Spanish'], ['fr', 'French'], ['de', 'German'], ['it', 'Italian'],
-  ['pt', 'Portuguese'], ['nl', 'Dutch'], ['pl', 'Polish'], ['ru', 'Russian'],
-  ['tr', 'Turkish'], ['ar', 'Arabic'], ['hi', 'Hindi'], ['ko', 'Korean'],
-  ['zh', 'Chinese'], ['sv', 'Swedish'],
-];
 
 export default function Page() {
   const [file, setFile] = useState<File | null>(null);

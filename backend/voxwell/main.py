@@ -1,4 +1,5 @@
 import os
+from contextlib import asynccontextmanager
 from dataclasses import asdict
 
 import truststore
@@ -13,7 +14,16 @@ from voxwell.features import FEATURES
 # local model cache on SSL errors, so without this even downloaded models fail to load there.
 truststore.inject_into_ssl()
 
-app = FastAPI(title="Voxwell")
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    for feature in FEATURES:
+        if feature.background:
+            feature.background()
+    yield
+
+
+app = FastAPI(title="Voxwell", lifespan=lifespan)
 # The renderer runs on the Vite dev server or from file:// (origin "null").
 app.add_middleware(
     CORSMiddleware,

@@ -1,7 +1,7 @@
-"""Projects: everything you have made (generated speech, dubs, transcripts), newest first.
+"""Projects: everything you have made (speech, stories, dubs, transcripts), newest first.
 
-Each kind stays owned by its feature (voice_cloning.history, dubbing.jobs, transcription.jobs);
-this router only lists, renames and deletes through them.
+Each kind stays owned by its feature (voice_cloning.history, stories.jobs, dubbing.jobs,
+transcription.jobs); this router only lists, renames and deletes through them.
 """
 
 import re
@@ -12,12 +12,14 @@ from pydantic import BaseModel
 
 from voxwell import voices
 from voxwell.features.dubbing import jobs as dub_jobs
+from voxwell.features.stories import jobs as story_jobs
+from voxwell.features.stories.router import summary as story_summary
 from voxwell.features.transcription import jobs as transcript_jobs
 from voxwell.features.voice_cloning import history
 
 router = APIRouter(tags=["projects"])
 
-Kind = Literal["speech", "dub", "transcript"]
+Kind = Literal["speech", "story", "dub", "transcript"]
 MAX_TITLE = 100
 _JOB_ID = re.compile(r"^[0-9a-f]{12}$")
 
@@ -64,8 +66,17 @@ def _transcript(job: transcript_jobs.Job) -> dict:
     }
 
 
+def _story(job: story_jobs.Job) -> dict:
+    voices_used = sorted({_voice_name(v) if v != story_jobs.DEFAULT_VOICE else "Default voice" for v in job.cast.values()})
+    return {**story_summary(job), "kind": "story", "voice": ", ".join(voices_used), "speakers": list(job.cast)}
+
+
 # Job-backed kinds: module with get/list_jobs/rename/delete, and how to show one job.
-JOB_KINDS = {"dub": (dub_jobs, _dub), "transcript": (transcript_jobs, _transcript)}
+JOB_KINDS = {
+    "story": (story_jobs, _story),
+    "dub": (dub_jobs, _dub),
+    "transcript": (transcript_jobs, _transcript),
+}
 
 
 def _job(kind: str, item_id: str):
