@@ -5,6 +5,7 @@ from fastapi import APIRouter
 from voxwell.features.dictation.router import router as dictation
 from voxwell.features.dubbing.router import router as dubbing
 from voxwell.features.projects.router import router as projects
+from voxwell.features.transcription.router import router as transcription
 from voxwell.features.voice_cloning.router import router as voice_cloning
 from voxwell.features.voice_design.router import router as voice_design
 from voxwell.features.voices.router import router as voices
@@ -22,5 +23,6 @@ FEATURES = [
     Feature("voices", voices),
     Feature("dubbing", dubbing),
     Feature("dictation", dictation),
+    Feature("transcription", transcription),
     Feature("projects", projects),
 ]

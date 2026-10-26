@@ -6,7 +6,7 @@ from voxwell.main import app
 
 client = TestClient(app)
 
-FEATURE_IDS = ["voice_cloning", "voice_design", "voices", "dubbing", "dictation", "projects"]
+FEATURE_IDS = ["voice_cloning", "voice_design", "voices", "dubbing", "dictation", "transcription", "projects"]
 
 
 def test_health_lists_all_features():

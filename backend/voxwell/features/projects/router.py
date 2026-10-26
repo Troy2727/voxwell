@@ -1,7 +1,7 @@
-"""Projects: everything you have made (generated speech and dubs), newest first.
+"""Projects: everything you have made (generated speech, dubs, transcripts), newest first.
 
-Each kind stays owned by its feature (voice_cloning.history, dubbing.jobs); this router only
-lists, renames and deletes through them.
+Each kind stays owned by its feature (voice_cloning.history, dubbing.jobs, transcription.jobs);
+this router only lists, renames and deletes through them.
 """
 
 import re
@@ -11,12 +11,13 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from voxwell import voices
-from voxwell.features.dubbing import jobs
+from voxwell.features.dubbing import jobs as dub_jobs
+from voxwell.features.transcription import jobs as transcript_jobs
 from voxwell.features.voice_cloning import history
 
 router = APIRouter(tags=["projects"])
 
-Kind = Literal["speech", "dub"]
+Kind = Literal["speech", "dub", "transcript"]
 MAX_TITLE = 100
 _JOB_ID = re.compile(r"^[0-9a-f]{12}$")
 
@@ -42,7 +43,7 @@ def _voice_name(voice_id: str) -> str:
         return "Deleted voice"
 
 
-def _dub(job: jobs.Job) -> dict:
+def _dub(job: dub_jobs.Job) -> dict:
     return {
         "kind": "dub", "id": job.id, "title": job.title, "created": job.created,
         "language": job.target, "voice": _voice_name(job.voice),
@@ -52,8 +53,24 @@ def _dub(job: jobs.Job) -> dict:
     }
 
 
-def _job(item_id: str) -> jobs.Job:
-    job = jobs.get(item_id) if _JOB_ID.match(item_id) else None
+def _transcript(job: transcript_jobs.Job) -> dict:
+    base = f"/api/transcription/jobs/{job.id}/export"
+    return {
+        "kind": "transcript", "id": job.id, "title": job.title, "created": job.created,
+        "language": job.detected or job.language or "auto", "voice": "",
+        "state": job.state, "step": "Transcribing", "percent": job.percent, "error": job.error,
+        "text": transcript_jobs.result(job)["text"] if job.state == "done" else "",
+        "exports": {fmt: f"{base}/{fmt}" for fmt in ("txt", "srt", "vtt")},
+    }
+
+
+# Job-backed kinds: module with get/list_jobs/rename/delete, and how to show one job.
+JOB_KINDS = {"dub": (dub_jobs, _dub), "transcript": (transcript_jobs, _transcript)}
+
+
+def _job(kind: str, item_id: str):
+    module, _ = JOB_KINDS[kind]
+    job = module.get(item_id) if _JOB_ID.match(item_id) else None
     if job is None:
         raise HTTPException(404, "Project not found.")
     return job
@@ -66,7 +83,9 @@ def status():
 
 @router.get("/items")
 def items():
-    found = [_speech(c) for c in history.list_clips()] + [_dub(j) for j in jobs.list_jobs()]
+    found = [_speech(c) for c in history.list_clips()]
+    for module, show in JOB_KINDS.values():
+        found += [show(j) for j in module.list_jobs()]
     return sorted(found, key=lambda item: item["created"], reverse=True)
 
 
@@ -82,9 +101,10 @@ def rename(kind: Kind, item_id: str, req: RenameRequest):
             return _speech(history.rename(item_id, title))
         except KeyError:
             raise HTTPException(404, "Project not found.")
-    job = _job(item_id)
-    jobs.rename(job, title)
-    return _dub(job)
+    module, show = JOB_KINDS[kind]
+    job = _job(kind, item_id)
+    module.rename(job, title)
+    return show(job)
 
 
 @router.delete("/items/{kind}/{item_id}")
@@ -95,8 +115,9 @@ def delete(kind: Kind, item_id: str):
         except KeyError:
             raise HTTPException(404, "Project not found.")
     else:
+        module, _ = JOB_KINDS[kind]
         try:
-            jobs.delete(_job(item_id))
+            module.delete(_job(kind, item_id))
         except ValueError as exc:
             raise HTTPException(409, str(exc))
     return {"deleted": item_id}

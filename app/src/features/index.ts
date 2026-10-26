@@ -2,6 +2,7 @@ import type { ComponentType } from 'react';
 import DictationPage from './dictation/Page';
 import DubbingPage from './dubbing/Page';
 import ProjectsPage from './projects/Page';
+import TranscriptionPage from './transcription/Page';
 import VoiceCloningPage from './voice_cloning/Page';
 import VoiceDesignPage from './voice_design/Page';
 import VoicesPage from './voices/Page';
@@ -18,5 +19,6 @@ export const FEATURES: FeatureEntry[] = [
   { id: 'voices', title: 'Saved voices', Page: VoicesPage },
   { id: 'dubbing', title: 'Dubbing', Page: DubbingPage },
   { id: 'dictation', title: 'Dictation', Page: DictationPage },
+  { id: 'transcription', title: 'Transcribe', Page: TranscriptionPage },
   { id: 'projects', title: 'Projects', Page: ProjectsPage },
 ];

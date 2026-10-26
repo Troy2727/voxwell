@@ -2,7 +2,7 @@
 
 ## Layout
 
-- `backend/voxwell/features/<feature>/`: one folder per feature (`voice_cloning`, `voice_design`, `voices`, `dubbing`, `dictation`, `projects`) with its FastAPI `router.py`, mounted at `/api/<feature>/`. `projects` owns no files: it lists, renames and deletes through `voice_cloning/history.py` and `dubbing/jobs.py`.
+- `backend/voxwell/features/<feature>/`: one folder per feature (`voice_cloning`, `voice_design`, `voices`, `dubbing`, `dictation`, `transcription`, `projects`) with its FastAPI `router.py`, mounted at `/api/<feature>/`. `projects` owns no files: it lists, renames and deletes through `voice_cloning/history.py`, `dubbing/jobs.py` and `transcription/jobs.py`.
 - `app/src/features/<feature>/Page.tsx`: the matching React page.
 - `app/electron/`: the desktop shell; it starts the backend.
 

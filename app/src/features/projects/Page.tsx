@@ -25,10 +25,23 @@ interface Dub extends Base {
   subtitles_url: string;
 }
 
-type Item = Speech | Dub;
+interface Transcript extends Base {
+  kind: 'transcript';
+  state: Dub['state'];
+  step: string;
+  percent: number;
+  error: string | null;
+  text: string;
+  exports: Record<'txt' | 'srt' | 'vtt', string>;
+}
+
+type Item = Speech | Dub | Transcript;
+
+const KIND_LABELS: Record<Item['kind'], string> = { speech: 'Speech', dub: 'Dub', transcript: 'Transcript' };
+const PREVIEW_LENGTH = 300;
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
-const working = (item: Item) => item.kind === 'dub' && (item.state === 'queued' || item.state === 'running');
+const working = (item: Item) => item.kind !== 'speech' && (item.state === 'queued' || item.state === 'running');
 
 export default function Page() {
   const [items, setItems] = useState<Item[] | null>(null);
@@ -59,7 +72,7 @@ export default function Page() {
       {items === null && <p className="meta">Loading…</p>}
       {items?.length === 0 && !error && (
         <div className="card">
-          <p>Nothing here yet. Speech you generate in Voice cloning and videos you dub appear here.</p>
+          <p>Nothing here yet. Speech you generate, videos you dub and files you transcribe appear here.</p>
         </div>
       )}
       {items?.map((item) => (
@@ -109,11 +122,14 @@ function ProjectCard({ item, onChanged, onError }: { item: Item; onChanged: () =
         <h2 style={{ margin: 0 }}>{item.title}</h2>
       )}
       <div className="meta">
-        {item.kind === 'speech' ? 'Speech' : 'Dub'} · {item.language.toUpperCase()} · {item.voice} ·{' '}
-        {new Date(item.created * 1000).toLocaleString()}
+        {[KIND_LABELS[item.kind], item.language.toUpperCase(), item.voice, new Date(item.created * 1000).toLocaleString()]
+          .filter(Boolean)
+          .join(' · ')}
       </div>
 
-      {item.kind === 'speech' ? <SpeechBody item={item} /> : <DubBody item={item} />}
+      {item.kind === 'speech' && <SpeechBody item={item} />}
+      {item.kind === 'dub' && <DubBody item={item} />}
+      {item.kind === 'transcript' && <TranscriptBody item={item} />}
 
       {!editing && (
         <div className="row">
@@ -141,15 +157,35 @@ function SpeechBody({ item }: { item: Speech }) {
   );
 }
 
-function DubBody({ item }: { item: Dub }) {
+function Progress({ item }: { item: Dub | Transcript }) {
   if (item.state === 'error') return <p className="error">{item.error}</p>;
-  if (item.state !== 'done')
-    return (
-      <>
-        <div>{item.step}</div>
-        <progress max={100} value={item.percent} style={{ width: '100%' }} />
-      </>
-    );
+  return (
+    <>
+      <div>{item.step}</div>
+      <progress max={100} value={item.percent} style={{ width: '100%' }} />
+    </>
+  );
+}
+
+function TranscriptBody({ item }: { item: Transcript }) {
+  if (item.state !== 'done') return <Progress item={item} />;
+  const preview = item.text.length > PREVIEW_LENGTH ? item.text.slice(0, PREVIEW_LENGTH - 1) + '…' : item.text;
+  return (
+    <>
+      <p className="meta">{preview}</p>
+      <div className="row">
+        {(['txt', 'srt', 'vtt'] as const).map((fmt) => (
+          <a key={fmt} href={apiUrl(item.exports[fmt])} download={`${item.title}.${fmt}`}>
+            Download {fmt.toUpperCase()}
+          </a>
+        ))}
+      </div>
+    </>
+  );
+}
+
+function DubBody({ item }: { item: Dub }) {
+  if (item.state !== 'done') return <Progress item={item} />;
   return (
     <>
       <video controls preload="none" src={apiUrl(item.video_url)} />

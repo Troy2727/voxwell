@@ -2,6 +2,7 @@
 
 import os
 import threading
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -48,12 +49,21 @@ def _load_model():
         return _model
 
 
-def transcribe(audio_path: Path, language: str | None = None) -> Transcript:
-    """Transcribe an audio file; detect the language when `language` is None."""
+def transcribe(
+    audio_path: Path, language: str | None = None, on_progress: Callable[[float], None] | None = None
+) -> Transcript:
+    """Transcribe an audio file; detect the language when `language` is None.
+
+    `on_progress`, if given, receives the fraction of the audio done (0..1) after each segment.
+    """
     model = _load_model()
     try:
         segments, info = model.transcribe(str(audio_path), language=language or None)
-        parts = [Segment(start=s.start, end=s.end, text=s.text.strip()) for s in segments]
+        parts = []
+        for s in segments:  # a generator: decoding happens as it is consumed
+            parts.append(Segment(start=s.start, end=s.end, text=s.text.strip()))
+            if on_progress and info.duration:
+                on_progress(min(s.end / info.duration, 1.0))
     except Exception as exc:
         # PyAV (the decoder) raises its own error types for unreadable audio.
         if type(exc).__module__.split(".")[0] == "av":
