@@ -1,0 +1,166 @@
+import { useEffect, useRef, useState } from 'react';
+import { api, apiUrl, sendJson } from '../../api';
+
+interface Base {
+  id: string;
+  title: string;
+  created: number;
+  language: string;
+  voice: string;
+}
+
+interface Speech extends Base {
+  kind: 'speech';
+  text: string;
+  audio_url: string;
+}
+
+interface Dub extends Base {
+  kind: 'dub';
+  state: 'queued' | 'running' | 'done' | 'error';
+  step: string;
+  percent: number;
+  error: string | null;
+  video_url: string;
+  subtitles_url: string;
+}
+
+type Item = Speech | Dub;
+
+const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
+const working = (item: Item) => item.kind === 'dub' && (item.state === 'queued' || item.state === 'running');
+
+export default function Page() {
+  const [items, setItems] = useState<Item[] | null>(null);
+  const [error, setError] = useState('');
+  const timer = useRef<number | undefined>(undefined);
+
+  const refresh = async () => {
+    window.clearTimeout(timer.current);
+    try {
+      const found = await api<Item[]>('/api/projects/items');
+      setItems(found);
+      // Keep dubs that are still working up to date.
+      if (found.some(working)) timer.current = window.setTimeout(refresh, 2000);
+    } catch (e) {
+      setItems((current) => current ?? []);
+      setError(message(e));
+    }
+  };
+  useEffect(() => {
+    void refresh();
+    return () => window.clearTimeout(timer.current);
+  }, []);
+
+  return (
+    <section className="page">
+      <h1>Projects</h1>
+      {error && <p className="error">{error}</p>}
+      {items === null && <p className="meta">Loading…</p>}
+      {items?.length === 0 && !error && (
+        <div className="card">
+          <p>Nothing here yet. Speech you generate in Voice cloning and videos you dub appear here.</p>
+        </div>
+      )}
+      {items?.map((item) => (
+        <ProjectCard key={`${item.kind}-${item.id}`} item={item} onChanged={refresh} onError={(e) => setError(message(e))} />
+      ))}
+    </section>
+  );
+}
+
+function ProjectCard({ item, onChanged, onError }: { item: Item; onChanged: () => void; onError: (e: unknown) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [title, setTitle] = useState(item.title);
+  const [busy, setBusy] = useState(false);
+  const path = `/api/projects/items/${item.kind}/${item.id}`;
+
+  async function run(action: () => Promise<unknown>) {
+    setBusy(true);
+    try {
+      await action();
+      setEditing(false);
+      onChanged();
+    } catch (e) {
+      onError(e);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const rename = () => run(() => sendJson(path, 'PATCH', { title }));
+  const remove = () => {
+    if (window.confirm(`Delete "${item.title}"? This cannot be undone.`)) void run(() => sendJson(path, 'DELETE'));
+  };
+
+  return (
+    <div className="card">
+      {editing ? (
+        <div className="row">
+          <input value={title} maxLength={100} onChange={(e) => setTitle(e.target.value)} style={{ flex: 1 }} autoFocus />
+          <button className="primary" disabled={busy || !title.trim()} onClick={rename}>
+            Save
+          </button>
+          <button className="secondary" disabled={busy} onClick={() => setEditing(false)}>
+            Cancel
+          </button>
+        </div>
+      ) : (
+        <h2 style={{ margin: 0 }}>{item.title}</h2>
+      )}
+      <div className="meta">
+        {item.kind === 'speech' ? 'Speech' : 'Dub'} · {item.language.toUpperCase()} · {item.voice} ·{' '}
+        {new Date(item.created * 1000).toLocaleString()}
+      </div>
+
+      {item.kind === 'speech' ? <SpeechBody item={item} /> : <DubBody item={item} />}
+
+      {!editing && (
+        <div className="row">
+          <button className="secondary" disabled={busy} onClick={() => { setTitle(item.title); setEditing(true); }}>
+            Rename
+          </button>
+          <button className="secondary danger" disabled={busy || working(item)} onClick={remove}>
+            Delete
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SpeechBody({ item }: { item: Speech }) {
+  return (
+    <>
+      {item.text !== item.title && <p className="meta">{item.text}</p>}
+      <audio controls preload="none" src={apiUrl(item.audio_url)} />
+      <a href={apiUrl(item.audio_url)} download={`${item.title}.wav`}>
+        Download WAV
+      </a>
+    </>
+  );
+}
+
+function DubBody({ item }: { item: Dub }) {
+  if (item.state === 'error') return <p className="error">{item.error}</p>;
+  if (item.state !== 'done')
+    return (
+      <>
+        <div>{item.step}</div>
+        <progress max={100} value={item.percent} style={{ width: '100%' }} />
+      </>
+    );
+  return (
+    <>
+      <video controls preload="none" src={apiUrl(item.video_url)} />
+      <div className="row">
+        <a href={apiUrl(item.video_url)} download={`${item.title}.mp4`}>
+          Download video
+        </a>
+        <a href={apiUrl(item.subtitles_url)} download={`${item.title}.srt`}>
+          Download subtitles
+        </a>
+      </div>
+    </>
+  );
+}

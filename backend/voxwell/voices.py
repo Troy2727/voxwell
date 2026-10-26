@@ -39,3 +39,22 @@ def voice_audio_path(voice_id: str) -> Path:
     if not path.exists():
         raise KeyError(voice_id)
     return path
+
+
+def get_voice(voice_id: str) -> Voice:
+    """KeyError if unknown or malformed."""
+    meta = voice_audio_path(voice_id).with_suffix(".json")
+    return Voice(**json.loads(meta.read_text(encoding="utf-8")))
+
+
+def rename_voice(voice_id: str, name: str) -> Voice:
+    voice = get_voice(voice_id)
+    voice.name = name
+    (data_dir("voices") / f"{voice.id}.json").write_text(json.dumps(asdict(voice)), encoding="utf-8")
+    return voice
+
+
+def delete_voice(voice_id: str) -> None:
+    audio = voice_audio_path(voice_id)
+    audio.with_suffix(".json").unlink(missing_ok=True)
+    audio.unlink()

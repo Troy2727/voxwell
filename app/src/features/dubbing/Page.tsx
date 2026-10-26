@@ -107,6 +107,7 @@ export default function Page() {
         <div className="card">
           <div>{job.step}</div>
           <progress max={100} value={job.percent} style={{ width: '100%' }} />
+          <small>You can leave this page; the dub keeps going and appears in Projects.</small>
         </div>
       )}
       {(error || failed) && <p className="error">{error ?? job?.error}</p>}

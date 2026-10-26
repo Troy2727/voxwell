@@ -34,4 +34,9 @@ body { margin: 0; }
 input, select, textarea { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px; font: inherit; }
 button.primary { background: var(--accent); color: #fff; border: none; border-radius: var(--radius); padding: 8px 16px; font-weight: 600; cursor: pointer; }
 button.primary:disabled { opacity: 0.5; cursor: default; }
+button.secondary { background: none; color: var(--text); border: 1px solid var(--border); border-radius: var(--radius); padding: 6px 12px; cursor: pointer; }
+button.secondary:disabled { opacity: 0.5; cursor: default; }
+button.danger { color: var(--danger); }
+.meta { font-size: 13px; color: var(--muted); }
 audio, video { width: 100%; }
+a { color: var(--accent); }

@@ -12,6 +12,14 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
+/** Send a JSON body (or none) with the given method; same error handling as api(). */
+export const sendJson = <T,>(path: string, method: string, body?: unknown) =>
+  api<T>(path, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+
 export interface Voice {
   id: string;
   name: string;

@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from voxwell import voices
-from voxwell.features.voice_cloning import engine
+from voxwell.features.voice_cloning import engine, history
 from voxwell.paths import data_dir
 
 router = APIRouter(tags=["voice_cloning"])
@@ -69,10 +69,11 @@ def synthesize(req: SynthesizeRequest):
         raise HTTPException(422, f"Text is too long ({MAX_TEXT} characters max).")
     if req.language not in engine.LANGUAGES:
         raise HTTPException(422, f"Unsupported language '{req.language}'.")
-    reference = None
+    reference, voice_name = None, "Default voice"
     if req.voice_id:
         try:
             reference = voices.voice_audio_path(req.voice_id)
+            voice_name = voices.get_voice(req.voice_id).name
         except KeyError:
             raise HTTPException(404, "Unknown voice.")
     try:
@@ -81,6 +82,7 @@ def synthesize(req: SynthesizeRequest):
         raise HTTPException(500, f"Speech synthesis failed: {exc}")
     audio_id = uuid.uuid4().hex
     (data_dir("voice_cloning") / f"{audio_id}.wav").write_bytes(wav)
+    history.record(audio_id, text, req.language, voice_name)
     return {"id": audio_id, "url": f"/api/voice_cloning/audio/{audio_id}"}
 
 

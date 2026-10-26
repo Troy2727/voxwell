@@ -46,7 +46,8 @@ def create_job(
             voices.voice_audio_path(voice)
         except KeyError:
             raise HTTPException(422, f"Unknown voice '{voice}'.")
-    job = jobs.create(data_dir("dubbing", "jobs"), ext, target, voice)
+    title = Path(file.filename or "").stem.strip()[:100] or "Dub"  # display only
+    job = jobs.create(data_dir("dubbing", "jobs"), ext, target, voice, title)
     with job.video.open("wb") as out:
         shutil.copyfileobj(file.file, out)
     if job.video.stat().st_size == 0:
