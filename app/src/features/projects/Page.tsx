@@ -45,9 +45,22 @@ interface Story extends Base {
   audio_url: string;
 }
 
-type Item = Speech | Story | Dub | Transcript;
+interface Audiobook extends Base {
+  kind: 'audiobook';
+  state: Dub['state'] | 'draft' | 'paused';
+  step: string;
+  percent: number;
+  error: string | null;
+  chapters: { title: string }[];
+  chapters_done: number;
+  download_url: string;
+}
 
-const KIND_LABELS: Record<Item['kind'], string> = { speech: 'Speech', story: 'Story', dub: 'Dub', transcript: 'Transcript' };
+type Item = Speech | Story | Audiobook | Dub | Transcript;
+
+const KIND_LABELS: Record<Item['kind'], string> = {
+  speech: 'Speech', story: 'Story', audiobook: 'Audiobook', dub: 'Dub', transcript: 'Transcript',
+};
 const PREVIEW_LENGTH = 300;
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -82,7 +95,7 @@ export default function Page() {
       {items === null && <p className="meta">Loading…</p>}
       {items?.length === 0 && !error && (
         <div className="card">
-          <p>Nothing here yet. Speech and stories you generate, videos you dub and files you transcribe appear here.</p>
+          <p>Nothing here yet. Speech, stories and audiobooks you make, videos you dub and files you transcribe appear here.</p>
         </div>
       )}
       {items?.map((item) => (
@@ -139,6 +152,7 @@ function ProjectCard({ item, onChanged, onError }: { item: Item; onChanged: () =
 
       {item.kind === 'speech' && <SpeechBody item={item} />}
       {item.kind === 'story' && <StoryBody item={item} />}
+      {item.kind === 'audiobook' && <AudiobookBody item={item} />}
       {item.kind === 'dub' && <DubBody item={item} />}
       {item.kind === 'transcript' && <TranscriptBody item={item} />}
 
@@ -168,6 +182,24 @@ function SpeechBody({ item }: { item: Speech }) {
   );
 }
 
+function AudiobookBody({ item }: { item: Audiobook }) {
+  if (item.state === 'queued' || item.state === 'running' || item.state === 'error') return <Progress item={item} />;
+  return (
+    <>
+      <p className="meta">
+        {item.chapters_done} of {item.chapters.length} chapters rendered
+        {item.state === 'paused' && ' · paused; resume it in Audiobook'}
+        {item.state === 'draft' && item.chapters_done === 0 && ' · open Audiobook to render it'}
+      </p>
+      {item.chapters_done > 0 && (
+        <a href={apiUrl(item.download_url)} download={`${item.title}.zip`}>
+          Download chapters (ZIP)
+        </a>
+      )}
+    </>
+  );
+}
+
 function StoryBody({ item }: { item: Story }) {
   if (item.state !== 'done') return <Progress item={item} />;
   return (
@@ -181,7 +213,7 @@ function StoryBody({ item }: { item: Story }) {
   );
 }
 
-function Progress({ item }: { item: Story | Dub | Transcript }) {
+function Progress({ item }: { item: Story | Audiobook | Dub | Transcript }) {
   if (item.state === 'error') return <p className="error">{item.error}</p>;
   return (
     <>

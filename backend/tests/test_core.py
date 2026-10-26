@@ -7,7 +7,8 @@ from voxwell.main import app
 client = TestClient(app)
 
 FEATURE_IDS = [
-    "voice_cloning", "voice_design", "voices", "stories", "dubbing", "batch", "dictation", "transcription", "projects",
+    "voice_cloning", "voice_design", "voices", "stories", "audiobook", "dubbing", "batch", "dictation", "transcription",
+    "projects",
 ]
 
 

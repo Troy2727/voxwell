@@ -1,7 +1,7 @@
-"""Projects: everything you have made (speech, stories, dubs, transcripts), newest first.
+"""Projects: everything you have made (speech, stories, audiobooks, dubs, transcripts), newest first.
 
-Each kind stays owned by its feature (voice_cloning.history, stories.jobs, dubbing.jobs,
-transcription.jobs); this router only lists, renames and deletes through them.
+Each kind stays owned by its feature (voice_cloning.history, stories.jobs, audiobook.books,
+dubbing.jobs, transcription.jobs); this router only lists, renames and deletes through them.
 """
 
 import re
@@ -11,6 +11,8 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from voxwell import voices
+from voxwell.features.audiobook import books as audiobooks
+from voxwell.features.audiobook.router import summary as audiobook_summary
 from voxwell.features.dubbing import jobs as dub_jobs
 from voxwell.features.stories import jobs as story_jobs
 from voxwell.features.stories.router import summary as story_summary
@@ -19,7 +21,7 @@ from voxwell.features.voice_cloning import history
 
 router = APIRouter(tags=["projects"])
 
-Kind = Literal["speech", "story", "dub", "transcript"]
+Kind = Literal["speech", "story", "audiobook", "dub", "transcript"]
 MAX_TITLE = 100
 _JOB_ID = re.compile(r"^[0-9a-f]{12}$")
 
@@ -72,8 +74,15 @@ def _story(job: story_jobs.Job) -> dict:
 
 
 # Job-backed kinds: module with get/list_jobs/rename/delete, and how to show one job.
+def _audiobook(book: audiobooks.Book) -> dict:
+    voice = "Default voice" if book.voice == audiobooks.DEFAULT_VOICE else _voice_name(book.voice)
+    done = sum(1 for ch in book.chapters if ch.status == "done")
+    return {**audiobook_summary(book), "kind": "audiobook", "voice": voice, "chapters_done": done}
+
+
 JOB_KINDS = {
     "story": (story_jobs, _story),
+    "audiobook": (audiobooks, _audiobook),
     "dub": (dub_jobs, _dub),
     "transcript": (transcript_jobs, _transcript),
 }

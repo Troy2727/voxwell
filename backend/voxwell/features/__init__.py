@@ -3,6 +3,7 @@ from dataclasses import dataclass
 
 from fastapi import APIRouter
 
+from voxwell.features.audiobook.router import router as audiobook
 from voxwell.features.batch import watch as batch_watch
 from voxwell.features.batch.router import router as batch
 from voxwell.features.dictation.router import router as dictation
@@ -28,6 +29,7 @@ FEATURES = [
     Feature("voice_design", voice_design),
     Feature("voices", voices),
     Feature("stories", stories),
+    Feature("audiobook", audiobook),
     Feature("dubbing", dubbing),
     Feature("batch", batch, batch_watch.start),
     Feature("dictation", dictation),

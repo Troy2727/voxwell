@@ -1,4 +1,5 @@
 import type { ComponentType } from 'react';
+import AudiobookPage from './audiobook/Page';
 import BatchPage from './batch/Page';
 import DictationPage from './dictation/Page';
 import DubbingPage from './dubbing/Page';
@@ -20,6 +21,7 @@ export const FEATURES: FeatureEntry[] = [
   { id: 'voice_design', title: 'Voice design', Page: VoiceDesignPage },
   { id: 'voices', title: 'Saved voices', Page: VoicesPage },
   { id: 'stories', title: 'Stories', Page: StoriesPage },
+  { id: 'audiobook', title: 'Audiobook', Page: AudiobookPage },
   { id: 'dubbing', title: 'Dubbing', Page: DubbingPage },
   { id: 'batch', title: 'Batch dub', Page: BatchPage },
   { id: 'dictation', title: 'Dictation', Page: DictationPage },
