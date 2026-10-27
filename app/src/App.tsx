@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Moon, Sun } from 'lucide-react';
+import type { User } from '@supabase/supabase-js';
+import { LogOut, Moon, Sun } from 'lucide-react';
 import { api } from './api';
+import { AuthPage } from './auth/AuthPage';
 import { FEATURES } from './features';
 import { Button } from '@/components/ui/button';
 import {
@@ -20,6 +22,7 @@ import {
 } from '@/components/ui/sidebar';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { supabase, useSession } from '@/lib/auth';
 import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 
@@ -35,7 +38,26 @@ function ThemeToggle() {
   );
 }
 
-function Shell() {
+function Account({ user }: { user: User }) {
+  const email = user.email ?? '';
+  const name: string = user.user_metadata.full_name || email;
+  return (
+    <div className="flex items-center gap-2 px-1 group-data-[collapsible=icon]:justify-center">
+      <span className="bg-primary text-primary-foreground flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold group-data-[collapsible=icon]:hidden">
+        {(name || '?')[0].toUpperCase()}
+      </span>
+      <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
+        <p className="truncate text-sm font-medium">{name}</p>
+        {name !== email && <p className="text-muted-foreground truncate text-xs">{email}</p>}
+      </div>
+      <Button variant="ghost" size="icon" className="size-8" aria-label="Sign out" title="Sign out" onClick={() => supabase!.auth.signOut()}>
+        <LogOut />
+      </Button>
+    </div>
+  );
+}
+
+function Shell({ user }: { user?: User }) {
   const [active, setActive] = useState(FEATURES[0].id);
   const [online, setOnline] = useState<boolean | null>(null);
 
@@ -74,6 +96,7 @@ function Shell() {
           ))}
         </SidebarContent>
         <SidebarFooter>
+          {user && <Account user={user} />}
           <div className="flex items-center gap-2 px-1 group-data-[collapsible=icon]:flex-col">
             <span
               className={cn('size-2 shrink-0 rounded-full', online === null ? 'bg-muted-foreground' : online ? 'bg-success' : 'bg-destructive')}
@@ -102,9 +125,14 @@ function Shell() {
 }
 
 export default function App() {
+  const { session, recovering, endRecovery } = useSession();
   return (
     <TooltipProvider>
-      <Shell />
+      {session === undefined ? null : supabase && (!session || recovering) ? (
+        <AuthPage recovering={recovering} onRecovered={endRecovery} />
+      ) : (
+        <Shell user={session?.user} />
+      )}
       <Toaster position="bottom-right" />
     </TooltipProvider>
   );

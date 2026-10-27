@@ -6,7 +6,8 @@
 - `app/src/features/<feature>/Page.tsx`: the matching React page.
 - `app/src/components/`: Voxwell's shared page pieces (`Page`, `Section`, `Field`, `FileDrop`, `AudioResult`, `VoiceSelect`, `JobProgress`, `ConfirmButton`).
 - `app/src/components/ui/`: UI components copied from shadcn/ui and ElevenLabs UI (both MIT); see its `LICENSES.md`.
-- `app/electron/`: the desktop shell; it starts the backend.
+- `app/src/auth/` and `app/src/lib/auth.ts`: optional sign-in (Supabase) in front of the dashboard; see the README's Accounts section.
+- `app/electron/`: the desktop shell; it starts the backend and receives `voxwell://auth/callback` sign-in links.
 
 ## Licensing
 

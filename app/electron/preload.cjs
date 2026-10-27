@@ -12,4 +12,16 @@ contextBridge.exposeInMainWorld('voxwell', {
     // Hand finished text to the main process (clipboard / insertion).
     deliver: (text) => ipcRenderer.invoke('dictation:deliver', text),
   },
+  auth: {
+    // Main process sends voxwell://auth/callback links (from account emails and Google) here,
+    // including one the app was started with.
+    onCallback: (callback) => {
+      const listener = (_event, url) => callback(url);
+      ipcRenderer.on('auth:callback', listener);
+      ipcRenderer.send('auth:ready');
+      return () => ipcRenderer.removeListener('auth:callback', listener);
+    },
+    // Google sign-in runs in the system browser: Google blocks it inside embedded app windows.
+    openExternal: (url) => ipcRenderer.invoke('auth:open', url),
+  },
 });
