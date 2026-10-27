@@ -1,9 +1,11 @@
-"""Integrations: what other apps need to connect (API address, MCP launch command), and the
-opt-in phone-call settings (see phone.py)."""
+"""Integrations: what other apps need to connect (API address, CLI and MCP launch commands), the
+agent skill installer, and the opt-in phone-call settings (see phone.py)."""
 
 import os
 import re
+import sys
 from pathlib import Path
+from typing import Literal
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
@@ -19,6 +21,8 @@ from voxwell.features.voice_cloning.engine import LANGUAGES
 router = APIRouter(tags=["integrations"])
 
 BACKEND_DIR = Path(voxwell.__file__).resolve().parents[1]  # folder with pyproject.toml
+SKILL_SOURCE = BACKEND_DIR.parent / "skills" / "voxwell" / "SKILL.md"
+SKILL_GENERIC_COMMAND = "`uv run --directory <voxwell>/backend voxwell`"
 MAX_GREETING = 500
 _PUBLIC_URL = re.compile(r"^https://[^\s/?#]+(/[^\s?#]*)?$")
 
@@ -28,11 +32,30 @@ def status():
     return {"ready": True}
 
 
+def cli_command() -> str:
+    """The `voxwell` launcher in this server's environment, or the uv command that finds it."""
+    launcher = Path(sys.executable).parent / ("voxwell.exe" if os.name == "nt" else "voxwell")
+    if launcher.is_file():
+        return f'"{launcher}"' if " " in str(launcher) else str(launcher)
+    return f'uv run --directory "{BACKEND_DIR}" voxwell'
+
+
+def _home() -> Path:
+    return Path.home()
+
+
+def skill_path(agent: str) -> Path:
+    """Where Claude Code and Codex look for personal skills."""
+    return _home() / f".{agent}" / "skills" / "voxwell" / "SKILL.md"
+
+
 @router.get("/info")
 def info():
     port = os.environ.get("VOXWELL_PORT", "8765")
     return {
         "api_base": f"http://127.0.0.1:{port}/v1",
+        "cli": cli_command(),
+        "skill": {agent: skill_path(agent).is_file() for agent in ("claude", "codex")},
         "mcp": {
             "command": "uv",
             "args": ["run", "--directory", str(BACKEND_DIR), "voxwell-mcp"],
@@ -40,6 +63,16 @@ def info():
             "env": {"UV_SYSTEM_CERTS": "1"},
         },
     }
+
+
+@router.post("/skill/{agent}")
+def install_skill(agent: Literal["claude", "codex"]):
+    """Install (or update) the Voxwell skill for Claude Code or Codex, with this computer's command."""
+    text = SKILL_SOURCE.read_text(encoding="utf-8").replace(SKILL_GENERIC_COMMAND, f"`{cli_command()}`")
+    path = skill_path(agent)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+    return {"path": str(path)}
 
 
 # --- phone calls (opt-in) ------------------------------------------------------------------

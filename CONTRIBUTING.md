@@ -7,6 +7,7 @@
 - `app/src/components/`: Voxwell's shared page pieces (`Page`, `Section`, `Field`, `FileDrop`, `AudioResult`, `VoiceSelect`, `JobProgress`, `ConfirmButton`).
 - `app/src/components/ui/`: UI components copied from shadcn/ui and ElevenLabs UI (both MIT); see its `LICENSES.md`.
 - `app/src/auth/` and `app/src/lib/auth.ts`: optional sign-in (Supabase) in front of the dashboard; see the README's Accounts section.
+- `backend/voxwell/cli.py`: the `voxwell` command. No arguments (or `serve`) starts the server, which is what the desktop app runs; every other command is a stdlib-only client of the running server's HTTP API, like the MCP server (`features/integrations/mcp_server.py`). Give new user-facing features a CLI command, and mention anything `--help` cannot say in `skills/voxwell/SKILL.md` (the skill the Integrations page installs for Claude Code and Codex).
 - `app/electron/`: the desktop shell; it starts the backend and receives `voxwell://auth/callback` sign-in links.
 
 ## Licensing

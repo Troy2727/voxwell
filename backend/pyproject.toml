@@ -50,7 +50,7 @@ explicit = true
 allow-direct-references = true
 
 [project.scripts]
-voxwell = "voxwell.main:run"
+voxwell = "voxwell.cli:main"  # no arguments: start the server (what the desktop app runs)
 voxwell-mcp = "voxwell.features.integrations.mcp_server:main"
 
 [dependency-groups]

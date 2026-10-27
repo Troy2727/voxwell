@@ -11,6 +11,7 @@ from voxwell import voices
 from voxwell.features.dictation import engine as stt
 from voxwell.features.dictation.engine import AudioError, Segment, Transcript
 from voxwell.features.integrations import mcp_server
+from voxwell.features.integrations import router as integrations_router
 from voxwell.features.voice_cloning import engine as tts
 from voxwell.main import app
 
@@ -155,11 +156,30 @@ def test_transcription_errors(monkeypatch, fake_stt):
 # --- integrations info ---------------------------------------------------------------------
 
 
-def test_info():
+def test_info(monkeypatch, tmp_path):
+    monkeypatch.setattr(integrations_router, "_home", lambda: tmp_path)
     body = client.get("/api/integrations/info").json()
     assert body["api_base"] == "http://127.0.0.1:8765/v1"
     assert body["mcp"]["args"][-1] == "voxwell-mcp" and body["mcp"]["args"][2].endswith("backend")
     assert body["mcp"]["env"]["UV_SYSTEM_CERTS"] == "1"  # uv must work behind TLS-inspecting networks
+    assert "voxwell" in body["cli"] and body["skill"] == {"claude": False, "codex": False}
+
+
+@pytest.mark.parametrize("agent", ["claude", "codex"])
+def test_install_skill_fills_in_the_command(monkeypatch, tmp_path, agent):
+    monkeypatch.setattr(integrations_router, "_home", lambda: tmp_path)
+    r = client.post(f"/api/integrations/skill/{agent}")
+    path = tmp_path / f".{agent}" / "skills" / "voxwell" / "SKILL.md"
+    assert r.status_code == 200 and r.json()["path"] == str(path)
+    text = path.read_text(encoding="utf-8")
+    assert text.startswith("---\nname: voxwell\n") and integrations_router.cli_command() in text
+    assert integrations_router.SKILL_GENERIC_COMMAND not in text
+    assert client.get("/api/integrations/info").json()["skill"][agent] is True
+    assert client.post("/api/integrations/skill/cursor").status_code == 422
+
+
+def test_skill_source_has_the_placeholder_the_installer_replaces():
+    assert integrations_router.SKILL_GENERIC_COMMAND in integrations_router.SKILL_SOURCE.read_text(encoding="utf-8")
 
 
 # --- MCP server ----------------------------------------------------------------------------

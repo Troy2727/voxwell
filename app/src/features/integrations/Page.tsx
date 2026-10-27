@@ -1,13 +1,18 @@
 import { useEffect, useState } from 'react';
-import { Check, Copy } from 'lucide-react';
-import { api } from '../../api';
-import { ErrorAlert, Muted, Page as PageLayout, Section } from '@/components/page';
+import { Check, Copy, Download } from 'lucide-react';
+import { toast } from 'sonner';
+import { api, sendJson } from '../../api';
+import { ErrorAlert, message, Muted, Page as PageLayout, Section } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import PhoneCard from './PhoneCard';
 
+type Agent = 'claude' | 'codex';
+
 interface Info {
   api_base: string;
+  cli: string;
+  skill: Record<Agent, boolean>;
   mcp: { command: string; args: string[]; env: Record<string, string> };
 }
 
@@ -24,6 +29,40 @@ function Snippet({ code }: { code: string }) {
 }
 
 const Label = ({ children }: { children: React.ReactNode }) => <span className="text-sm font-medium">{children}</span>;
+
+const AGENTS: { id: Agent; name: string; folder: string }[] = [
+  { id: 'claude', name: 'Claude Code', folder: '~/.claude/skills/voxwell' },
+  { id: 'codex', name: 'Codex', folder: '~/.codex/skills/voxwell' },
+];
+
+/** Installs the Voxwell skill (how to use the CLI) where Claude Code or Codex looks for skills. */
+function SkillButtons({ installed, onInstalled }: { installed: Record<Agent, boolean>; onInstalled: (agent: Agent) => void }) {
+  const [busy, setBusy] = useState<Agent | null>(null);
+
+  async function install(agent: Agent, name: string) {
+    setBusy(agent);
+    try {
+      const { path } = await sendJson<{ path: string }>(`/api/integrations/skill/${agent}`, 'POST');
+      onInstalled(agent);
+      toast.success(`Installed for ${name}`, { description: path });
+    } catch (e) {
+      toast.error(`Could not install for ${name}`, { description: message(e) });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      {AGENTS.map((a) => (
+        <Button key={a.id} variant={installed[a.id] ? 'outline' : 'default'} disabled={busy !== null} onClick={() => install(a.id, a.name)} title={a.folder}>
+          {installed[a.id] ? <Check /> : <Download />}
+          {busy === a.id ? 'Installing…' : installed[a.id] ? `Installed for ${a.name} (update)` : `Install for ${a.name}`}
+        </Button>
+      ))}
+    </div>
+  );
+}
 
 export default function Page() {
   const [info, setInfo] = useState<Info | null>(null);
@@ -74,6 +113,28 @@ with open("recording.mp3", "rb") as f:
           Formats: <code>wav</code> and <code>pcm</code> always work; <code>mp3</code>, <code>flac</code>, <code>opus</code>,
           <code> aac</code> and a <code>speed</code> other than 1.0 need ffmpeg. Transcripts: json, text, srt, vtt, verbose_json.
         </Muted>
+      </Section>
+
+      <Section
+        title="Command line (Claude Code, Codex, scripts)"
+        description={
+          <>
+            The <code>voxwell</code> command speaks, transcribes, isolates voices, clones and designs voices, converts and dubs,
+            from a terminal or an AI coding agent. Add <code>--json</code> for machine-readable output. Keep Voxwell open while
+            it runs.
+          </>
+        }
+      >
+        <Label>Command on this computer</Label>
+        <Snippet code={`${info.cli} --help
+${info.cli} speak "Hello from Voxwell" -o hello.wav
+${info.cli} isolate song.mp3`} />
+        <Label>Teach your AI agent</Label>
+        <Muted>
+          Installs a skill that tells the agent when and how to use Voxwell, with the command above filled in. Then just ask,
+          e.g. “isolate the voice in song.mp3”.
+        </Muted>
+        <SkillButtons installed={info.skill} onInstalled={(agent) => setInfo({ ...info, skill: { ...info.skill, [agent]: true } })} />
       </Section>
 
       <Section
