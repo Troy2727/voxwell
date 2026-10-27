@@ -229,7 +229,8 @@ export function AuthPage({ recovering, onRecovered }: { recovering: boolean; onR
         </section>
         <aside aria-label="About Voxwell" className="flex flex-col gap-7 border-t px-5 py-12 md:px-12 md:py-14 lg:border-t-0 lg:border-l">
           <h2 className="text-4xl leading-tight font-bold tracking-tight md:text-5xl">
-            Your Voice. <span className="text-primary">Every Language.</span>
+            Your Voice.{' '}
+            <span className="text-primary dark:from-cta-from dark:via-cta-via dark:to-cta-to dark:bg-linear-90 dark:bg-clip-text dark:text-transparent">Every Language.</span>
           </h2>
           <p className="text-muted-foreground max-w-md text-lg">Clone, design and dub voices, all running on your own machine.</p>
           <WaveStage />

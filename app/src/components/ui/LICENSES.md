@@ -14,6 +14,7 @@ Changes made in Voxwell (marked `Voxwell:` in the code):
 - `use-transcript-viewer` defines the character-alignment type locally instead of importing it from the ElevenLabs SDK.
 - `waveform`: `AudioScrubber` passes its `height` to the canvas (upstream always drew it 128px tall).
 - `sonner` reads the theme from `@/lib/theme` instead of `next-themes`.
+- `button`: the default variant fades orange to gold with a glow in dark mode, and disabled default buttons are gray instead of dimmed.
 
 No ElevenLabs service is called: these are UI components only, and all audio comes from the local Voxwell backend.
 

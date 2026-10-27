@@ -44,7 +44,7 @@
   --card-foreground: #f5f1ec;
   --popover: #182433;
   --popover-foreground: #f5f1ec;
-  --primary: #f47735; /* 6.6:1 on the background; text on it must be navy, not white */
+  --primary: #ffa800; /* the middle of the button gradient; text on it must be navy, not white */
   --primary-foreground: #0f141c;
   --secondary: #22324a;
   --secondary-foreground: #f5f1ec;
@@ -55,12 +55,15 @@
   --destructive: #e5484d;
   --success: #3fb950;
   --highlight: #f3a92e;
+  --cta-from: #ff7a00; /* main buttons: orange to gold, same as FanClash's Create Debate */
+  --cta-via: #ffa800;
+  --cta-to: #ffc800;
   --border: #2a3a52;
   --input: #2a3a52;
   --ring: #f3a92e;
   --sidebar: #131c28;
   --sidebar-foreground: #f5f1ec;
-  --sidebar-primary: #f47735;
+  --sidebar-primary: #ffa800;
   --sidebar-primary-foreground: #0f141c;
   --sidebar-accent: #22324a;
   --sidebar-accent-foreground: #f5f1ec;
@@ -91,6 +94,9 @@
   --color-destructive: var(--destructive);
   --color-success: var(--success);
   --color-highlight: var(--highlight);
+  --color-cta-from: var(--cta-from);
+  --color-cta-via: var(--cta-via);
+  --color-cta-to: var(--cta-to);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
