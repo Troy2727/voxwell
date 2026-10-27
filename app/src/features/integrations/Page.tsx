@@ -141,7 +141,7 @@ ${info.cli} isolate song.mp3`} />
         title="AI assistants (MCP)"
         description={
           <>
-            Lets assistants such as Claude list your voices, speak text into a WAV file and transcribe files. Keep Voxwell open
+            Gives AI apps without a terminal, such as Claude Desktop and Cursor, the same eight tools as the command line: speak, transcribe, isolate, clone, design, convert, dub and list voices. Keep Voxwell open
             while the assistant uses it. Requires <a href="https://docs.astral.sh/uv/">uv</a>.
           </>
         }

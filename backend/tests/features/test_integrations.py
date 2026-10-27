@@ -3,14 +3,16 @@ import json
 import shutil
 import urllib.error
 import wave
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
-from voxwell import voices
+from voxwell import cli, voices
 from voxwell.features.dictation import engine as stt
 from voxwell.features.dictation.engine import AudioError, Segment, Transcript
 from voxwell.features.integrations import mcp_server
+from voxwell.features.transcription import jobs as transcription_jobs
 from voxwell.features.integrations import router as integrations_router
 from voxwell.features.voice_cloning import engine as tts
 from voxwell.main import app
@@ -185,17 +187,26 @@ def test_skill_source_has_the_placeholder_the_installer_replaces():
 # --- MCP server ----------------------------------------------------------------------------
 
 
-@pytest.fixture
-def mcp(monkeypatch):
-    """Route the MCP server's HTTP calls into the app, so tool calls run end to end."""
+class AppClient(cli.Client):
+    """cli.Client wired to the app in-process, so MCP tool calls run end to end."""
 
-    def request(path, data=None, headers=None):
-        r = client.request("POST" if data else "GET", path, content=data, headers=headers or {})
+    def __init__(self):
+        super().__init__("http://testserver")
+
+    def request(self, method, path, body=None, headers=None):
+        if body is not None and not isinstance(body, bytes):
+            body = b"".join(body)  # the streamed upload
+        r = client.request(method, path, content=body, headers=headers)
         if r.status_code >= 400:
-            raise mcp_server.ToolError(r.json().get("error", {}).get("message", r.text))
+            raise cli.CliError(cli._error_message(r.content, r.reason_phrase))
         return r.content
 
-    monkeypatch.setattr(mcp_server, "_request", request)
+
+@pytest.fixture
+def mcp(monkeypatch):
+    monkeypatch.setattr(mcp_server, "_client", AppClient)
+    monkeypatch.setattr(cli, "POLL_SECONDS", 0)
+    monkeypatch.setattr(transcription_jobs, "start", transcription_jobs._work)  # run synchronously
 
     def call(method, params=None, msg_id=1):
         return mcp_server.handle({"jsonrpc": "2.0", "id": msg_id, "method": method, "params": params or {}})
@@ -203,15 +214,17 @@ def mcp(monkeypatch):
     return call
 
 
-def tool(mcp, name, **arguments):
-    return mcp("tools/call", {"name": name, "arguments": arguments})["result"]
+def tool(mcp, tool_name, /, **arguments):
+    return mcp("tools/call", {"name": tool_name, "arguments": arguments})["result"]
 
 
 def test_mcp_handshake_and_tool_list(mcp):
     init = mcp("initialize", {"protocolVersion": "2025-03-26", "capabilities": {}, "clientInfo": {"name": "test"}})
     assert init["result"]["protocolVersion"] == "2025-03-26" and "tools" in init["result"]["capabilities"]
     assert mcp_server.handle({"jsonrpc": "2.0", "method": "notifications/initialized"}) is None
-    assert {t["name"] for t in mcp("tools/list")["result"]["tools"]} == {"list_voices", "speak", "transcribe"}
+    names = {t["name"] for t in mcp("tools/list")["result"]["tools"]}
+    assert names == {"list_voices", "speak", "transcribe", "isolate_voice", "clone_voice", "design_voice", "convert_voice", "dub_video"}
+    assert names == set(mcp_server.HANDLERS)
     assert mcp("ping")["result"] == {}
     assert mcp("resources/list")["error"]["code"] == -32601
 
@@ -236,8 +249,55 @@ def test_mcp_transcribe_and_list_voices(mcp, fake_stt, tmp_path):
     assert "No saved voices" in tool(mcp, "list_voices")["content"][0]["text"]
 
 
+def test_mcp_isolate_clone_convert_design(mcp, monkeypatch, tmp_path, isolated_data_dir):
+    from voxwell.features.tools import engine as tools_engine
+    from voxwell.features.tools import isolation
+    from voxwell.features.voice_design import engine as design_engine
+
+    clip = tmp_path / "clip.wav"
+    clip.write_bytes(wav_bytes())
+
+    def fake_isolate(source, voice_out, background_out):
+        voice_out.write_bytes(wav_bytes())
+        background_out.write_bytes(wav_bytes())
+        return 1.0
+
+    monkeypatch.setattr(isolation, "isolate", fake_isolate)
+    text = tool(mcp, "isolate_voice", file_path=str(clip))["content"][0]["text"]
+    assert str(tmp_path / "clip.voice.wav") in text and (tmp_path / "clip.background.wav").exists()
+
+    assert "Saved the voice 'Anna'" in tool(mcp, "clone_voice", name="Anna", file_path=str(clip))["content"][0]["text"]
+    monkeypatch.setattr(tools_engine, "convert", lambda source, target: wav_bytes())
+    result = tool(mcp, "convert_voice", file_path=str(clip), voice="anna")
+    assert result["isError"] is False and (isolated_data_dir / "mcp" / "clip.converted.wav").exists()
+
+    monkeypatch.setattr(design_engine, "design", lambda description, sample: wav_bytes())
+    assert "'Deep'" in tool(mcp, "design_voice", description="deep calm narrator", name="Deep")["content"][0]["text"]
+    assert {v.name for v in voices.list_voices()} == {"Anna", "Deep"}
+
+
+def test_mcp_dub_video(mcp, monkeypatch, fake_tts, tmp_path, isolated_data_dir):
+    from voxwell.features.dubbing import ffmpeg, translate
+    from voxwell.features.dubbing import jobs as dubbing_jobs
+
+    def fake_ffmpeg(args):
+        out = Path(args[-1])
+        out.write_bytes(wav_bytes() if out.suffix == ".wav" else b"video")
+
+    monkeypatch.setattr(ffmpeg, "run_ffmpeg", fake_ffmpeg)
+    monkeypatch.setattr(stt, "transcribe", lambda p, language=None: Transcript("hola", "es", [Segment(0.0, 1.0, "hola")]))
+    monkeypatch.setattr(translate, "translate", lambda texts, s, t: texts)
+    monkeypatch.setattr(dubbing_jobs, "start", dubbing_jobs._work)
+    video = tmp_path / "talk.mp4"
+    video.write_bytes(b"fakevideo")
+    result = tool(mcp, "dub_video", file_path=str(video), target_language="EN")
+    assert result["isError"] is False and (isolated_data_dir / "mcp" / "talk.en.mp4").read_bytes() == b"video"
+
+
 def test_mcp_tool_errors_are_reported_not_raised(mcp, fake_tts, tmp_path):
     assert tool(mcp, "speak", text="Hi", voice="Nobody")["isError"] is True
+    assert tool(mcp, "speak", text="-")["isError"] is True  # never read the protocol stream as text
+    assert tool(mcp, "clone_voice", name="", file_path="x")["content"][0]["text"] == "name is required."
     assert tool(mcp, "transcribe", file_path=str(tmp_path / "missing.wav"))["content"][0]["text"].startswith("File not found")
     assert mcp("tools/call", {"name": "nope"})["error"]["code"] == -32602
 
@@ -246,7 +306,7 @@ def test_mcp_when_voxwell_is_closed(monkeypatch):
     def refuse(*a, **k):
         raise urllib.error.URLError("connection refused")
 
-    monkeypatch.setattr(mcp_server.urllib.request, "urlopen", refuse)
+    monkeypatch.setattr(cli.urllib.request, "urlopen", refuse)
     result = mcp_server.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "list_voices"}})
     assert result["result"]["isError"] and "not running" in result["result"]["content"][0]["text"]
 

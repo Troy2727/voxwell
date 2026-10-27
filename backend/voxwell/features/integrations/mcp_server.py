@@ -1,54 +1,90 @@
-"""Voxwell MCP server: lets AI assistants (Claude Desktop, Claude Code, ...) use Voxwell's voices.
+"""Voxwell MCP server: lets AI assistants (Claude Desktop, Cursor, Claude Code, ...) use Voxwell.
 
 Run by the assistant as `uv run --directory <backend> voxwell-mcp`. It speaks the Model Context
-Protocol (JSON-RPC 2.0, one message per line on stdin/stdout) and forwards each tool call to the
-running Voxwell app over its local HTTP API, so models are loaded only once, in the app.
-Written with the standard library only.
+Protocol (JSON-RPC 2.0, one message per line on stdin/stdout). Each tool runs the matching
+`voxwell` CLI command (voxwell/cli.py), which forwards it to the running Voxwell app over its
+local HTTP API, so models are loaded only once, in the app. Written with the standard library only.
 """
 
+import argparse
 import json
-import os
 import sys
-import time
-import urllib.error
-import urllib.request
-import uuid
-from pathlib import Path
+
+from voxwell import cli
 
 PROTOCOL_VERSION = "2025-06-18"
-API = f"http://127.0.0.1:{os.environ.get('VOXWELL_PORT', '8765')}"
+
+
+def _schema(properties: dict, required: list[str]) -> dict:
+    return {"type": "object", "properties": properties, "required": required}
+
+
+_FILE = {"type": "string", "description": "Path to the file on this computer."}
+_VOICE = {"type": "string", "description": "A saved voice name or id (see list_voices)."}
+_LANGUAGE = {"type": "string", "description": "ISO 639-1 code, e.g. en, es, fr."}
 
 TOOLS = [
     {
         "name": "list_voices",
-        "description": "List the voices saved in Voxwell (names can be used with the speak tool).",
-        "inputSchema": {"type": "object", "properties": {}},
+        "description": "List the voices saved in Voxwell. Their names work in speak, convert_voice and dub_video.",
+        "inputSchema": _schema({}, []),
     },
     {
         "name": "speak",
         "description": "Turn text into speech with a Voxwell voice and save it as a WAV file. Returns the file path.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "text": {"type": "string", "description": "What to say (up to 4096 characters)."},
-                "voice": {"type": "string", "description": "A saved voice name or id. Omit for the default voice."},
-                "language": {"type": "string", "description": "ISO 639-1 code, e.g. en, es, fr. Default en."},
-                "output_path": {"type": "string", "description": "Where to save the WAV. Default: the Voxwell MCP folder."},
-            },
-            "required": ["text"],
-        },
+        "inputSchema": _schema({
+            "text": {"type": "string", "description": "What to say (up to 4096 characters)."},
+            "voice": {**_VOICE, "description": "A saved voice name or id. Omit for the built-in voice."},
+            "language": {**_LANGUAGE, "description": "ISO 639-1 code, e.g. en, es, fr. Default en."},
+            "output_path": {"type": "string", "description": "Where to save the WAV. Default: the Voxwell MCP folder."},
+        }, ["text"]),
     },
     {
         "name": "transcribe",
         "description": "Transcribe an audio or video file on this computer to text.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "file_path": {"type": "string", "description": "Path to the audio or video file."},
-                "language": {"type": "string", "description": "ISO 639-1 code; omit to detect it."},
-            },
-            "required": ["file_path"],
-        },
+        "inputSchema": _schema({"file_path": _FILE, "language": {**_LANGUAGE, "description": "ISO 639-1 code; omit to detect it."}}, ["file_path"]),
+    },
+    {
+        "name": "isolate_voice",
+        "description": "Split a recording (up to 10 minutes) into the voice alone and the background (music, noise, "
+        "effects). Saves <name>.voice.wav and <name>.background.wav and returns their paths.",
+        "inputSchema": _schema({
+            "file_path": _FILE,
+            "output_folder": {"type": "string", "description": "Folder for the two WAVs. Default: next to the input."},
+        }, ["file_path"]),
+    },
+    {
+        "name": "clone_voice",
+        "description": "Save a new voice from a few seconds of clean speech, so speak and the other tools can use it.",
+        "inputSchema": _schema({"name": {"type": "string", "description": "Name for the new voice."}, "file_path": _FILE}, ["name", "file_path"]),
+    },
+    {
+        "name": "design_voice",
+        "description": "Create a new voice from a description (e.g. 'warm, low female voice, slight British accent') and save it.",
+        "inputSchema": _schema({
+            "description": {"type": "string", "description": "How the voice should sound."},
+            "name": {"type": "string", "description": "Name for the new voice."},
+            "sample_text": {"type": "string", "description": "Text the preview says (optional)."},
+        }, ["description", "name"]),
+    },
+    {
+        "name": "convert_voice",
+        "description": "Re-speak a recording in a saved voice, keeping the words and timing. Returns the WAV path.",
+        "inputSchema": _schema({
+            "file_path": _FILE,
+            "voice": _VOICE,
+            "output_path": {"type": "string", "description": "Where to save the WAV. Default: the Voxwell MCP folder."},
+        }, ["file_path", "voice"]),
+    },
+    {
+        "name": "dub_video",
+        "description": "Dub a video into another language (takes minutes). Saves an MP4 and an SRT and returns their paths.",
+        "inputSchema": _schema({
+            "file_path": _FILE,
+            "target_language": _LANGUAGE,
+            "voice": {**_VOICE, "description": "A saved voice name or id. Omit to clone the original speaker."},
+            "output_path": {"type": "string", "description": "Where to save the MP4. Default: the Voxwell MCP folder."},
+        }, ["file_path", "target_language"]),
     },
 ]
 
@@ -57,65 +93,73 @@ class ToolError(Exception):
     """Shown to the assistant as a failed tool result."""
 
 
-def _request(path: str, data: bytes | None = None, headers: dict | None = None) -> bytes:
-    req = urllib.request.Request(API + path, data=data, headers=headers or {})
-    try:
-        with urllib.request.urlopen(req, timeout=1800) as res:  # long texts take a while
-            return res.read()
-    except urllib.error.HTTPError as exc:
-        body = exc.read().decode("utf-8", "replace")
-        try:
-            message = json.loads(body)["error"]["message"]
-        except (ValueError, KeyError, TypeError):
-            message = body or str(exc)
-        raise ToolError(message) from exc
-    except urllib.error.URLError as exc:
-        raise ToolError("Voxwell is not running. Open the Voxwell app, then try again.") from exc
+def _client() -> cli.Client:
+    return cli.Client()
 
 
-def _default_output() -> Path:
+def _default_folder() -> str:
     from voxwell.paths import data_dir
 
-    return data_dir("mcp") / f"speech-{time.strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:6]}.wav"
+    return str(data_dir("mcp"))
 
 
-def list_voices(_args: dict) -> str:
-    found = json.loads(_request("/api/voices"))
-    if not found:
-        return "No saved voices yet; speak uses the default voice."
-    return "\n".join(f"- {v['name']} (id {v['id']}, {v['source']})" for v in found)
+def _run(command, **values) -> str:
+    """Run a CLI command; its human-readable result is the tool's text."""
+    text, _ = command(_client(), argparse.Namespace(json=True, **values))
+    return text
+
+
+def _required(args: dict, key: str) -> str:
+    value = str(args.get(key) or "").strip()
+    if not value:
+        raise ToolError(f"{key} is required.")
+    return value
+
+
+def list_voices(args: dict) -> str:
+    return _run(cli.cmd_voices)
 
 
 def speak(args: dict) -> str:
-    text = str(args.get("text", "")).strip()
-    if not text:
+    text = _required(args, "text")
+    if text == "-":  # the CLI reads "-" from stdin, which is this server's protocol stream
         raise ToolError("text is required.")
-    body = {"input": text, "voice": args.get("voice") or "default", "language": args.get("language") or "en",
-            "response_format": "wav"}
-    wav = _request("/v1/audio/speech", json.dumps(body).encode(), {"Content-Type": "application/json"})
-    out = Path(args["output_path"]).expanduser() if args.get("output_path") else _default_output()
-    if out.suffix.lower() != ".wav":
-        out = out.with_suffix(".wav")
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_bytes(wav)
-    return f"Saved the speech to {out}"
+    return _run(cli.cmd_speak, text=text, voice=args.get("voice"), language=args.get("language") or "en", speed=1.0,
+                output=args.get("output_path") or _default_folder())
 
 
 def transcribe(args: dict) -> str:
-    path = Path(str(args.get("file_path", ""))).expanduser()
-    if not path.is_file():
-        raise ToolError(f"File not found: {path}")
-    boundary = uuid.uuid4().hex
-    parts = [f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="audio{path.suffix}"\r\n\r\n'.encode(),
-             path.read_bytes(), b"\r\n"]
-    if args.get("language"):
-        parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="language"\r\n\r\n{args["language"]}\r\n'.encode())
-    parts.append(f"--{boundary}--\r\n".encode())
-    result = _request("/v1/audio/transcriptions", b"".join(parts), {"Content-Type": f"multipart/form-data; boundary={boundary}"})
-    return json.loads(result)["text"] or "(no speech found)"
+    text = _run(cli.cmd_transcribe, file=_required(args, "file_path"), language=args.get("language"), format="txt", output=None)
+    return text or "(no speech found)"
 
 
-HANDLERS = {"list_voices": list_voices, "speak": speak, "transcribe": transcribe}
+def isolate_voice(args: dict) -> str:
+    return _run(cli.cmd_isolate, file=_required(args, "file_path"), output=args.get("output_folder"))
+
+
+def clone_voice(args: dict) -> str:
+    return _run(cli.cmd_clone, name=_required(args, "name"), file=_required(args, "file_path"))
+
+
+def design_voice(args: dict) -> str:
+    return _run(cli.cmd_design, description=_required(args, "description"), name=_required(args, "name"),
+                sample=args.get("sample_text"), preview=None)
+
+
+def convert_voice(args: dict) -> str:
+    return _run(cli.cmd_convert, file=_required(args, "file_path"), voice=_required(args, "voice"),
+                output=args.get("output_path") or _default_folder())
+
+
+def dub_video(args: dict) -> str:
+    return _run(cli.cmd_dub, file=_required(args, "file_path"), to=_required(args, "target_language").lower(),
+                voice=args.get("voice") or "original", output=args.get("output_path") or _default_folder())
+
+
+HANDLERS = {
+    "list_voices": list_voices, "speak": speak, "transcribe": transcribe, "isolate_voice": isolate_voice,
+    "clone_voice": clone_voice, "design_voice": design_voice, "convert_voice": convert_voice, "dub_video": dub_video,
+}
 
 
 def handle(message: dict) -> dict | None:
@@ -139,7 +183,7 @@ def handle(message: dict) -> dict | None:
             return {"jsonrpc": "2.0", "id": msg_id, "error": {"code": -32602, "message": f"Unknown tool: {params.get('name')}"}}
         try:
             result = {"content": [{"type": "text", "text": handler(params.get("arguments") or {})}], "isError": False}
-        except ToolError as exc:
+        except (ToolError, cli.CliError) as exc:
             result = {"content": [{"type": "text", "text": str(exc)}], "isError": True}
     else:
         return {"jsonrpc": "2.0", "id": msg_id, "error": {"code": -32601, "message": f"Method not found: {method}"}}
