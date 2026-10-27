@@ -8,9 +8,9 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        // Voxwell: orange-to-gold with a glow in dark mode; disabled is plain gray, not dimmed orange.
+        // Voxwell: orange-to-gold with a glow; disabled is plain gray, not dimmed orange.
         default:
-          "bg-primary text-primary-foreground hover:bg-primary/90 dark:bg-linear-90 dark:from-cta-from dark:via-cta-via dark:to-cta-to dark:shadow-md dark:shadow-cta-from/35 dark:hover:brightness-110 dark:hover:shadow-cta-from/55 disabled:bg-none disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 disabled:shadow-none dark:disabled:bg-none",
+          "bg-linear-90 from-cta-from via-cta-via to-cta-to text-cta-foreground shadow-md shadow-cta-from/35 hover:brightness-110 hover:shadow-cta-from/55 disabled:bg-none disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 disabled:shadow-none",
         destructive:
           "bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:bg-destructive/60 dark:focus-visible:ring-destructive/40",
         outline:

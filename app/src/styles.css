@@ -13,7 +13,7 @@
   --card-foreground: #182433;
   --popover: #ffffff;
   --popover-foreground: #182433;
-  --primary: #c2410c; /* dark orange: 5.2:1 on white */
+  --primary: #b45309; /* dark gold for text and icons: 5:1 on white */
   --primary-foreground: #ffffff;
   --secondary: #ede7df;
   --secondary-foreground: #182433;
@@ -23,18 +23,22 @@
   --accent-foreground: #182433;
   --destructive: #dc2626;
   --success: #1a7f37;
-  --highlight: #f47735; /* waveforms, voice discs */
+  --highlight: #d97706; /* waveforms, voice discs */
+  --cta-from: #ff7a00; /* main buttons: orange to gold, same as FanClash's Create Debate */
+  --cta-via: #ffa800;
+  --cta-to: #ffc800;
+  --cta-foreground: #182433; /* navy: readable across the whole gradient */
   --border: #e2dad0;
   --input: #e2dad0;
-  --ring: #f47735;
+  --ring: #f59e0b;
   --sidebar: #fbf8f4;
   --sidebar-foreground: #182433;
-  --sidebar-primary: #c2410c;
+  --sidebar-primary: #b45309;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #ede7df;
   --sidebar-accent-foreground: #182433;
   --sidebar-border: #e2dad0;
-  --sidebar-ring: #f47735;
+  --sidebar-ring: #f59e0b;
 }
 
 .dark {
@@ -54,13 +58,11 @@
   --accent-foreground: #f5f1ec;
   --destructive: #e5484d;
   --success: #3fb950;
-  --highlight: #f3a92e;
-  --cta-from: #ff7a00; /* main buttons: orange to gold, same as FanClash's Create Debate */
-  --cta-via: #ffa800;
-  --cta-to: #ffc800;
+  --highlight: #ffc800;
+  --cta-foreground: #0f141c;
   --border: #2a3a52;
   --input: #2a3a52;
-  --ring: #f3a92e;
+  --ring: #ffa800;
   --sidebar: #131c28;
   --sidebar-foreground: #f5f1ec;
   --sidebar-primary: #ffa800;
@@ -68,7 +70,7 @@
   --sidebar-accent: #22324a;
   --sidebar-accent-foreground: #f5f1ec;
   --sidebar-border: #2a3a52;
-  --sidebar-ring: #f3a92e;
+  --sidebar-ring: #ffa800;
 }
 
 @theme inline {
@@ -97,6 +99,7 @@
   --color-cta-from: var(--cta-from);
   --color-cta-via: var(--cta-via);
   --color-cta-to: var(--cta-to);
+  --color-cta-foreground: var(--cta-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);

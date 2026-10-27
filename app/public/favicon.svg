@@ -1,8 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Voxwell">
   <defs>
     <linearGradient id="v-gradient" x1="70" y1="70" x2="290" y2="330" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#F47735"/>
-      <stop offset="1" stop-color="#F3A92E"/>
+      <stop stop-color="#FF7A00"/>
+      <stop offset=".5" stop-color="#FFA800"/>
+      <stop offset="1" stop-color="#FFC800"/>
     </linearGradient>
     <style>
       .voice-ball { transform-box: fill-box; transform-origin: center bottom; animation: ball-bounce 1.2s infinite; }

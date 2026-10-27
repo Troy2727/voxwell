@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { ArrowRight, Eye, EyeOff, Loader2, Lock, MailCheck, Mic, SlidersHorizontal, Type, Video } from 'lucide-react';
 import { toast } from 'sonner';
+import { LogoMark } from '@/components/logo';
 import { ErrorAlert, Field, message } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -128,8 +129,8 @@ function AccountForm() {
   return (
     <div className="w-full max-w-sm">
       <div className="mb-10 flex items-center justify-center gap-3">
-        <img src="favicon.svg" alt="" className="size-11" />
-        <span className="text-2xl font-bold tracking-tight">Voxwell</span>
+        <LogoMark className="size-14" />
+        <span className="text-3xl font-bold tracking-tight">Voxwell</span>
       </div>
       <h1 className="text-center text-3xl font-bold tracking-tight">{copy.title}</h1>
       <p className="text-muted-foreground mt-2 mb-8 text-center">{mode === 'sent' ? sentTo : copy.sub}</p>

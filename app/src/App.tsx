@@ -4,6 +4,7 @@ import { LogOut, Moon, Sun } from 'lucide-react';
 import { api } from './api';
 import { AuthPage } from './auth/AuthPage';
 import { FEATURES } from './features';
+import { LogoMark } from '@/components/logo';
 import { Button } from '@/components/ui/button';
 import {
   Sidebar,
@@ -71,9 +72,9 @@ function Shell({ user }: { user?: User }) {
     <SidebarProvider>
       <Sidebar collapsible="icon">
         <SidebarHeader>
-          <div className="flex items-center gap-2 px-1 py-1.5">
-            <img src="favicon.svg" alt="" className="size-7 shrink-0" />
-            <span className="text-lg font-bold tracking-tight group-data-[collapsible=icon]:hidden">Voxwell</span>
+          <div className="flex items-center gap-2.5 px-1 py-1.5">
+            <LogoMark className="size-8" />
+            <span className="text-xl font-bold tracking-tight group-data-[collapsible=icon]:hidden">Voxwell</span>
           </div>
         </SidebarHeader>
         <SidebarContent>

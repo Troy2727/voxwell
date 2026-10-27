@@ -1,10 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 360" role="img" aria-labelledby="title description">
   <title id="title">Voxwell Voice Studio</title>
-  <desc id="description">A warm orange V holding a white well with a navy sound signal, alongside the Voxwell wordmark, for dark backgrounds.</desc>
+  <desc id="description">An orange-to-gold V holding a white well with a navy sound signal, alongside the Voxwell wordmark, for dark backgrounds.</desc>
   <defs>
     <linearGradient id="v-gradient" x1="70" y1="70" x2="290" y2="330" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#F47735"/>
-      <stop offset="1" stop-color="#F3A92E"/>
+      <stop stop-color="#FF7A00"/>
+      <stop offset=".5" stop-color="#FFA800"/>
+      <stop offset="1" stop-color="#FFC800"/>
     </linearGradient>
     <linearGradient id="well-gradient" x1="186" y1="80" x2="186" y2="292" gradientUnits="userSpaceOnUse">
       <stop stop-color="#FFFFFF"/>
@@ -32,8 +33,8 @@
   <g transform="translate(28 16)">
     <path d="M98 125Q186 165 274 125L186 292Z" fill="url(#well-gradient)"/>
     <g clip-path="url(#well-clip)">
-      <circle class="sound-ring" cx="186" cy="190" r="26" fill="none" stroke="#F3A92E" stroke-width="5"/>
-      <circle class="sound-ring second" cx="186" cy="190" r="26" fill="none" stroke="#FDBA74" stroke-width="5"/>
+      <circle class="sound-ring" cx="186" cy="190" r="26" fill="none" stroke="#FFC800" stroke-width="5"/>
+      <circle class="sound-ring second" cx="186" cy="190" r="26" fill="none" stroke="#FFE38A" stroke-width="5"/>
     </g>
     <circle class="voice-ball" cx="186" cy="190" r="16" fill="#182433"/>
     <path d="M62 48 176 294 Q180 303 186 303 Q192 303 196 294 L310 48" fill="none" stroke="url(#v-gradient)" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
@@ -41,6 +42,6 @@
 
   <g font-family="Aptos, Inter, Arial, sans-serif">
     <text x="394" y="205" fill="#F5F1EC" font-size="96" font-weight="700" textLength="500" lengthAdjust="spacing">VOXWELL</text>
-    <text x="398" y="268" fill="#F3A92E" font-size="34" font-weight="500" letter-spacing="10">VOICE STUDIO</text>
+    <text x="398" y="268" fill="#FFA800" font-size="34" font-weight="500" letter-spacing="10">VOICE STUDIO</text>
   </g>
 </svg>
