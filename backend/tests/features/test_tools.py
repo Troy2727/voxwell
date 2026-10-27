@@ -1,5 +1,7 @@
+import hashlib
 import io
 import os
+import pickle
 import shutil
 import subprocess
 import time
@@ -9,7 +11,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from voxwell import voices
-from voxwell.features.tools import engine
+from voxwell.features.tools import engine, htdemucs, isolation
+from voxwell.features.tools.router import MAX_ISOLATE_SECONDS
 from voxwell.features.voice_cloning import engine as cloning_engine
 from voxwell.main import app
 
@@ -132,6 +135,104 @@ def test_convert_engine_error(monkeypatch):
     voice = voices.save_voice("Target", wav_bytes(1), "upload")
     r = client.post("/api/tools/convert", files={"file": ("a.wav", wav_bytes(1))}, data={"voice_id": voice.id})
     assert r.status_code == 500 and "download failed" in r.json()["detail"]
+
+
+# --- voice isolation -----------------------------------------------------------------------
+
+
+def test_isolate_returns_voice_and_background(monkeypatch):
+    calls = []
+
+    def fake_isolate(source, voice_out, background_out):
+        calls.append(duration(source.read_bytes()))
+        voice_out.write_bytes(wav_bytes(1.0))
+        background_out.write_bytes(wav_bytes(1.0))
+        return 1.0
+
+    monkeypatch.setattr(isolation, "isolate", fake_isolate)
+    r = client.post("/api/tools/isolate", files={"file": ("song.wav", wav_bytes(1.0))})
+    body = r.json()
+    assert r.status_code == 200 and calls == [1.0] and body["seconds"] == 1.0
+    assert body["voice"]["url"] != body["background"]["url"]
+    for part in ("voice", "background"):
+        assert duration(client.get(body[part]["url"]).content) == 1.0
+
+
+def test_isolate_rejects_bad_input(monkeypatch):
+    monkeypatch.setattr(isolation, "isolate", lambda *a: pytest.fail("must not run"))
+    assert client.post("/api/tools/isolate", files={"file": ("a.wav", b"nope")}).status_code == 422
+    too_long = wav_bytes(MAX_ISOLATE_SECONDS + 1, rate=1000)
+    r = client.post("/api/tools/isolate", files={"file": ("long.wav", too_long)})
+    assert r.status_code == 422 and "10 minutes" in r.json()["detail"]
+
+
+@pytest.mark.parametrize("error,status", [
+    (isolation.IsolationError("Could not download the voice isolation model: offline"), 422),
+    (RuntimeError("out of memory"), 500),
+])
+def test_isolate_errors(monkeypatch, error, status):
+    def fail(*a):
+        raise error
+
+    monkeypatch.setattr(isolation, "isolate", fail)
+    r = client.post("/api/tools/isolate", files={"file": ("a.wav", wav_bytes(1))})
+    assert r.status_code == status and str(error) in r.json()["detail"]
+
+
+def test_separate_windows_line_up_with_the_audio(monkeypatch):
+    """A stand-in model that gives each stem a quarter of its input: the stems must add back up
+    to the input for clips shorter than, as long as and longer than one window."""
+    torch = pytest.importorskip("torch")
+    monkeypatch.setattr(htdemucs, "SEGMENT", 1000)
+
+    class Quarter(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.anchor = torch.nn.Parameter(torch.zeros(1))  # separate() reads the device from it
+
+        def forward(self, x):
+            return x[:, None].expand(-1, 4, -1, -1) / 4
+
+    for length in (300, 1000, 2600):
+        mix = torch.randn(2, length)
+        mix -= mix.mean()
+        stems = isolation.separate(mix, Quarter())
+        assert stems.shape == (4, 2, length)
+        assert torch.allclose(stems.sum(0), mix, atol=1e-5)
+
+
+def test_corrupted_download_is_rejected(monkeypatch, isolated_data_dir):
+    monkeypatch.setattr(isolation.urllib.request, "urlopen", lambda url, timeout: io.BytesIO(b"not the model"))
+    with pytest.raises(isolation.IsolationError, match="corrupted"):
+        isolation.weights_path()
+    assert not any((isolated_data_dir / "models" / "isolation").iterdir())
+
+
+class _RunsCode:
+    def __reduce__(self):
+        return (print, ("this must never run",))
+
+
+def test_model_file_cannot_run_code(tmp_path):
+    torch = pytest.importorskip("torch")
+    path = tmp_path / "bad.th"
+    torch.save({"kwargs": {"sources": list(htdemucs.SOURCES)}, "state": {}, "extra": _RunsCode()}, path)
+    with pytest.raises(pickle.UnpicklingError):
+        isolation.load_state(path)
+
+
+def test_htdemucs_layout_matches_the_published_weights():
+    """Any change to a module name or shape would stop Meta's checkpoint from loading. The
+    signature was computed from the real checkpoint (955717e8): 533 tensors, 41,984,456 parameters."""
+    torch = pytest.importorskip("torch")
+    model = htdemucs.HTDemucs()
+    state = model.state_dict()
+    layout = "".join(f"{k}:{tuple(v.shape)};" for k, v in sorted(state.items()))
+    assert len(state) == 533 and sum(p.numel() for p in model.parameters()) == 41_984_456
+    assert hashlib.sha256(layout.encode()).hexdigest() == "5ad203e8cbb0f8a07dd38b67346453283f3e520913220d7976ee095daad59c52"
+    with torch.no_grad():
+        out = model.eval()(torch.randn(1, 2, htdemucs.SEGMENT))
+    assert out.shape == (1, 4, 2, htdemucs.SEGMENT) and torch.isfinite(out).all()
 
 
 # --- compare voices ------------------------------------------------------------------------

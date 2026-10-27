@@ -1,5 +1,5 @@
-"""Tools: voice conversion, AI direction, speech-rate fit and file info. (Compare voices is a page
-that calls /speak once per voice.)"""
+"""Tools: voice conversion, voice isolation, AI direction, speech-rate fit and file info.
+(Compare voices is a page that calls /speak once per voice.)"""
 
 import importlib.util
 import io
@@ -17,7 +17,7 @@ from pydantic import BaseModel
 
 from voxwell import voices
 from voxwell.features.dubbing.ffmpeg import DubbingError, ffmpeg_path
-from voxwell.features.tools import direction, engine
+from voxwell.features.tools import direction, engine, isolation
 from voxwell.features.voice_cloning import engine as cloning_engine
 from voxwell.paths import data_dir
 
@@ -25,6 +25,7 @@ router = APIRouter(tags=["tools"])
 
 MAX_UPLOAD = 50 * 1024 * 1024
 MAX_COMPARE_TEXT = 300
+MAX_ISOLATE_SECONDS = 10 * 60  # about 1 GB of working memory; longer files take a while on CPU
 OUTPUT_TTL_SECONDS = 24 * 60 * 60  # results are scratch files; download what you want to keep
 _OUTPUT_ID = re.compile(r"^[0-9a-f]{32}$")
 _EXT = re.compile(r"\.[a-z0-9]{1,6}")
@@ -92,6 +93,27 @@ async def convert(file: UploadFile = File(...), voice_id: str = Form(...)):
     finally:
         source.unlink(missing_ok=True)
     return _result(output_id)
+
+
+@router.post("/isolate")
+async def isolate(file: UploadFile = File(...)):
+    """Split a recording into the voice and the background (music, noise, effects)."""
+    wav, seconds = await _read_audio(file)
+    if seconds > MAX_ISOLATE_SECONDS:
+        raise HTTPException(422, f"Use a recording of up to {MAX_ISOLATE_SECONDS // 60} minutes.")
+    voice_id, voice_out = _new_output()
+    background_id, background_out = _new_output()
+    source = voice_out.with_suffix(".source.wav")
+    source.write_bytes(wav)
+    try:
+        isolation.isolate(source, voice_out, background_out)
+    except isolation.IsolationError as exc:
+        raise HTTPException(422, str(exc))
+    except Exception as exc:
+        raise HTTPException(500, f"Voice isolation failed: {exc}")
+    finally:
+        source.unlink(missing_ok=True)
+    return {"voice": _result(voice_id), "background": _result(background_id), "seconds": round(seconds, 3)}
 
 
 class SpeakRequest(BaseModel):

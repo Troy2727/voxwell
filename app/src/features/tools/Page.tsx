@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ArrowRightLeft, Plus, Sparkles, Timer, Trash2, Volume2 } from 'lucide-react';
+import { ArrowRightLeft, AudioLines, Plus, Sparkles, Timer, Trash2, Volume2 } from 'lucide-react';
 import { api, apiUrl, listVoices, sendJson, type Voice } from '../../api';
 import { AudioResult } from '@/components/audio-result';
 import { ChoiceSelect } from '@/components/choice-select';
@@ -17,6 +17,7 @@ import { LANGUAGES } from '../voice_cloning/languages';
 
 const TOOLS = [
   { id: 'convert', title: 'Convert voice', hint: 'Re-speak a recording in one of your saved voices. The words and timing stay the same.' },
+  { id: 'isolate', title: 'Isolate voice', hint: 'Split a recording into the voice alone and everything else: music, noise and effects.' },
   { id: 'direct', title: 'AI direction', hint: 'Say how a line should sound, in your own words. A local AI turns it into settings you can adjust.' },
   { id: 'compare', title: 'Compare voices', hint: 'Hear the same sentence in several voices, side by side.' },
   { id: 'fit', title: 'Fit length', hint: 'Speed audio up or slow it down to an exact length, without changing the pitch.' },
@@ -49,6 +50,7 @@ export default function Page() {
               </CardHeader>
               <CardContent className="flex flex-col gap-4">
                 {t.id === 'convert' && <Convert voices={voices} />}
+                {t.id === 'isolate' && <Isolate />}
                 {t.id === 'direct' && <Direct voices={voices} />}
                 {t.id === 'compare' && <Compare voices={voices} />}
                 {t.id === 'fit' && <Fit />}
@@ -104,6 +106,56 @@ function Convert({ voices }: { voices: Voice[] }) {
       </div>
       <ErrorAlert message={error} />
       {url && <Result url={url} name="converted.wav" />}
+    </>
+  );
+}
+
+type Isolated = { voice: { url: string }; background: { url: string }; seconds: number };
+
+function Isolate() {
+  const [file, setFile] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<Isolated | null>(null);
+  const [error, setError] = useState('');
+
+  async function run() {
+    if (!file) return;
+    setBusy(true);
+    setError('');
+    setResult(null);
+    const form = new FormData();
+    form.append('file', file);
+    try {
+      setResult(await api<Isolated>('/api/tools/isolate', { method: 'POST', body: form }));
+    } catch (e) {
+      setError(message(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <Field label="Recording" hint="WAV, MP3, FLAC or OGG, up to 10 minutes">
+        <FileDrop file={file} onFile={setFile} accept=".wav,.mp3,.flac,.ogg,audio/*" disabled={busy} />
+      </Field>
+      <div className="flex flex-wrap items-center gap-3">
+        <Button disabled={busy || !file} onClick={run}>
+          <AudioLines /> {busy ? 'Isolating…' : 'Isolate voice'}
+        </Button>
+        {busy && <Muted>The first time downloads the isolation model (84 MB). A minute of audio takes about 20 seconds on a CPU.</Muted>}
+      </div>
+      <ErrorAlert message={error} />
+      {result && (
+        <div className="grid gap-4 md:grid-cols-2">
+          <Field label="Voice">
+            <Result url={result.voice.url} name="voice.wav" />
+          </Field>
+          <Field label="Background">
+            <Result url={result.background.url} name="background.wav" />
+          </Field>
+        </div>
+      )}
     </>
   );
 }
