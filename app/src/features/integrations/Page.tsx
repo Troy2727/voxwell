@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Check, Copy, Download } from 'lucide-react';
 import { toast } from 'sonner';
-import { api, sendJson } from '../../api';
-import { ErrorAlert, message, Muted, Page as PageLayout, Section } from '@/components/page';
+import { api, BACKEND_URL, sendJson } from '../../api';
+import { message, Muted, Page as PageLayout, Section } from '@/components/page';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import PhoneCard from './PhoneCard';
@@ -15,6 +16,26 @@ interface Info {
   skill: Record<Agent, boolean>;
   mcp: { command: string; args: string[]; env: Record<string, string> };
 }
+
+/** What the page shows while the backend is unreachable: the generic commands, with <voxwell> for the install folder. */
+const OFFLINE_INFO: Info = {
+  api_base: `${BACKEND_URL}/v1`,
+  cli: 'uv run --directory <voxwell>/backend voxwell',
+  skill: { claude: false, codex: false },
+  mcp: { command: 'uv', args: ['run', '--directory', '<voxwell>/backend', 'voxwell-mcp'], env: { UV_SYSTEM_CERTS: '1' } },
+};
+
+/** The eight tools, the same in the CLI and the MCP server (backend/voxwell/cli.py, mcp_server.py). */
+const TOOLS: { cli: string; mcp: string; what: string }[] = [
+  { cli: 'voices', mcp: 'list_voices', what: 'List saved voices' },
+  { cli: 'speak', mcp: 'speak', what: 'Turn text into speech (WAV)' },
+  { cli: 'transcribe', mcp: 'transcribe', what: 'Transcribe an audio or video file' },
+  { cli: 'isolate', mcp: 'isolate_voice', what: 'Split a recording into the voice and the background' },
+  { cli: 'clone', mcp: 'clone_voice', what: 'Save a voice from a short, clean recording' },
+  { cli: 'design', mcp: 'design_voice', what: 'Create a voice from a description' },
+  { cli: 'convert', mcp: 'convert_voice', what: 'Re-speak a recording in a saved voice' },
+  { cli: 'dub', mcp: 'dub_video', what: 'Dub a video into another language (MP4 + SRT)' },
+];
 
 function Snippet({ code }: { code: string }) {
   const [copied, setCopied] = useState(false);
@@ -36,7 +57,7 @@ const AGENTS: { id: Agent; name: string; folder: string }[] = [
 ];
 
 /** Installs the Voxwell skill (how to use the CLI) where Claude Code or Codex looks for skills. */
-function SkillButtons({ installed, onInstalled }: { installed: Record<Agent, boolean>; onInstalled: (agent: Agent) => void }) {
+function SkillButtons({ installed, offline, onInstalled }: { installed: Record<Agent, boolean>; offline: boolean; onInstalled: (agent: Agent) => void }) {
   const [busy, setBusy] = useState<Agent | null>(null);
 
   async function install(agent: Agent, name: string) {
@@ -55,7 +76,7 @@ function SkillButtons({ installed, onInstalled }: { installed: Record<Agent, boo
   return (
     <div className="flex flex-wrap gap-2">
       {AGENTS.map((a) => (
-        <Button key={a.id} variant={installed[a.id] ? 'outline' : 'default'} disabled={busy !== null} onClick={() => install(a.id, a.name)} title={a.folder}>
+        <Button key={a.id} variant={installed[a.id] ? 'outline' : 'default'} disabled={offline || busy !== null} onClick={() => install(a.id, a.name)} title={a.folder}>
           {installed[a.id] ? <Check /> : <Download />}
           {busy === a.id ? 'Installing…' : installed[a.id] ? `Installed for ${a.name} (update)` : `Install for ${a.name}`}
         </Button>
@@ -65,17 +86,17 @@ function SkillButtons({ installed, onInstalled }: { installed: Record<Agent, boo
 }
 
 export default function Page() {
-  const [info, setInfo] = useState<Info | null>(null);
-  const [error, setError] = useState('');
+  const [loaded, setLoaded] = useState<Info | null>(null);
+  const [offline, setOffline] = useState(false);
 
   useEffect(() => {
-    api<Info>('/api/integrations/info').then(setInfo, (e: Error) => setError(e.message));
+    api<Info>('/api/integrations/info').then(setLoaded, () => setOffline(true));
   }, []);
 
   const description = 'Other apps on this computer can use Voxwell while it is open. Everything stays on your machine: the API only listens on this computer, so no API key is needed.';
-  if (error) return <PageLayout title="Integrations" description={description}><ErrorAlert message={error} /></PageLayout>;
-  if (!info) return <PageLayout title="Integrations" description={description}><Skeleton className="h-64 w-full" /></PageLayout>;
+  if (!loaded && !offline) return <PageLayout title="Integrations" description={description}><Skeleton className="h-64 w-full" /></PageLayout>;
 
+  const info = loaded ?? OFFLINE_INFO;
   const base = info.api_base;
   const mcpJson = JSON.stringify({ mcpServers: { voxwell: info.mcp } }, null, 2);
   const envFlags = Object.entries(info.mcp.env).map(([k, v]) => `-e ${k}=${v}`).join(' ');
@@ -83,6 +104,40 @@ export default function Page() {
 
   return (
     <PageLayout title="Integrations" description={description}>
+      {offline && (
+        <Alert>
+          <AlertDescription>
+            <p>
+              Voxwell's backend isn't running, so the commands below show <code>&lt;voxwell&gt;</code> where your Voxwell folder
+              goes. Open the Voxwell app to fill in this computer's commands and install the agent skill.
+            </p>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      <Section title="Eight tools, two ways in" description="The command line and MCP share the same eight tools.">
+        <div className="overflow-x-auto rounded-lg border">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/40 text-left">
+              <tr>
+                <th className="px-3 py-2 font-medium">Command line</th>
+                <th className="px-3 py-2 font-medium">MCP tool</th>
+                <th className="px-3 py-2 font-medium">What it does</th>
+              </tr>
+            </thead>
+            <tbody>
+              {TOOLS.map((t) => (
+                <tr key={t.mcp} className="border-t">
+                  <td className="px-3 py-2 font-mono text-xs">voxwell {t.cli}</td>
+                  <td className="px-3 py-2 font-mono text-xs">{t.mcp}</td>
+                  <td className="text-muted-foreground px-3 py-2">{t.what}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Section>
+
       <Section
         title="OpenAI-compatible API"
         description={
@@ -134,7 +189,7 @@ ${info.cli} isolate song.mp3`} />
           Installs a skill that tells the agent when and how to use Voxwell, with the command above filled in. Then just ask,
           e.g. “isolate the voice in song.mp3”.
         </Muted>
-        <SkillButtons installed={info.skill} onInstalled={(agent) => setInfo({ ...info, skill: { ...info.skill, [agent]: true } })} />
+        <SkillButtons installed={info.skill} offline={offline} onInstalled={(agent) => setLoaded({ ...info, skill: { ...info.skill, [agent]: true } })} />
       </Section>
 
       <Section

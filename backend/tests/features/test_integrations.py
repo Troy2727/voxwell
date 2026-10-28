@@ -1,5 +1,6 @@
 import io
 import json
+import re
 import shutil
 import urllib.error
 import wave
@@ -227,6 +228,13 @@ def test_mcp_handshake_and_tool_list(mcp):
     assert names == set(mcp_server.HANDLERS)
     assert mcp("ping")["result"] == {}
     assert mcp("resources/list")["error"]["code"] == -32601
+
+
+def test_integrations_page_lists_every_tool():
+    """The page's tool table is static (it must show while the backend is offline), so keep it in step."""
+    page = (integrations_router.BACKEND_DIR.parent / "app/src/features/integrations/Page.tsx").read_text(encoding="utf-8")
+    assert set(re.findall(r"mcp: '(\w+)'", page)) == set(mcp_server.HANDLERS)
+    assert set(re.findall(r"cli: '(\w+)'", page)) == {n[4:] for n in dir(cli) if n.startswith("cmd_")} - {"status"}
 
 
 def test_mcp_speak_saves_a_wav(mcp, fake_tts, tmp_path):
