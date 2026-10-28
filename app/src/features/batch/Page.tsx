@@ -259,7 +259,7 @@ function WatchFolder({ voices }: { voices: Voice[] }) {
         ) : (
           <Button disabled={busy || !folder.trim()} onClick={() => save(true)}><Eye /> Start watching</Button>
         )}
-        {state?.enabled && <Muted>Watching · {state.skipped} existing video(s) skipped</Muted>}
+        {state?.enabled && <Muted>Watching · {state.skipped} existing {state.skipped === 1 ? 'video' : 'videos'} skipped</Muted>}
       </div>
       <ErrorAlert message={error} />
       <ErrorAlert message={state?.problem ?? ''} />

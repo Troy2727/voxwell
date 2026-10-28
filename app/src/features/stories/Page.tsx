@@ -116,7 +116,7 @@ export default function Page() {
       </Section>
 
       {speakers.length > 0 && !scriptError && (
-        <Section title="Cast" description={`${lineCount} line(s). Give each speaker a voice from Saved voices.`}>
+        <Section title="Cast" description={`${lineCount} ${lineCount === 1 ? 'line' : 'lines'}. Give each speaker a voice from Saved voices.`}>
           {speakers.map((speaker) => (
             <div key={speaker} className="grid items-center gap-2 sm:grid-cols-[160px_1fr]">
               <span className="truncate text-sm font-medium">{speaker}</span>

@@ -75,7 +75,7 @@ export default function Page() {
         </Field>
         <div>
           <Button onClick={generate} disabled={loading || !description.trim()}>
-            <Sparkles /> {loading ? 'Generating...' : preview ? 'Regenerate' : 'Preview'}
+            <Sparkles /> {loading ? 'Generating…' : preview ? 'Regenerate' : 'Preview'}
           </Button>
         </div>
       </Section>
@@ -88,7 +88,7 @@ export default function Page() {
               <Input id="design-name" value={name} onChange={(e) => setName(e.target.value)} />
             </Field>
             <Button onClick={save} disabled={saving || !name.trim()}>
-              {saving ? 'Saving...' : 'Save to voices'}
+              {saving ? 'Saving…' : 'Save to voices'}
             </Button>
           </div>
         </Section>

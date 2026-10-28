@@ -50,7 +50,7 @@ interface Book {
 const DEFAULT_VOICE = 'default';
 const CHARS_PER_MINUTE = 900; // typical narration speed, for a rough length estimate
 const working = (b: Book) => b.state === 'queued' || b.state === 'running';
-const minutes = (chars: number) => Math.max(1, Math.round(chars / CHARS_PER_MINUTE));
+const length = (chars: number) => (chars < CHARS_PER_MINUTE ? 'under 1 min' : `~${Math.round(chars / CHARS_PER_MINUTE)} min`);
 
 export default function Page() {
   const [books, setBooks] = useState<Book[] | null>(null);
@@ -185,7 +185,7 @@ function BookEditor({ book, voices, onChanged }: { book: Book; voices: Voice[]; 
   return (
     <Section
       title={book.title}
-      description={`${included.length} of ${book.chapters.length} chapters selected · about ${minutes(included.reduce((n, c) => n + c.chars, 0))} min of audio`}
+      description={`${included.length} of ${book.chapters.length} chapters selected · ${length(included.reduce((n, c) => n + c.chars, 0))} of audio`}
     >
       <div className="grid gap-4 sm:grid-cols-[200px_1fr]">
         <Field label="Language">
@@ -207,7 +207,7 @@ function BookEditor({ book, voices, onChanged }: { book: Book; voices: Voice[]; 
             <div key={i} className="flex items-center gap-3 px-4 py-2 text-sm">
               <Checkbox checked={c.include} disabled={locked || busy} onCheckedChange={() => toggle(i)} aria-label={`Include ${c.title}`} />
               <span className="flex-1 truncate">{c.title}</span>
-              <span className="text-muted-foreground text-xs">~{minutes(c.chars)} min</span>
+              <span className="text-muted-foreground text-xs">{length(c.chars)}</span>
               {c.status === 'done' && c.audio_url ? (
                 <Button asChild variant="ghost" size="sm">
                   <a href={apiUrl(c.audio_url)} download={`${String(i + 1).padStart(3, '0')} ${c.title}.wav`}>
