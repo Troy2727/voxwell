@@ -1,4 +1,6 @@
 import io
+import shutil
+import subprocess
 import wave
 from pathlib import Path
 
@@ -236,3 +238,20 @@ def test_srt_and_reference_window():
     assert fitting.reference_window([(0, 1), (5, 30)]) == (5, 12.0)
     assert fitting.reference_window([(0, 1)]) == (0, 3.0)
     assert fitting.reference_window([]) == (0.0, 8.0)
+
+
+@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg is not installed")
+@pytest.mark.parametrize("track_seconds", [1.0, 5.0])
+def test_mux_keeps_the_whole_video(tmp_path, track_seconds):
+    """A dubbed track shorter than the video must not cut the video; a longer one stops at its end."""
+    video, track, out = tmp_path / "in.mp4", tmp_path / "track.wav", tmp_path / "out.mp4"
+    ffmpeg.run_ffmpeg(["-f", "lavfi", "-i", "color=c=black:s=64x64:r=25:d=3", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(video)])
+    track.write_bytes(wav_bytes(track_seconds))
+    pipeline.mux(video, track, out)
+    probe = subprocess.run(
+        [shutil.which("ffprobe") or "ffprobe", "-v", "error", "-show_entries", "stream=codec_type,duration", "-of", "csv=p=0", str(out)],
+        capture_output=True, text=True, check=True,
+    ).stdout.split()
+    durations = {kind: float(seconds) for kind, seconds in (line.split(",") for line in probe)}
+    assert durations["video"] == pytest.approx(3.0, abs=0.1)
+    assert durations["audio"] == pytest.approx(3.0, abs=0.15)

@@ -93,8 +93,14 @@ def run(job_dir: Path, video: Path, target: str, voice: str, progress: Progress)
     srt = fitting.build_srt([(s.start, s.end, t) for s, t in zip(segments, texts)])
     srt_path.write_bytes(srt.encode("utf-8"))  # bytes: no CRLF translation on Windows
     out = job_dir / "dubbed.mp4"
-    ffmpeg.run_ffmpeg([
-        "-i", str(video), "-i", str(track_path), "-map", "0:v:0", "-map", "1:a:0",
-        "-c:v", "copy", "-c:a", "aac", "-shortest", str(out),
-    ])
+    mux(video, track_path, out)
     return {"video": out, "subtitles": srt_path}
+
+
+def mux(video: Path, track: Path, out: Path) -> None:
+    """Put the dubbed track on the original picture. The track ends after the last line, so it is
+    padded with silence (apad) and -shortest stops at the end of the video, never earlier."""
+    ffmpeg.run_ffmpeg([
+        "-i", str(video), "-i", str(track), "-map", "0:v:0", "-map", "1:a:0",
+        "-c:v", "copy", "-af", "apad", "-c:a", "aac", "-shortest", str(out),
+    ])
