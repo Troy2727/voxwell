@@ -57,9 +57,11 @@ class Client:
             for name, value in fields.items()
         )
         content_type = mimetypes.guess_type(file.name)[0] or "application/octet-stream"
-        # Only the extension is sent: the server never uses client file names as paths.
+        # The server shows the name as the job's title and never uses it as a path; drop the
+        # characters that would end the header value early.
+        filename = "".join("_" if c in '"\\\r\n' else c for c in file.name)
         head += (
-            f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="upload{file.suffix.lower()}"\r\n'
+            f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="{filename}"\r\n'
             f"Content-Type: {content_type}\r\n\r\n".encode()
         )
         tail = f"\r\n--{boundary}--\r\n".encode()

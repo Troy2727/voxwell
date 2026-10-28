@@ -2,6 +2,7 @@
 
 import io
 import json
+import os
 import wave
 from pathlib import Path
 
@@ -135,6 +136,22 @@ def test_design_saves_the_voice_and_preview(capsys, monkeypatch, tmp_path):
     code, out, _ = run(capsys, "design", "deep calm narrator", "--name", "Deep", "--preview", str(tmp_path / "p.wav"), "--json")
     result = json.loads(out)
     assert code == 0 and result["name"] == "Deep" and result["source"] == "design" and Path(result["preview_path"]).exists()
+
+
+@pytest.mark.parametrize("name, title", [
+    ("Café talk.wav", "Café talk"),
+    pytest.param('say "hi".wav', "say _hi_", marks=pytest.mark.skipif(os.name == "nt", reason='Windows file names cannot hold "')),
+])
+def test_jobs_are_titled_after_the_file(capsys, monkeypatch, audio, tmp_path, name, title):
+    """Projects lists CLI and MCP work under the file's name, even one the header can't hold as is."""
+    transcript = Transcript("Hi.", "en", [Segment(0.0, 1.0, "Hi.")])
+    monkeypatch.setattr(dictation_engine, "transcribe", lambda path, language=None, on_progress=None: transcript)
+    monkeypatch.setattr(transcription_jobs, "start", transcription_jobs._work)
+    named = tmp_path / name
+    named.write_bytes(audio.read_bytes())
+    assert run(capsys, "transcribe", str(named))[0] == 0
+    items = TestClient(app).get("/api/projects/items").json()
+    assert title in [item["title"] for item in items if item["kind"] == "transcript"]
 
 
 def test_dub_downloads_video_and_subtitles(capsys, monkeypatch, tmp_path):
