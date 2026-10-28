@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Copy, Mic, Square } from 'lucide-react';
-import { apiUrl } from '../../api';
+import { apiUrl, errorMessage } from '../../api';
 import { ChoiceSelect } from '@/components/choice-select';
 import { ErrorAlert, Field, Muted, Page as PageLayout, Section } from '@/components/page';
 import { Button } from '@/components/ui/button';
@@ -54,15 +54,7 @@ export default function Page() {
       form.append('file', blob, 'recording.webm');
       if (languageRef.current !== 'auto') form.append('language', languageRef.current);
       const res = await fetch(apiUrl('/api/dictation/transcribe'), { method: 'POST', body: form });
-      if (!res.ok) {
-        let msg = `${res.status}`;
-        try {
-          msg = (await res.json()).detail ?? msg;
-        } catch {
-          /* keep status */
-        }
-        throw new Error(msg);
-      }
+      if (!res.ok) throw new Error(await errorMessage(res));
       const result = (await res.json()) as TranscribeResult;
       setText(result.text);
       if (result.text) {

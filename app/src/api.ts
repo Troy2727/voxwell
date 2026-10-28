@@ -5,10 +5,23 @@ export function apiUrl(path: string): string {
   return BACKEND_URL + path;
 }
 
+/** The server's sentence for a failed response: FastAPI's `detail` (a string, or a list for invalid input). */
+export async function errorMessage(res: Response): Promise<string> {
+  const text = await res.text();
+  try {
+    const detail = JSON.parse(text).detail;
+    if (typeof detail === 'string') return detail;
+    if (Array.isArray(detail)) return detail.map((d: { msg?: string }) => d.msg).filter(Boolean).join(' ');
+  } catch {
+    /* not JSON */
+  }
+  return text || `Request failed (${res.status}).`;
+}
+
 /** Fetch JSON from the backend; throws with the server's message on a non-2xx status. */
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(apiUrl(path), init);
-  if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
+  if (!res.ok) throw new Error(await errorMessage(res));
   return (await res.json()) as T;
 }
 
