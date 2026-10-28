@@ -10,7 +10,7 @@ from voxwell import voices
 from voxwell.features.dubbing import ffmpeg, jobs
 from voxwell.features.dubbing.translate import LANGUAGES as TRANSLATION_LANGUAGES
 from voxwell.features.voice_cloning.engine import LANGUAGES as SPEECH_LANGUAGES
-from voxwell.paths import data_dir
+from voxwell.paths import data_dir, download_name
 
 router = APIRouter(tags=["dubbing"])
 
@@ -83,18 +83,20 @@ def job_status(job_id: str):
     return {"id": job.id, "state": job.state, "step": job.step, "percent": job.percent, "error": job.error}
 
 
-def _output(job_id: str, key: str, media_type: str, name: str):
+def _output(job_id: str, key: str, media_type: str, ext: str):
     job = _job(job_id)
     if job.state != "done":
         raise HTTPException(409, "The job is not finished yet.")
+    # Named like the watch folder's copies: "<video>.<language>.mp4".
+    name = download_name(job.title, f".{job.target}{ext}", "Dub")
     return FileResponse(job.outputs[key], media_type=media_type, filename=name)
 
 
 @router.get("/jobs/{job_id}/video")
 def job_video(job_id: str):
-    return _output(job_id, "video", "video/mp4", "dubbed.mp4")
+    return _output(job_id, "video", "video/mp4", ".mp4")
 
 
 @router.get("/jobs/{job_id}/subtitles")
 def job_subtitles(job_id: str):
-    return _output(job_id, "subtitles", "application/x-subrip; charset=utf-8", "subtitles.srt")
+    return _output(job_id, "subtitles", "application/x-subrip; charset=utf-8", ".srt")

@@ -9,6 +9,7 @@ from fastapi.responses import Response
 
 from voxwell.features.dubbing.fitting import build_srt, srt_time
 from voxwell.features.transcription import jobs
+from voxwell.paths import attachment, download_name
 
 router = APIRouter(tags=["transcription"])
 
@@ -89,5 +90,5 @@ def export(job_id: str, fmt: Literal["txt", "srt", "vtt"]):
     return Response(
         render(jobs.result(job)).encode("utf-8"),
         media_type=media_type,
-        headers={"Content-Disposition": f'attachment; filename="transcript.{fmt}"'},
+        headers=attachment(download_name(job.title, f".{fmt}", "Transcript")),
     )

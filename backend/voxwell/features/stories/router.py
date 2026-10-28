@@ -9,6 +9,7 @@ from voxwell import voices
 from voxwell.features.stories import jobs
 from voxwell.features.stories.script import ScriptError, parse, speakers
 from voxwell.features.voice_cloning.engine import LANGUAGES
+from voxwell.paths import download_name
 
 router = APIRouter(tags=["stories"])
 
@@ -89,4 +90,4 @@ def audio(job_id: str):
     job = _job(job_id)
     if job.state != "done":
         raise HTTPException(409, "The story is not finished yet.")
-    return FileResponse(jobs.audio_path(job), media_type="audio/wav", filename="story.wav")
+    return FileResponse(jobs.audio_path(job), media_type="audio/wav", filename=download_name(job.title, ".wav", "Story"))

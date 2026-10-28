@@ -83,7 +83,14 @@ def test_exports(fake, fmt, expected):
     job = done_job()
     r = client.get(f"/api/transcription/jobs/{job['id']}/export/{fmt}")
     assert r.status_code == 200 and r.text.startswith(expected)
-    assert f'filename="transcript.{fmt}"' in r.headers["content-disposition"]
+    assert f'filename="Interview.{fmt}"' in r.headers["content-disposition"]
+
+
+def test_export_names_keep_non_ascii_titles(fake):
+    """Downloads are named after the file, encoded so any title survives (Starlette's FileResponse style)."""
+    job = done_job(name="Entrevista café: día 1.mp3")
+    disposition = client.get(f"/api/transcription/jobs/{job['id']}/export/srt").headers["content-disposition"]
+    assert disposition == "attachment; filename*=utf-8''Entrevista%20caf%C3%A9%20d%C3%ADa%201.srt"
 
 
 def test_export_needs_a_finished_job(fake, monkeypatch):

@@ -13,7 +13,7 @@ from voxwell import voices
 from voxwell.features.audiobook import books
 from voxwell.features.audiobook.importer import ImportError_, import_book
 from voxwell.features.voice_cloning.engine import LANGUAGES
-from voxwell.paths import data_dir
+from voxwell.paths import attachment, data_dir, download_name
 
 router = APIRouter(tags=["audiobook"])
 
@@ -21,7 +21,6 @@ MAX_UPLOAD = 50 * 1024 * 1024
 MAX_TITLE = 100
 _BOOK_ID = re.compile(r"^[0-9a-f]{12}$")
 _PREVIEW_ID = re.compile(r"^[0-9a-f]{32}$")
-_UNSAFE_NAME = re.compile(r'[\\/:*?"<>|\x00-\x1f]')
 
 
 class ChapterSettings(BaseModel):
@@ -173,7 +172,8 @@ def chapter_audio(book_id: str, index: int):
     path = books.chapter_audio(book, _chapter(book, index))
     if book.chapters[index].status != "done" or not path.exists():
         raise HTTPException(409, "This chapter has not been rendered yet.")
-    return FileResponse(path, media_type="audio/wav", filename=f"chapter-{index + 1:03}.wav")
+    name = download_name(book.chapters[index].title, ".wav", "Chapter")
+    return FileResponse(path, media_type="audio/wav", filename=f"{index + 1:03} - {name}")
 
 
 @router.get("/books/{book_id}/download")
@@ -186,9 +186,8 @@ def download(book_id: str):
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_STORED) as zf:  # WAV barely compresses
         for i, ch in done:
-            name = _UNSAFE_NAME.sub("", ch.title).strip()[:80] or "Chapter"
-            zf.write(books.chapter_audio(book, i), f"{i + 1:03} - {name}.wav")
+            zf.write(books.chapter_audio(book, i), f"{i + 1:03} - {download_name(ch.title, '.wav', 'Chapter')}")
     return Response(
         buf.getvalue(), media_type="application/zip",
-        headers={"Content-Disposition": 'attachment; filename="audiobook.zip"'},
+        headers=attachment(download_name(book.title, ".zip", "Audiobook")),
     )
