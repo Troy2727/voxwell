@@ -11,6 +11,7 @@
 - **Video**: dub videos into another language, one at a time, in a batch, or by watching a folder.
 - **Text**: dictation and Transcribe (TXT, SRT or VTT).
 - **Tools**: convert a recording to another voice, isolate a voice from music and noise, AI direction (describe how a line should sound; a local AI model sets the delivery), compare voices, fit audio to a length, inspect media files.
+- **Effects**: add reverb, distance, background noise or stereo pan to speech (also optional when generating in Voice cloning and Stories) or to any recording, from the Effects page or `voxwell effects`.
 - **Pronunciation**: teach every voice how to say names, brands and jargon; the per-language list applies to all speech, and `voxwell pronounce` manages it.
 - **Projects**: everything you make, in one list.
 - **Integrations**: a `voxwell` command line (speak, transcribe, isolate, clone, design, convert, dub; `--json` for scripts) with a skill that teaches Claude Code and Codex to use it, an OpenAI-compatible API at `http://127.0.0.1:8765/v1`, an MCP server for AI assistants, and optional phone calls (Twilio callers hear a greeting in your voice; off by default, and only a small separate server is ever exposed). The Integrations page shows how to connect them.

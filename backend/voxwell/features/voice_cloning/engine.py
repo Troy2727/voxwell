@@ -6,6 +6,7 @@ import threading
 import wave
 from pathlib import Path
 
+from voxwell.features.audio_effects.dsp import Effects, apply_to_wav
 from voxwell.features.pronunciation import store as pronunciation
 
 # Languages supported by Chatterbox Multilingual (ISO 639-1). Japanese is left out: Chatterbox
@@ -119,12 +120,15 @@ def synthesize(
     *,
     exaggeration: float = 0.5,
     cfg_weight: float = 0.5,
+    effects: Effects | None = None,
 ) -> bytes:
     """Return WAV bytes of `text` spoken in the voice of `reference_audio` (a default voice if None).
 
     `language` is an ISO 639-1 code such as "en". `exaggeration` (0.25-2) sets emotional
     intensity; a lower `cfg_weight` (0-1) gives slower, more deliberate delivery. The defaults
     are Chatterbox's own. The language's pronunciation dictionary is applied to `text` first.
+    `effects` (reverb, distance, noise, pan) is applied to the finished audio; without it, or
+    with neutral settings, the bytes are exactly the model's.
     """
     if language not in LANGUAGES:
         raise ValueError(f"Unsupported language '{language}'.")
@@ -135,4 +139,5 @@ def synthesize(
         kwargs["audio_prompt_path"] = str(reference_audio)
     with _lock:
         wav = model.generate(text, **kwargs)
-    return _to_wav(wav, model.sr)
+    out = _to_wav(wav, model.sr)
+    return apply_to_wav(out, effects) if effects is not None else out
