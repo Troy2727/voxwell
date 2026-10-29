@@ -224,7 +224,8 @@ def test_mcp_handshake_and_tool_list(mcp):
     assert init["result"]["protocolVersion"] == "2025-03-26" and "tools" in init["result"]["capabilities"]
     assert mcp_server.handle({"jsonrpc": "2.0", "method": "notifications/initialized"}) is None
     names = {t["name"] for t in mcp("tools/list")["result"]["tools"]}
-    assert names == {"list_voices", "speak", "transcribe", "isolate_voice", "clone_voice", "design_voice", "convert_voice", "dub_video"}
+    assert names == {"list_voices", "speak", "transcribe", "isolate_voice", "clone_voice", "design_voice", "convert_voice", "dub_video",
+                     "translate_speech"}
     assert names == set(mcp_server.HANDLERS)
     assert mcp("ping")["result"] == {}
     assert mcp("resources/list")["error"]["code"] == -32601
@@ -300,6 +301,21 @@ def test_mcp_dub_video(mcp, monkeypatch, fake_tts, tmp_path, isolated_data_dir):
     video.write_bytes(b"fakevideo")
     result = tool(mcp, "dub_video", file_path=str(video), target_language="EN")
     assert result["isError"] is False and (isolated_data_dir / "mcp" / "talk.en.mp4").read_bytes() == b"video"
+
+
+def test_mcp_translate_speech(mcp, monkeypatch, fake_tts, fake_stt, tmp_path, isolated_data_dir):
+    from voxwell.features.dubbing import translate
+
+    monkeypatch.setattr(translate, "translate", lambda texts, s, t: [f"[{s}>{t}] {x}" for x in texts])
+    result = tool(mcp, "translate_speech", text="Good morning", target_language="ES")
+    assert result["isError"] is False and result["content"][0]["text"].startswith("[en>es] Good morning")
+    clip = tmp_path / "talk.wav"
+    clip.write_bytes(wav_bytes())
+    result = tool(mcp, "translate_speech", file_path=str(clip), target_language="fr", output_path=str(tmp_path / "out.wav"))
+    assert result["isError"] is False and (tmp_path / "out.wav").read_bytes()[:4] == b"RIFF"
+    assert len(list((isolated_data_dir / "mcp").glob("translation-*.es.wav"))) == 1
+    assert tool(mcp, "translate_speech", target_language="es")["isError"] is True  # neither text nor file
+    assert tool(mcp, "translate_speech", text="hi", file_path=str(clip), target_language="es")["isError"] is True
 
 
 def test_mcp_tool_errors_are_reported_not_raised(mcp, fake_tts, tmp_path):

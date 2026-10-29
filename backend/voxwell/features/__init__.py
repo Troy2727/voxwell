@@ -17,6 +17,7 @@ from voxwell.features.projects.router import router as projects_router
 from voxwell.features.stories.router import router as stories_router
 from voxwell.features.tools.router import router as tools_router
 from voxwell.features.transcription.router import router as transcription_router
+from voxwell.features.translation.router import router as translation_router
 from voxwell.features.voice_cloning.router import router as voice_cloning_router
 from voxwell.features.voice_design.router import router as voice_design_router
 from voxwell.features.voices.router import router as voices_router
@@ -41,6 +42,7 @@ FEATURES = [
     Feature("batch", batch_router, batch_watch.start),
     Feature("dictation", dictation_router),
     Feature("transcription", transcription_router),
+    Feature("translation", translation_router),
     Feature("tools", tools_router),
     Feature("integrations", integrations_router, integrations_phone.sync_gateway),
     Feature("projects", projects_router),

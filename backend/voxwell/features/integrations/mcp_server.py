@@ -86,6 +86,19 @@ TOOLS = [
             "output_path": {"type": "string", "description": "Where to save the MP4. Default: the Voxwell MCP folder."},
         }, ["file_path", "target_language"]),
     },
+    {
+        "name": "translate_speech",
+        "description": "Translate text, or the speech in an audio or video file, into another language and speak it. "
+        "Saves a WAV and returns the translation and the file path.",
+        "inputSchema": _schema({
+            "text": {"type": "string", "description": "What to translate. Give this or file_path."},
+            "file_path": {**_FILE, "description": "A recording to transcribe and translate instead of text."},
+            "target_language": _LANGUAGE,
+            "source_language": {**_LANGUAGE, "description": "ISO 639-1 code. Default en for text; detected for a file."},
+            "voice": {**_VOICE, "description": "A saved voice name or id. Omit for the built-in voice."},
+            "output_path": {"type": "string", "description": "Where to save the WAV. Default: the Voxwell MCP folder."},
+        }, ["target_language"]),
+    },
 ]
 
 
@@ -156,9 +169,21 @@ def dub_video(args: dict) -> str:
                 voice=args.get("voice") or "original", output=args.get("output_path") or _default_folder())
 
 
+def translate_speech(args: dict) -> str:
+    text = str(args.get("text") or "").strip()
+    file = str(args.get("file_path") or "").strip()
+    if bool(text) == bool(file):
+        raise ToolError("Give text or file_path (one of them).")
+    if text == "-":  # the CLI reads "-" from stdin, which is this server's protocol stream
+        raise ToolError("text is required.")
+    return _run(cli.cmd_translate, text=text or None, file=file or None, to=_required(args, "target_language").lower(),
+                source=args.get("source_language"), voice=args.get("voice"), output=args.get("output_path") or _default_folder())
+
+
 HANDLERS = {
     "list_voices": list_voices, "speak": speak, "transcribe": transcribe, "isolate_voice": isolate_voice,
     "clone_voice": clone_voice, "design_voice": design_voice, "convert_voice": convert_voice, "dub_video": dub_video,
+    "translate_speech": translate_speech,
 }
 
 
