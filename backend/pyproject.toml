@@ -7,6 +7,7 @@ requires-python = ">=3.11,<3.12"  # chatterbox-tts 0.1.6 pins numpy<1.26 (no 3.1
 dependencies = [
     "fastapi>=0.115",
     "uvicorn>=0.30",
+    "websockets>=12",  # uvicorn serves WebSockets (live audio) only with this installed
     "python-multipart>=0.0.9",
     "platformdirs>=4",
     "truststore>=0.10",  # trust the OS certificate store (corporate proxies, antivirus TLS inspection)

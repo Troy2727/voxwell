@@ -5,6 +5,11 @@ export function apiUrl(path: string): string {
   return BACKEND_URL + path;
 }
 
+/** Backend WebSocket URL (ws://), for the live features. */
+export function wsUrl(path: string): string {
+  return BACKEND_URL.replace(/^http/, 'ws') + path;
+}
+
 /** The server's sentence for a failed response: FastAPI's `detail` (a string, or a list for invalid input). */
 export async function errorMessage(res: Response): Promise<string> {
   const text = await res.text();

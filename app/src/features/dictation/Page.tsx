@@ -6,6 +6,8 @@ import { ErrorAlert, Field, Muted, Page as PageLayout, Section } from '@/compone
 import { Button } from '@/components/ui/button';
 import { LiveWaveform } from '@/components/ui/live-waveform';
 import { MicSelector } from '@/components/ui/mic-selector';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import LiveDictation from './LiveDictation';
 
 interface TranscribeResult {
   text: string;
@@ -19,6 +21,7 @@ const LANGUAGES: [string, string][] = [
 ];
 
 type Phase = 'idle' | 'recording' | 'transcribing';
+type Mode = 'record' | 'live';
 
 const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
@@ -32,6 +35,8 @@ export default function Page() {
   const [history, setHistory] = useState<string[]>([]);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
+  const [mode, setMode] = useState<Mode>('record');
+  const [liveActive, setLiveActive] = useState(false);
 
   const recorder = useRef<MediaRecorder | null>(null);
   const timer = useRef<number | undefined>(undefined);
@@ -41,6 +46,8 @@ export default function Page() {
   languageRef.current = language;
   const deviceRef = useRef(device);
   deviceRef.current = device;
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
 
   const setPhaseBoth = (p: Phase) => {
     phaseRef.current = p;
@@ -110,6 +117,7 @@ export default function Page() {
 
   const toggle = useCallback(
     (fromShortcut: boolean) => {
+      if (modeRef.current === 'live') return; // the shortcut records; live mode has its own Start button
       if (phaseRef.current === 'recording') {
         if (recorder.current?.state === 'recording') recorder.current.stop();
       } else if (phaseRef.current === 'idle') {
@@ -143,9 +151,34 @@ export default function Page() {
   };
 
   const recording = phase === 'recording';
+  const tabs = (
+    <Tabs value={mode} onValueChange={(v) => setMode(v as Mode)}>
+      <TabsList>
+        <TabsTrigger value="record" disabled={liveActive}>Record</TabsTrigger>
+        <TabsTrigger value="live" disabled={phase !== 'idle'}>Live</TabsTrigger>
+      </TabsList>
+    </Tabs>
+  );
+  const fields = (
+    <div className="grid gap-4 sm:grid-cols-2">
+      <Field label="Microphone" hint={muted ? `Muted: unmute it to ${mode === 'live' ? 'start' : 'record'}.` : undefined}>
+        <MicSelector value={device} onValueChange={setDevice} muted={muted} onMutedChange={setMuted} disabled={phase !== 'idle' || liveActive} className="w-full justify-start border sm:w-full" />
+      </Field>
+      <Field label="Language">
+        <ChoiceSelect options={LANGUAGES} value={language} disabled={phase !== 'idle' || liveActive} onChange={setLanguage} />
+      </Field>
+    </div>
+  );
+  if (mode === 'live') {
+    return (
+      <PageLayout title="Dictation" description="Speak and get text, all on this computer.">
+        <LiveDictation tabs={tabs} fields={fields} device={device} language={language} muted={muted} onActiveChange={setLiveActive} />
+      </PageLayout>
+    );
+  }
   return (
     <PageLayout title="Dictation" description="Speak and get text, all on this computer.">
-      <Section title="Record">
+      <Section title="Record" action={tabs}>
         <div className="bg-muted/30 flex flex-col items-center gap-4 rounded-xl border p-6">
           <LiveWaveform active={recording} processing={phase === 'transcribing'} deviceId={device || undefined} height={64} mode="static" className="w-full" />
           <div className="flex items-center gap-3">
@@ -162,14 +195,7 @@ export default function Page() {
             {phase === 'transcribing' && <span aria-live="polite" className="text-muted-foreground text-sm">Transcribing…</span>}
           </div>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Microphone" hint={muted ? 'Muted: unmute it to record.' : undefined}>
-            <MicSelector value={device} onValueChange={setDevice} muted={muted} onMutedChange={setMuted} disabled={phase !== 'idle'} className="w-full justify-start border sm:w-full" />
-          </Field>
-          <Field label="Language">
-            <ChoiceSelect options={LANGUAGES} value={language} disabled={phase !== 'idle'} onChange={setLanguage} />
-          </Field>
-        </div>
+        {fields}
         <Muted className="text-xs">
           {window.voxwell
             ? 'Press Ctrl/Cmd+Shift+Space anywhere to start and stop; the text is copied for you to paste.'
