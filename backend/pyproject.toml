@@ -19,6 +19,7 @@ dependencies = [
     "torchaudio",  # listed directly so the CUDA index source below applies to it
     "sentencepiece",
     "soundfile",
+    "scipy",
 ]
 
 [tool.uv]

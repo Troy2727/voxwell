@@ -17,6 +17,7 @@ Voxwell runs every model locally; the `voxwell` CLI drives the running Voxwell s
 - Voices are referenced by saved name (any case) or id; `voxwell voices` lists them. `speak` without `--voice` uses the built-in voice; `dub` without `--voice` clones the original speaker.
 - Languages are ISO 639-1 codes. Speech, cloning and dubbing cover about 20 common languages (Japanese is not one of them) and reject others with an error. Transcription detects the language when `--language` is left out.
 - Commands take local file paths and write next to the input (`isolate`) or into the current folder, unless `-o` says otherwise.
+- `effects` post-processes an existing recording (`--reverb`, `--distance`, `--noise`, `--pan`, each a number; 0 leaves it off). A non-zero `--pan` makes the WAV stereo and reverb adds a tail, so the file gets slightly longer. The same settings are available as optional `effects` on the app's voice cloning and Stories requests.
 - `isolate` accepts up to 10 minutes of audio; `speak` up to 4096 characters per call, so split longer texts and speak each part.
 - Speed is CPU-bound without a GPU: a minute of audio takes tens of seconds to isolate or transcribe, and a dub several minutes. Long commands block until finished; let them run.
 - Each model downloads on its first use, so the first call of a command is the slowest.
