@@ -7,6 +7,7 @@ import wave
 from pathlib import Path
 
 from voxwell.features.audio_effects.dsp import Effects, apply_to_wav
+from voxwell.features.pronunciation import store as pronunciation
 
 # Languages supported by Chatterbox Multilingual (ISO 639-1). Japanese is left out: Chatterbox
 # needs the GPL-3.0 pykakasi package for it, which pyproject.toml excludes to keep the app MIT.
@@ -125,11 +126,13 @@ def synthesize(
 
     `language` is an ISO 639-1 code such as "en". `exaggeration` (0.25-2) sets emotional
     intensity; a lower `cfg_weight` (0-1) gives slower, more deliberate delivery. The defaults
-    are Chatterbox's own. `effects` (reverb, distance, noise, pan) is applied to the finished
-    audio; without it, or with neutral settings, the bytes are exactly the model's.
+    are Chatterbox's own. The language's pronunciation dictionary is applied to `text` first.
+    `effects` (reverb, distance, noise, pan) is applied to the finished audio; without it, or
+    with neutral settings, the bytes are exactly the model's.
     """
     if language not in LANGUAGES:
         raise ValueError(f"Unsupported language '{language}'.")
+    text = pronunciation.apply(text, language)
     model = _load_model()
     kwargs = {"language_id": language, "exaggeration": exaggeration, "cfg_weight": cfg_weight}
     if reference_audio is not None:

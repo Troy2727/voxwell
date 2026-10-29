@@ -30,6 +30,17 @@ TOOLS = [
         "inputSchema": _schema({}, []),
     },
     {
+        "name": "voice_collections",
+        "description": "Organize saved voices into collections (folders). Deleting a collection never deletes its voices.",
+        "inputSchema": _schema({
+            "action": {"type": "string", "enum": ["list", "show", "create", "rename", "delete", "add", "remove"],
+                       "description": "list collections; show a collection's voices; create, rename or delete one; add or remove voices."},
+            "name": {"type": "string", "description": "Collection name or id (not needed for list)."},
+            "new_name": {"type": "string", "description": "The new name, for rename."},
+            "voices": {"type": "array", "items": {"type": "string"}, "description": "Saved voice names or ids, for add and remove."},
+        }, ["action"]),
+    },
+    {
         "name": "speak",
         "description": "Turn text into speech with a Voxwell voice and save it as a WAV file. Returns the file path.",
         "inputSchema": _schema({
@@ -91,6 +102,19 @@ TOOLS = [
         }, ["file_path"]),
     },
     {
+        "name": "manage_pronunciations",
+        "description": "List, add or remove how a word is pronounced. Every voice then says the word as respelled "
+        "(e.g. Nguyen -> win). Adding a word that already has an entry replaces it.",
+        "inputSchema": _schema({
+            "action": {"type": "string", "enum": ["list", "add", "remove"]},
+            "word": {"type": "string", "description": "The word as written (add, remove)."},
+            "respelling": {"type": "string", "description": "How to write it so it is spoken right (add)."},
+            "language": {**_LANGUAGE, "description": "ISO 639-1 code. Default en."},
+            "case_sensitive": {"type": "boolean", "description": "Match only this capitalization (add). Default false."},
+            "whole_word": {"type": "boolean", "description": "Match whole words only (add). Default true."},
+        }, ["action"]),
+    },
+    {
         "name": "dub_video",
         "description": "Dub a video into another language (takes minutes). Saves an MP4 and an SRT and returns their paths.",
         "inputSchema": _schema({
@@ -132,6 +156,17 @@ def _required(args: dict, key: str) -> str:
 
 def list_voices(args: dict) -> str:
     return _run(cli.cmd_voices)
+
+
+def voice_collections(args: dict) -> str:
+    action = _required(args, "action")
+    if action == "rename":
+        rest = [_required(args, "new_name")]
+    elif action in ("add", "remove"):
+        rest = [str(v) for v in args.get("voices") or []]
+    else:
+        rest = []
+    return _run(cli.cmd_collection, action=action, name=args.get("name"), rest=rest)
 
 
 def speak(args: dict) -> str:
@@ -177,12 +212,20 @@ def apply_effects(args: dict) -> str:
         raise ToolError("reverb, distance, noise and pan must be numbers.")
     return _run(cli.cmd_effects, file=_required(args, "file_path"), noise_color=args.get("noise_color") or "pink",
                 output=args.get("output_path") or _default_folder(), **levels)
+def manage_pronunciations(args: dict) -> str:
+    action = _required(args, "action")
+    if action not in ("list", "add", "remove"):
+        raise ToolError("action must be list, add or remove.")
+    return _run(cli.cmd_pronounce, action=action, word=args.get("word"), respelling=args.get("respelling"),
+                language=args.get("language") or "en", case_sensitive=bool(args.get("case_sensitive")),
+                partial=args.get("whole_word") is False)
 
 
 HANDLERS = {
-    "list_voices": list_voices, "speak": speak, "transcribe": transcribe, "isolate_voice": isolate_voice,
+    "list_voices": list_voices, "voice_collections": voice_collections, "speak": speak, "transcribe": transcribe, "isolate_voice": isolate_voice,
     "clone_voice": clone_voice, "design_voice": design_voice, "convert_voice": convert_voice, "dub_video": dub_video,
     "apply_effects": apply_effects,
+    "manage_pronunciations": manage_pronunciations,
 }
 
 

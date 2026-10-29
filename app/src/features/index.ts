@@ -1,7 +1,7 @@
 import type { ComponentType } from 'react';
 import {
   AudioLines, AudioWaveform, BookOpen, FileText, FolderOpen, Languages, Layers, LayoutGrid, Library,
-  type LucideIcon, MessagesSquare, Mic, Plug, Wand2, Wrench,
+  type LucideIcon, MessagesSquare, Mic, Plug, SpellCheck, Wand2, Wrench,
 } from 'lucide-react';
 import AudioEffectsPage from './audio_effects/Page';
 import AudiobookPage from './audiobook/Page';
@@ -11,6 +11,7 @@ import DubbingPage from './dubbing/Page';
 import GalleryPage from './gallery/Page';
 import IntegrationsPage from './integrations/Page';
 import ProjectsPage from './projects/Page';
+import PronunciationPage from './pronunciation/Page';
 import StoriesPage from './stories/Page';
 import ToolsPage from './tools/Page';
 import TranscriptionPage from './transcription/Page';
@@ -40,5 +41,6 @@ export const FEATURES: FeatureEntry[] = [
   { id: 'tools', title: 'Tools', group: 'More', icon: Wrench, Page: ToolsPage },
   { id: 'integrations', title: 'Integrations', group: 'More', icon: Plug, Page: IntegrationsPage },
   { id: 'audio_effects', title: 'Audio effects', group: 'Create', icon: AudioWaveform, Page: AudioEffectsPage },
+  { id: 'pronunciation', title: 'Pronunciation', group: 'Voices', icon: SpellCheck, Page: PronunciationPage },
   { id: 'projects', title: 'Projects', group: 'More', icon: FolderOpen, Page: ProjectsPage },
 ];
