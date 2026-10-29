@@ -77,6 +77,19 @@ TOOLS = [
         }, ["file_path", "voice"]),
     },
     {
+        "name": "manage_pronunciations",
+        "description": "List, add or remove how a word is pronounced. Every voice then says the word as respelled "
+        "(e.g. Nguyen -> win). Adding a word that already has an entry replaces it.",
+        "inputSchema": _schema({
+            "action": {"type": "string", "enum": ["list", "add", "remove"]},
+            "word": {"type": "string", "description": "The word as written (add, remove)."},
+            "respelling": {"type": "string", "description": "How to write it so it is spoken right (add)."},
+            "language": {**_LANGUAGE, "description": "ISO 639-1 code. Default en."},
+            "case_sensitive": {"type": "boolean", "description": "Match only this capitalization (add). Default false."},
+            "whole_word": {"type": "boolean", "description": "Match whole words only (add). Default true."},
+        }, ["action"]),
+    },
+    {
         "name": "dub_video",
         "description": "Dub a video into another language (takes minutes). Saves an MP4 and an SRT and returns their paths.",
         "inputSchema": _schema({
@@ -156,9 +169,19 @@ def dub_video(args: dict) -> str:
                 voice=args.get("voice") or "original", output=args.get("output_path") or _default_folder())
 
 
+def manage_pronunciations(args: dict) -> str:
+    action = _required(args, "action")
+    if action not in ("list", "add", "remove"):
+        raise ToolError("action must be list, add or remove.")
+    return _run(cli.cmd_pronounce, action=action, word=args.get("word"), respelling=args.get("respelling"),
+                language=args.get("language") or "en", case_sensitive=bool(args.get("case_sensitive")),
+                partial=args.get("whole_word") is False)
+
+
 HANDLERS = {
     "list_voices": list_voices, "speak": speak, "transcribe": transcribe, "isolate_voice": isolate_voice,
     "clone_voice": clone_voice, "design_voice": design_voice, "convert_voice": convert_voice, "dub_video": dub_video,
+    "manage_pronunciations": manage_pronunciations,
 }
 
 
