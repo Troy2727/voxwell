@@ -1,15 +1,18 @@
 import importlib.util
+import os
 import re
 import shutil
+import tempfile
 from pathlib import Path
 from typing import Literal
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
 
+from voxwell.features.dictation import engine
 from voxwell.features.dubbing.fitting import build_srt, srt_time
-from voxwell.features.transcription import jobs
-from voxwell.paths import attachment, download_name
+from voxwell.features.transcription import alignment, jobs
+from voxwell.paths import attachment, data_dir, download_name
 
 router = APIRouter(tags=["transcription"])
 
@@ -92,3 +95,56 @@ def export(job_id: str, fmt: Literal["txt", "srt", "vtt"]):
         media_type=media_type,
         headers=attachment(download_name(job.title, f".{fmt}", "Transcript")),
     )
+
+
+MAX_SCRIPT_CHARS = 200_000
+
+
+@router.post("/align")
+def align_script(
+    file: UploadFile = File(...),
+    script: str = Form(...),
+    language: str = Form(""),
+    max_chars: int = Form(42),
+    max_seconds: float = Form(6.0),
+):
+    """Time a script against its recording: word timings plus SRT and VTT subtitles. Runs while the request waits."""
+    language = language.strip().lower()
+    if language and not _LANGUAGE.match(language):
+        raise HTTPException(422, f"Unsupported language '{language}'.")
+    if not alignment.script_words(script):
+        raise HTTPException(422, "Paste the script to align.")
+    if len(script) > MAX_SCRIPT_CHARS:
+        raise HTTPException(422, f"The script is too long (limit {MAX_SCRIPT_CHARS:,} characters).")
+    if not 10 <= max_chars <= 200 or not 1 <= max_seconds <= 30:
+        raise HTTPException(422, "Use 10 to 200 characters and 1 to 30 seconds per subtitle.")
+    ext = Path(file.filename or "").suffix.lower()
+    fd, name = tempfile.mkstemp(suffix=ext if _EXT.match(ext) else "", dir=data_dir("alignment"))  # the name is never used as a path
+    path = Path(name)
+    try:
+        with os.fdopen(fd, "wb") as out:
+            shutil.copyfileobj(file.file, out)
+        if path.stat().st_size == 0:
+            raise HTTPException(422, "The uploaded file is empty.")
+        try:
+            with jobs._one_at_a_time:  # one model, so it waits for any transcription in progress
+                timings = engine.transcribe_words(path, language or None)
+        except engine.AudioError as exc:
+            raise HTTPException(422, str(exc))
+        except Exception as exc:
+            raise HTTPException(500, f"Alignment failed: {exc}")
+    finally:
+        path.unlink(missing_ok=True)
+    result = alignment.align(script, [(w.start, w.end, w.text) for w in timings.words])
+    cues = alignment.build_cues(result.words, max_chars, max_seconds)
+    entries = [{"start": c.start, "end": c.end, "text": c.text} for c in cues]
+    return {
+        "language": timings.language,
+        "words": [{"text": w.text, "start": w.start, "end": w.end, "matched": w.matched} for w in result.words],
+        "cues": entries,
+        "srt": EXPORTS["srt"][1]({"segments": entries}),
+        "vtt": EXPORTS["vtt"][1]({"segments": entries}),
+        "matched": result.matched,
+        "total": len(result.words),
+        "fallback": result.fallback,
+    }

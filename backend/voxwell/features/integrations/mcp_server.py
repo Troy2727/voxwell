@@ -45,6 +45,19 @@ TOOLS = [
         "inputSchema": _schema({"file_path": _FILE, "language": {**_LANGUAGE, "description": "ISO 639-1 code; omit to detect it."}}, ["file_path"]),
     },
     {
+        "name": "align_script",
+        "description": "Make accurate subtitles from a recording and the script it speaks: every script word is timed "
+        "against the audio. Saves an SRT or VTT file and returns its path and how many words matched.",
+        "inputSchema": _schema({
+            "file_path": _FILE,
+            "script": {"type": "string", "description": "The words spoken. Alternative to script_path."},
+            "script_path": {**_FILE, "description": "Path to a text file with the script. Alternative to script."},
+            "language": {**_LANGUAGE, "description": "ISO 639-1 code; omit to detect it."},
+            "format": {"type": "string", "enum": ["srt", "vtt"], "description": "Subtitle format. Default srt."},
+            "output_path": {"type": "string", "description": "Where to save the subtitles. Default: the Voxwell MCP folder."},
+        }, ["file_path"]),
+    },
+    {
         "name": "isolate_voice",
         "description": "Split a recording (up to 10 minutes) into the voice alone and the background (music, noise, "
         "effects). Saves <name>.voice.wav and <name>.background.wav and returns their paths.",
@@ -133,6 +146,20 @@ def transcribe(args: dict) -> str:
     return text or "(no speech found)"
 
 
+def align_script(args: dict) -> str:
+    script, path = args.get("script"), str(args.get("script_path") or "").strip()
+    if (script is None) == (not path):
+        raise ToolError("Give either script or script_path.")
+    if script is not None and not str(script).strip():
+        raise ToolError("script is required.")
+    fmt = str(args.get("format") or "srt").lower()
+    if fmt not in ("srt", "vtt"):
+        raise ToolError("format must be srt or vtt.")
+    return _run(cli.cmd_align, file=_required(args, "file_path"), script=path or "script", script_text=script,
+                language=args.get("language"), format=fmt, max_chars=42, max_seconds=6.0,
+                output=args.get("output_path") or _default_folder())
+
+
 def isolate_voice(args: dict) -> str:
     return _run(cli.cmd_isolate, file=_required(args, "file_path"), output=args.get("output_folder"))
 
@@ -157,7 +184,7 @@ def dub_video(args: dict) -> str:
 
 
 HANDLERS = {
-    "list_voices": list_voices, "speak": speak, "transcribe": transcribe, "isolate_voice": isolate_voice,
+    "list_voices": list_voices, "speak": speak, "transcribe": transcribe, "align_script": align_script, "isolate_voice": isolate_voice,
     "clone_voice": clone_voice, "design_voice": design_voice, "convert_voice": convert_voice, "dub_video": dub_video,
 }
 

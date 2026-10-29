@@ -17,6 +17,7 @@ import {
   TranscriptViewerWords,
 } from '@/components/ui/transcript-viewer';
 import { cn } from '@/lib/utils';
+import { AlignPanel } from './AlignPanel';
 
 interface Summary {
   id: string;
@@ -136,6 +137,8 @@ export default function Page() {
         </div>
       </Section>
       <ErrorAlert message={error} />
+
+      <AlignPanel />
 
       {current && (
         <Viewer
