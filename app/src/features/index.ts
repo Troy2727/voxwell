@@ -1,8 +1,9 @@
 import type { ComponentType } from 'react';
 import {
-  AudioLines, BookOpen, FileText, FolderOpen, Languages, Layers, LayoutGrid, Library,
+  AudioLines, BookOpen, Bot, FileText, FolderOpen, Languages, Layers, LayoutGrid, Library,
   type LucideIcon, MessagesSquare, Mic, Plug, Wand2, Wrench,
 } from 'lucide-react';
+import AgentsPage from './agents/Page';
 import AudiobookPage from './audiobook/Page';
 import BatchPage from './batch/Page';
 import DictationPage from './dictation/Page';
@@ -37,6 +38,7 @@ export const FEATURES: FeatureEntry[] = [
   { id: 'dictation', title: 'Dictation', group: 'Dub & transcribe', icon: Mic, Page: DictationPage },
   { id: 'transcription', title: 'Transcribe', group: 'Dub & transcribe', icon: FileText, Page: TranscriptionPage },
   { id: 'tools', title: 'Tools', group: 'More', icon: Wrench, Page: ToolsPage },
+  { id: 'agents', title: 'Voice agents', group: 'More', icon: Bot, Page: AgentsPage },
   { id: 'integrations', title: 'Integrations', group: 'More', icon: Plug, Page: IntegrationsPage },
   { id: 'projects', title: 'Projects', group: 'More', icon: FolderOpen, Page: ProjectsPage },
 ];

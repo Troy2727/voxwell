@@ -241,10 +241,24 @@ def cmd_dub(client: Client, args) -> tuple[str, dict]:
     return f"Saved the dubbed video to {out}\nSaved the subtitles to {subtitles}", {"path": str(out), "subtitles": str(subtitles)}
 
 
+def cmd_chat(client: Client, args) -> tuple[str, dict]:
+    message = sys.stdin.read() if args.message == "-" else args.message
+    if not message.strip():
+        raise CliError("Give the message (or - to read it from stdin).")
+    saved = client.get_json("/api/agents/agents")
+    agent = next((a for a in saved if args.agent in (a["id"], a["name"]) or args.agent.lower() == a["name"].lower()), None)
+    if agent is None:
+        names = ", ".join(a["name"] for a in saved) or "none yet (create one on the Voice agents page)"
+        raise CliError(f"Unknown agent '{args.agent}'. Saved agents: {names}.")
+    result = json.loads(client.post_json(f"/api/agents/agents/{agent['id']}/chat", {"message": message.strip(), "speak": False}))
+    lines = [f"[{c['tool'] or 'tool'}: {c.get('result', c.get('error'))}]" for c in result["tool_calls"]]
+    return "\n".join([*lines, result["reply"]]), {"agent": agent["name"], **result}
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="voxwell",
-        description="Voxwell: local voice cloning, voice design, dubbing, transcription and voice isolation. "
+        description="Voxwell: local voice cloning, voice design, dubbing, transcription, voice isolation and voice agents. "
         "Commands other than `serve` need Voxwell running (the desktop app, or `voxwell serve`).",
         epilog="Add --json to any command for machine-readable output.",
     )
@@ -302,6 +316,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("-v", "--voice", default="original", help="saved voice name or id, or original (default: clone the speaker)")
     p.add_argument("-o", "--output", help="MP4 file or folder (default: <name>.<lang>.mp4 in the current folder)")
     p.set_defaults(run=cmd_dub)
+
+    p = sub.add_parser("chat", parents=[common], help="send a message to a saved voice agent and print its reply")
+    p.add_argument("agent", help="saved agent name or id")
+    p.add_argument("message", help="what to say; - reads it from stdin")
+    p.set_defaults(run=cmd_chat)
     return parser
 
 

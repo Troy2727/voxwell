@@ -224,7 +224,8 @@ def test_mcp_handshake_and_tool_list(mcp):
     assert init["result"]["protocolVersion"] == "2025-03-26" and "tools" in init["result"]["capabilities"]
     assert mcp_server.handle({"jsonrpc": "2.0", "method": "notifications/initialized"}) is None
     names = {t["name"] for t in mcp("tools/list")["result"]["tools"]}
-    assert names == {"list_voices", "speak", "transcribe", "isolate_voice", "clone_voice", "design_voice", "convert_voice", "dub_video"}
+    assert names == {"list_voices", "speak", "transcribe", "isolate_voice", "clone_voice", "design_voice", "convert_voice", "dub_video",
+                     "chat_with_agent"}
     assert names == set(mcp_server.HANDLERS)
     assert mcp("ping")["result"] == {}
     assert mcp("resources/list")["error"]["code"] == -32601
@@ -300,6 +301,18 @@ def test_mcp_dub_video(mcp, monkeypatch, fake_tts, tmp_path, isolated_data_dir):
     video.write_bytes(b"fakevideo")
     result = tool(mcp, "dub_video", file_path=str(video), target_language="EN")
     assert result["isError"] is False and (isolated_data_dir / "mcp" / "talk.en.mp4").read_bytes() == b"video"
+
+
+def test_mcp_chat_with_agent(mcp, monkeypatch):
+    from voxwell.features.agents import conversation, store
+
+    replies = iter(['{"tool": "calculator", "arguments": {"expression": "2 + 2"}}', "Four."])
+    monkeypatch.setattr(conversation, "_chat", lambda messages: next(replies))
+    store.create(name="Maths", system_prompt="", voice="", language="en", tools=["calculator"])
+    result = tool(mcp, "chat_with_agent", agent="maths", message="2+2?")
+    assert result["isError"] is False and result["content"][0]["text"] == "[calculator: 4]\nFour."
+    result = tool(mcp, "chat_with_agent", agent="Nobody", message="hi")
+    assert result["isError"] is True and "Saved agents: Maths" in result["content"][0]["text"]
 
 
 def test_mcp_tool_errors_are_reported_not_raised(mcp, fake_tts, tmp_path):

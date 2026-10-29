@@ -86,6 +86,15 @@ TOOLS = [
             "output_path": {"type": "string", "description": "Where to save the MP4. Default: the Voxwell MCP folder."},
         }, ["file_path", "target_language"]),
     },
+    {
+        "name": "chat_with_agent",
+        "description": "Send a message to a voice agent saved in Voxwell (a local AI model with its own instructions and "
+        "tools) and return its text reply. One turn, no memory of earlier calls.",
+        "inputSchema": _schema({
+            "agent": {"type": "string", "description": "A saved agent's name or id."},
+            "message": {"type": "string", "description": "What to say to the agent."},
+        }, ["agent", "message"]),
+    },
 ]
 
 
@@ -156,9 +165,17 @@ def dub_video(args: dict) -> str:
                 voice=args.get("voice") or "original", output=args.get("output_path") or _default_folder())
 
 
+def chat_with_agent(args: dict) -> str:
+    message = _required(args, "message")
+    if message == "-":  # the CLI reads "-" from stdin, which is this server's protocol stream
+        raise ToolError("message is required.")
+    return _run(cli.cmd_chat, agent=_required(args, "agent"), message=message)
+
+
 HANDLERS = {
     "list_voices": list_voices, "speak": speak, "transcribe": transcribe, "isolate_voice": isolate_voice,
     "clone_voice": clone_voice, "design_voice": design_voice, "convert_voice": convert_voice, "dub_video": dub_video,
+    "chat_with_agent": chat_with_agent,
 }
 
 

@@ -5,6 +5,7 @@ from fastapi import APIRouter
 
 # Routers are imported under *_router names: binding a feature's own name (e.g. `tools`) here
 # would replace the voxwell.features.tools package attribute with its router object.
+from voxwell.features.agents.router import router as agents_router
 from voxwell.features.audiobook.router import router as audiobook_router
 from voxwell.features.batch import watch as batch_watch
 from voxwell.features.batch.router import router as batch_router
@@ -42,6 +43,7 @@ FEATURES = [
     Feature("dictation", dictation_router),
     Feature("transcription", transcription_router),
     Feature("tools", tools_router),
+    Feature("agents", agents_router),
     Feature("integrations", integrations_router, integrations_phone.sync_gateway),
     Feature("projects", projects_router),
 ]

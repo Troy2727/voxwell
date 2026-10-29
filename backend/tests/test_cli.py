@@ -154,6 +154,20 @@ def test_jobs_are_titled_after_the_file(capsys, monkeypatch, audio, tmp_path, na
     assert title in [item["title"] for item in items if item["kind"] == "transcript"]
 
 
+def test_chat_with_an_agent(capsys, monkeypatch):
+    from voxwell.features.agents import conversation, store
+
+    seen = []
+    monkeypatch.setattr(conversation, "_chat", lambda messages: seen.append(messages) or "Hello!")
+    store.create(name="Guide", system_prompt="Be brief.", voice="", language="en", tools=[])
+    code, out, _ = run(capsys, "chat", "guide", "Hi there", "--json")
+    result = json.loads(out)
+    assert code == 0 and result["reply"] == "Hello!" and result["agent"] == "Guide" and "audio" not in result
+    assert seen[0][-1] == {"role": "user", "content": "Hi there"}
+    code, _, err = run(capsys, "chat", "nobody", "hi")
+    assert code == 1 and "Unknown agent 'nobody'" in err
+
+
 def test_dub_downloads_video_and_subtitles(capsys, monkeypatch, tmp_path):
     def fake_ffmpeg(args):
         out = Path(args[-1])

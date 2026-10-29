@@ -10,9 +10,10 @@
 - **Speech**: Stories (a script with a voice per speaker) and Audiobook (EPUB, TXT or Markdown, chapter by chapter, with resume).
 - **Video**: dub videos into another language, one at a time, in a batch, or by watching a folder.
 - **Text**: dictation (record and transcribe, or live: each turn is transcribed when you pause) and Transcribe (TXT, SRT or VTT).
+- **Voice agents**: talk with a local AI model, live or push-to-talk, that answers in a saved voice and can use a few safe, read-only tools (time, calculator, saved voices).
 - **Tools**: convert a recording to another voice, isolate a voice from music and noise, AI direction (describe how a line should sound; a local AI model sets the delivery), compare voices, fit audio to a length, inspect media files.
 - **Projects**: everything you make, in one list.
-- **Integrations**: a `voxwell` command line (speak, transcribe, isolate, clone, design, convert, dub; `--json` for scripts) with a skill that teaches Claude Code and Codex to use it, an OpenAI-compatible API at `http://127.0.0.1:8765/v1`, an MCP server for AI assistants, and optional phone calls (Twilio callers hear a greeting in your voice; off by default, and only a small separate server is ever exposed). The Integrations page shows how to connect them.
+- **Integrations**: a `voxwell` command line (speak, transcribe, isolate, clone, design, convert, dub, chat with an agent; `--json` for scripts) with a skill that teaches Claude Code and Codex to use it, an OpenAI-compatible API at `http://127.0.0.1:8765/v1`, an MCP server for AI assistants, and optional phone calls (Twilio callers hear a greeting in your voice; off by default, and only a small separate server is ever exposed). The Integrations page shows how to connect them.
 
 ## Develop
 
