@@ -109,6 +109,24 @@ def test_transcribe_prints_or_saves(capsys, monkeypatch, audio, tmp_path):
     assert result["text"] == "Hello there." and Path(result["path"]).read_text().startswith("1\n00:00:00,000 --> ")
 
 
+def test_edit_prints_or_saves(capsys, monkeypatch, tmp_path):
+    from voxwell.features.tools import direction
+
+    monkeypatch.setattr(direction, "complete", lambda system, user, max_new_tokens=80: "Edited.")
+    source = tmp_path / "talk.txt"
+    source.write_text("Um, hello.", encoding="utf-8")
+    code, out, _ = run(capsys, "edit", str(source), "-p", "filler")
+    assert code == 0 and out.strip() == "Edited."
+    code, out, _ = run(capsys, "edit", str(source), "-i", "make it formal", "-o", str(tmp_path / "out"), "--json")
+    result = json.loads(out)
+    assert code == 0 and Path(result["path"]).read_text(encoding="utf-8") == "Edited.\n" and Path(result["path"]).name == "out.txt"
+    monkeypatch.setattr("sys.stdin", io.StringIO("From a pipe"))
+    assert run(capsys, "edit", "-", "-p", "filler")[1].strip() == "Edited."
+    code, _, err = run(capsys, "edit", str(source))
+    assert code == 1 and "--preset or --instruction" in err
+    assert run(capsys, "edit", str(source), "-p", "nope")[0] == 1
+
+
 def test_isolate_writes_two_tracks(capsys, monkeypatch, audio, tmp_path):
     def fake_isolate(source, voice_out, background_out):
         voice_out.write_bytes(wav_bytes())

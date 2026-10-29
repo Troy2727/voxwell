@@ -18,5 +18,6 @@ Voxwell runs every model locally; the `voxwell` CLI drives the running Voxwell s
 - Languages are ISO 639-1 codes. Speech, cloning and dubbing cover about 20 common languages (Japanese is not one of them) and reject others with an error. Transcription detects the language when `--language` is left out.
 - Commands take local file paths and write next to the input (`isolate`) or into the current folder, unless `-o` says otherwise.
 - `isolate` accepts up to 10 minutes of audio; `speak` up to 4096 characters per call, so split longer texts and speak each part.
+- `edit` cleans up transcript text (a file, or `-` for stdin) with a local AI model: `--preset filler|punctuation|formal|concise`, or `--instruction "..."`. It edits chunk by chunk and keeps the original wording of any chunk the model garbles, so review the result; it prints the text, or saves it with `-o`.
 - Speed is CPU-bound without a GPU: a minute of audio takes tens of seconds to isolate or transcribe, and a dub several minutes. Long commands block until finished; let them run.
 - Each model downloads on its first use, so the first call of a command is the slowest.
