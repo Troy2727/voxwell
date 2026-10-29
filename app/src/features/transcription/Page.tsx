@@ -5,6 +5,7 @@ import { ChoiceSelect } from '@/components/choice-select';
 import { FileDrop } from '@/components/file-drop';
 import { JobProgress } from '@/components/job-progress';
 import { EmptyState, ErrorAlert, Field, message, Page as PageLayout, Section } from '@/components/page';
+import { appendSpeakerFields, SpeakerOptions } from '@/components/speaker-options';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -33,10 +34,11 @@ interface Segment {
   start: number;
   end: number;
   text: string;
+  speaker?: string; // only when speakers were labelled
 }
 
 interface Detail extends Summary {
-  transcript?: { text: string; language: string; segments: Segment[] };
+  transcript?: { text: string; language: string; segments: Segment[]; speakers_error?: string };
 }
 
 const AUTO = 'auto';
@@ -56,7 +58,8 @@ function alignmentFrom(segments: Segment[]): CharacterAlignmentResponseModel {
   const starts: number[] = [];
   const ends: number[] = [];
   segments.forEach((s, i) => {
-    const chars = Array.from(s.text);
+    const turn = s.speaker && s.speaker !== segments[i - 1]?.speaker; // name the speaker where they take over
+    const chars = Array.from(turn ? `${s.speaker}: ${s.text}` : s.text);
     const step = (s.end - s.start) / Math.max(chars.length, 1);
     chars.forEach((c, j) => {
       characters.push(c);
@@ -75,6 +78,8 @@ function alignmentFrom(segments: Segment[]): CharacterAlignmentResponseModel {
 export default function Page() {
   const [file, setFile] = useState<File | null>(null);
   const [language, setLanguage] = useState(AUTO);
+  const [speakers, setSpeakers] = useState(false);
+  const [speakerCount, setSpeakerCount] = useState('');
   const [starting, setStarting] = useState(false);
   const [list, setList] = useState<Summary[] | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
@@ -107,6 +112,7 @@ export default function Page() {
     const form = new FormData();
     form.append('file', file);
     form.append('language', language === AUTO ? '' : language);
+    appendSpeakerFields(form, speakers, speakerCount);
     try {
       const { id } = await api<{ id: string }>('/api/transcription/jobs', { method: 'POST', body: form });
       setSelected(id);
@@ -126,6 +132,14 @@ export default function Page() {
     <PageLayout title="Transcribe" description="Turn audio or video into text with timestamps. Export as TXT, SRT or VTT.">
       <Section title="New transcript" description="Long files take a while; you can leave this page and come back.">
         <FileDrop file={file} onFile={setFile} accept="audio/*,video/*,.mkv" disabled={starting} />
+        <SpeakerOptions
+          enabled={speakers}
+          onEnabled={setSpeakers}
+          count={speakerCount}
+          onCount={setSpeakerCount}
+          disabled={starting}
+          hint="Marks who is speaking in the text and in TXT, SRT and VTT downloads. Takes extra time and downloads a small model the first time."
+        />
         <div className="flex flex-wrap items-end gap-4">
           <Field label="Language" className="w-full sm:w-56">
             <ChoiceSelect options={LANGUAGES} value={language} onChange={setLanguage} />
@@ -205,7 +219,7 @@ function Viewer({ summary, media, onMedia }: { summary: Summary; media?: File; o
     );
   if (!detail?.transcript || !alignment) return <Skeleton className="h-40 w-full" />;
 
-  const { text, segments } = detail.transcript;
+  const { text, segments, speakers_error: speakersError } = detail.transcript;
   const copy = () => navigator.clipboard.writeText(text).then(() => setCopied(true));
   const base = `/api/transcription/jobs/${summary.id}/export`;
 
@@ -218,6 +232,7 @@ function Viewer({ summary, media, onMedia }: { summary: Summary; media?: File; o
         </Button>
       }
     >
+      {speakersError && <ErrorAlert message={speakersError} />}
       <div className="flex flex-wrap gap-2">
         {(['txt', 'srt', 'vtt'] as const).map((fmt) => (
           <Button key={fmt} asChild variant="secondary" size="sm">
@@ -249,6 +264,7 @@ function Viewer({ summary, media, onMedia }: { summary: Summary; media?: File; o
             {segments.map((s, i) => (
               <div key={i} className="flex items-baseline gap-3 text-sm">
                 <span className="text-muted-foreground w-12 shrink-0 text-xs tabular-nums">{clock(s.start)}</span>
+                {s.speaker && <Badge variant="outline">{s.speaker}</Badge>}
                 <span>{s.text}</span>
               </div>
             ))}

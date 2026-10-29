@@ -9,6 +9,7 @@ from fastapi.responses import FileResponse
 from voxwell import voices
 from voxwell.features.dubbing import ffmpeg, jobs
 from voxwell.features.dubbing.translate import LANGUAGES as TRANSLATION_LANGUAGES
+from voxwell.features.transcription import diarization
 from voxwell.features.voice_cloning.engine import LANGUAGES as SPEECH_LANGUAGES
 from voxwell.paths import data_dir, download_name
 
@@ -43,15 +44,17 @@ def check_settings(target_language: str, voice: str) -> str:
     return target
 
 
-def start_dub(source: BinaryIO, filename: str, target_language: str, voice: str) -> jobs.Job:
+def start_dub(source: BinaryIO, filename: str, target_language: str, voice: str, *, speakers: bool = False, num_speakers: int = 0) -> jobs.Job:
     """Validate, copy `source` into a new job and queue it. Used by uploads and Batch."""
     target = check_settings(target_language, voice)
+    if not 0 <= num_speakers <= diarization.MAX_SPEAKERS:
+        raise HTTPException(422, f"The number of speakers must be 0 (detect) or 1 to {diarization.MAX_SPEAKERS}.")
     name = Path(filename or "")
     ext = name.suffix.lower()  # only the extension is used as a path, never the name
     if ext not in VIDEO_EXTS:
         raise HTTPException(422, f"Unsupported video type '{ext}'. Use one of: {', '.join(sorted(VIDEO_EXTS))}.")
     title = name.stem.strip()[:100] or "Dub"  # display only
-    job = jobs.create(data_dir("dubbing", "jobs"), ext, target, voice, title)
+    job = jobs.create(data_dir("dubbing", "jobs"), ext, target, voice, title, speakers=speakers, num_speakers=num_speakers if speakers else 0)
     with job.video.open("wb") as out:
         shutil.copyfileobj(source, out)
     if job.video.stat().st_size == 0:
@@ -66,8 +69,10 @@ def create_job(
     file: UploadFile = File(...),
     target_language: str = Form(...),
     voice: str = Form("original"),
+    speakers: bool = Form(False),
+    num_speakers: int = Form(0),
 ):
-    return {"id": start_dub(file.file, file.filename or "", target_language, voice).id}
+    return {"id": start_dub(file.file, file.filename or "", target_language, voice, speakers=speakers, num_speakers=num_speakers).id}
 
 
 def _job(job_id: str) -> jobs.Job:

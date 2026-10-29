@@ -13,6 +13,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from voxwell.features.dictation import engine
+from voxwell.features.transcription import diarization
 from voxwell.paths import data_dir
 
 STATE_FILE = "job.json"
@@ -32,6 +33,8 @@ class Job:
     percent: int = 0
     error: str | None = None
     detected: str = ""  # language reported by the model
+    speakers: bool = False  # label who speaks (off by default)
+    num_speakers: int = 0  # how many speakers there are, 0 to detect it
 
 
 _jobs: dict[str, Job] = {}
@@ -60,11 +63,11 @@ def _load(folder: Path) -> Job | None:
     return job
 
 
-def create(ext: str, title: str, language: str) -> Job:
+def create(ext: str, title: str, language: str, *, speakers: bool = False, num_speakers: int = 0) -> Job:
     job_id = uuid.uuid4().hex[:12]
     folder = _root() / job_id
     folder.mkdir(parents=True)
-    job = Job(job_id, folder, f"input{ext}", title, language, time.time())
+    job = Job(job_id, folder, f"input{ext}", title, language, time.time(), speakers=speakers, num_speakers=num_speakers)
     with _lock:
         _jobs[job_id] = job
     return job
@@ -107,18 +110,39 @@ def delete(job: Job) -> None:
     discard(job)
 
 
+def _label_speakers(job: Job, data: dict) -> None:
+    """Add a "speaker" to each segment of `data`. A failure is recorded in data["speakers_error"], so the
+    transcript itself is still saved."""
+    try:
+        turns = diarization.diarize(
+            job.dir / job.source, job.num_speakers, on_progress=lambda f: setattr(job, "percent", 80 + int(f * 19))
+        )
+        labels = diarization.assign_speakers([(s["start"], s["end"]) for s in data["segments"]], turns)
+    except Exception as exc:  # download, decode or model failures all leave the plain transcript
+        data["speakers_error"] = f"Speaker labels failed: {exc}"
+        return
+    if not any(labels):
+        data["speakers_error"] = "No speakers were found in the file."
+    for segment, label in zip(data["segments"], labels):
+        if label:
+            segment["speaker"] = label
+
+
 def _work(job: Job) -> None:
     with _one_at_a_time:
         job.state = "running"
         _save(job)
         try:
             t = engine.transcribe(
-                job.dir / job.source, job.language or None, on_progress=lambda f: setattr(job, "percent", int(f * 99))
+                job.dir / job.source, job.language or None,
+                on_progress=lambda f: setattr(job, "percent", int(f * (80 if job.speakers else 99))),
             )
             segments = [{"start": s.start, "end": s.end, "text": s.text} for s in t.segments if s.text]
             if not segments:
                 raise engine.AudioError("No speech was found in the file.")
             data = {"text": t.text, "language": t.language, "segments": segments}
+            if job.speakers:
+                _label_speakers(job, data)
             (job.dir / RESULT_FILE).write_bytes(json.dumps(data, ensure_ascii=False).encode("utf-8"))
             job.state, job.percent, job.detected = "done", 100, t.language
         except engine.AudioError as exc:

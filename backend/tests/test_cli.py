@@ -189,6 +189,47 @@ def test_dub_downloads_video_and_subtitles(capsys, monkeypatch, tmp_path):
     assert Path(result["subtitles"]).read_text(encoding="utf-8").strip().endswith("[en] hola")
 
 
+def test_transcribe_and_dub_label_speakers(capsys, monkeypatch, audio, tmp_path):
+    from voxwell.features.transcription import diarization
+
+    turns = [diarization.Turn(0.0, 1.0, 0), diarization.Turn(1.0, 2.0, 1)]
+    seen = []
+    monkeypatch.setattr(diarization, "diarize", lambda path, n=0, on_progress=None: seen.append(n) or turns)
+    transcript = Transcript("Hi. Bye.", "en", [Segment(0.0, 1.0, "Hi."), Segment(1.0, 2.0, "Bye.")])
+    monkeypatch.setattr(dictation_engine, "transcribe", lambda path, language=None, on_progress=None: transcript)
+    monkeypatch.setattr(transcription_jobs, "start", transcription_jobs._work)
+    code, out, _ = run(capsys, "transcribe", str(audio), "--speakers", "--num-speakers", "2")
+    assert code == 0 and out.strip() == "Speaker 1: Hi.\n\nSpeaker 2: Bye."
+    assert seen == [2]
+    code, out, _ = run(capsys, "transcribe", str(audio), "--speakers", "--json")
+    assert [s["speaker"] for s in json.loads(out)["segments"]] == ["Speaker 1", "Speaker 2"]
+    code, out, _ = run(capsys, "transcribe", str(audio), "--speakers", "-f", "vtt", "-o", str(tmp_path / "v"))
+    assert "<v Speaker 2>Bye." in (tmp_path / "v.vtt").read_text(encoding="utf-8")
+
+    def offline(path, n=0, on_progress=None):
+        raise diarization.DiarizationError("Could not download the speaker model: offline")
+
+    monkeypatch.setattr(diarization, "diarize", offline)
+    code, out, _ = run(capsys, "transcribe", str(audio), "--speakers")
+    assert code == 0 and out.startswith("Hi. Bye.") and out.strip().endswith("[Speaker labels failed: Could not download the speaker model: offline]")
+
+    monkeypatch.setattr(diarization, "diarize", lambda path, n=0, on_progress=None: turns)
+
+    def fake_ffmpeg(args):
+        out_file = Path(args[-1])
+        out_file.write_bytes(wav_bytes() if out_file.suffix == ".wav" else b"video")
+
+    monkeypatch.setattr(ffmpeg, "run_ffmpeg", fake_ffmpeg)
+    monkeypatch.setattr(dictation_engine, "transcribe", lambda p, language=None: transcript)
+    monkeypatch.setattr(translator, "translate", lambda texts, s, t: texts)
+    monkeypatch.setattr(cloning_engine, "synthesize", lambda *a, **k: wav_bytes())
+    monkeypatch.setattr(dubbing_jobs, "start", dubbing_jobs._work)
+    video = tmp_path / "talk.mp4"
+    video.write_bytes(b"fakevideo")
+    code, out, _ = run(capsys, "dub", str(video), "--to", "en", "--speakers", "-o", str(tmp_path / "dubbed"), "--json")
+    assert code == 0 and "Speaker 2: Bye." in Path(json.loads(out)["subtitles"]).read_text(encoding="utf-8")
+
+
 def test_errors_are_clear(capsys, tmp_path):
     code, _, err = run(capsys, "isolate", str(tmp_path / "missing.wav"))
     assert code == 1 and "File not found" in err
