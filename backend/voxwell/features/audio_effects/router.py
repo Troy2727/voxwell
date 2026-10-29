@@ -1,5 +1,6 @@
 """Apply reverb, distance, background noise and stereo pan to an uploaded recording."""
 
+import asyncio
 import re
 import time
 import uuid
@@ -41,7 +42,8 @@ async def apply(
     if len(data) > MAX_UPLOAD:
         raise HTTPException(413, "The file is too large (50 MB max).")
     try:
-        audio, rate = dsp.decode(data)
+        # Decoding and the DSP take seconds on a long file; keep them off the event loop.
+        audio, rate = await asyncio.to_thread(dsp.decode, data)
     except ValueError:
         raise HTTPException(422, "Could not read the file as audio. Use WAV, MP3, FLAC or OGG.")
     if len(audio) / rate > MAX_SECONDS:
@@ -53,7 +55,8 @@ async def apply(
             old.unlink(missing_ok=True)
     output_id = uuid.uuid4().hex
     try:
-        (folder / f"{output_id}.wav").write_bytes(dsp.encode_wav(dsp.process(audio, rate, fx), rate))
+        wav = await asyncio.to_thread(lambda: dsp.encode_wav(dsp.process(audio, rate, fx), rate))
+        (folder / f"{output_id}.wav").write_bytes(wav)
     except Exception as exc:
         raise HTTPException(500, f"Applying the effects failed: {exc}")
     return {"id": output_id, "url": f"/api/audio_effects/audio/{output_id}"}

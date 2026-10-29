@@ -216,6 +216,31 @@ def test_upload_path_applies_effects():
     assert rms(brown - plain) > 0
 
 
+def test_upload_processing_runs_off_the_event_loop(monkeypatch):
+    # Decoding and DSP on a long file take seconds; on the loop they would stall every request.
+    import asyncio
+
+    from voxwell.features.audio_effects import router as fx_router
+
+    on_loop = []
+
+    def probe(fn):
+        def wrapped(*args, **kwargs):
+            try:
+                asyncio.get_running_loop()
+                on_loop.append(fn.__name__)
+            except RuntimeError:
+                pass
+            return fn(*args, **kwargs)
+
+        return wrapped
+
+    for name in ("decode", "process", "encode_wav"):
+        monkeypatch.setattr(fx_router.dsp, name, probe(getattr(dsp, name)))
+    fetch(apply(speechlike(), {"reverb": "1"}))
+    assert on_loop == []
+
+
 def test_upload_errors():
     assert apply(data=b"not audio").status_code == 422
     assert apply(fields={"reverb": "2"}).status_code == 422
