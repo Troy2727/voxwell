@@ -14,6 +14,7 @@ from voxwell.features.gallery.router import router as gallery_router
 from voxwell.features.integrations import phone as integrations_phone
 from voxwell.features.integrations.router import router as integrations_router
 from voxwell.features.projects.router import router as projects_router
+from voxwell.features.sound.router import router as sound_router
 from voxwell.features.stories.router import router as stories_router
 from voxwell.features.tools.router import router as tools_router
 from voxwell.features.transcription.router import router as transcription_router
@@ -35,6 +36,7 @@ FEATURES = [
     Feature("voice_design", voice_design_router),
     Feature("voices", voices_router),
     Feature("gallery", gallery_router),
+    Feature("sound", sound_router),
     Feature("stories", stories_router),
     Feature("audiobook", audiobook_router),
     Feature("dubbing", dubbing_router),

@@ -15,6 +15,7 @@ Voxwell runs every model locally; the `voxwell` CLI drives the running Voxwell s
 ## Facts --help does not state
 
 - Voices are referenced by saved name (any case) or id; `voxwell voices` lists them. `speak` without `--voice` uses the built-in voice; `dub` without `--voice` clones the original speaker.
+- `sound` makes sound effects from a text description (1 to 30 seconds; reuse the printed `seed` to repeat a result). It needs a free Hugging Face token with the Stable Audio Open terms accepted, set on the Voxwell Sound page or as `HF_TOKEN`; if the command says the model is gated, tell the user to do that rather than retrying. Expect minutes per clip on CPU.
 - Languages are ISO 639-1 codes. Speech, cloning and dubbing cover about 20 common languages (Japanese is not one of them) and reject others with an error. Transcription detects the language when `--language` is left out.
 - Commands take local file paths and write next to the input (`isolate`) or into the current folder, unless `-o` says otherwise.
 - `isolate` accepts up to 10 minutes of audio; `speak` up to 4096 characters per call, so split longer texts and speak each part.

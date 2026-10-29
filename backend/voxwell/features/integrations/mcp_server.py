@@ -40,6 +40,17 @@ TOOLS = [
         }, ["text"]),
     },
     {
+        "name": "generate_sound",
+        "description": "Generate a sound effect or ambience from a text description (Stable Audio Open; needs a Hugging Face "
+        "token and accepted model terms, see the Sound page). Takes a while on CPU. Saves a WAV and returns its path and seed.",
+        "inputSchema": _schema({
+            "prompt": {"type": "string", "description": "What the sound is, e.g. 'rain on a tin roof, distant thunder'."},
+            "duration": {"type": "number", "description": "Seconds, 1 to 30. Default 10."},
+            "seed": {"type": "integer", "description": "Reuse a previous seed to repeat a result."},
+            "output_path": {"type": "string", "description": "Where to save the WAV. Default: the Voxwell MCP folder."},
+        }, ["prompt"]),
+    },
+    {
         "name": "transcribe",
         "description": "Transcribe an audio or video file on this computer to text.",
         "inputSchema": _schema({"file_path": _FILE, "language": {**_LANGUAGE, "description": "ISO 639-1 code; omit to detect it."}}, ["file_path"]),
@@ -128,6 +139,11 @@ def speak(args: dict) -> str:
                 output=args.get("output_path") or _default_folder())
 
 
+def generate_sound(args: dict) -> str:
+    return _run(cli.cmd_sound, prompt=_required(args, "prompt"), duration=float(args.get("duration") or 10),
+                seed=args.get("seed"), steps=100, output=args.get("output_path") or _default_folder())
+
+
 def transcribe(args: dict) -> str:
     text = _run(cli.cmd_transcribe, file=_required(args, "file_path"), language=args.get("language"), format="txt", output=None)
     return text or "(no speech found)"
@@ -157,7 +173,7 @@ def dub_video(args: dict) -> str:
 
 
 HANDLERS = {
-    "list_voices": list_voices, "speak": speak, "transcribe": transcribe, "isolate_voice": isolate_voice,
+    "list_voices": list_voices, "speak": speak, "generate_sound": generate_sound, "transcribe": transcribe, "isolate_voice": isolate_voice,
     "clone_voice": clone_voice, "design_voice": design_voice, "convert_voice": convert_voice, "dub_video": dub_video,
 }
 

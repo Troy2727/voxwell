@@ -224,7 +224,7 @@ def test_mcp_handshake_and_tool_list(mcp):
     assert init["result"]["protocolVersion"] == "2025-03-26" and "tools" in init["result"]["capabilities"]
     assert mcp_server.handle({"jsonrpc": "2.0", "method": "notifications/initialized"}) is None
     names = {t["name"] for t in mcp("tools/list")["result"]["tools"]}
-    assert names == {"list_voices", "speak", "transcribe", "isolate_voice", "clone_voice", "design_voice", "convert_voice", "dub_video"}
+    assert names == {"list_voices", "speak", "generate_sound", "transcribe", "isolate_voice", "clone_voice", "design_voice", "convert_voice", "dub_video"}
     assert names == set(mcp_server.HANDLERS)
     assert mcp("ping")["result"] == {}
     assert mcp("resources/list")["error"]["code"] == -32601

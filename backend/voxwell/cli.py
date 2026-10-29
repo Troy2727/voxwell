@@ -161,6 +161,18 @@ def cmd_voices(client: Client, args) -> tuple[str, dict]:
     return "\n".join(lines), {"voices": saved}
 
 
+def cmd_sound(client: Client, args) -> tuple[str, dict]:
+    if not args.prompt.strip():
+        raise CliError("Describe the sound to make.")
+    body = {"prompt": args.prompt.strip(), "duration": args.duration, "steps": args.steps}
+    if args.seed is not None:
+        body["seed"] = args.seed
+    sound = json.loads(client.post_json("/api/sound/generate", body))
+    out = _output_path(args.output, f"sound-{_stamp()}.wav", ".wav")
+    out.write_bytes(client.request("GET", sound["url"]))
+    return f"Saved the sound to {out} (seed {sound['seed']})", {"path": str(out), "seed": sound["seed"], "duration": sound["duration"]}
+
+
 def cmd_speak(client: Client, args) -> tuple[str, dict]:
     text = sys.stdin.read() if args.text == "-" else args.text
     if not text.strip():
@@ -257,6 +269,14 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(run=cmd_status)
     p = sub.add_parser("voices", parents=[common], help="list saved voices")
     p.set_defaults(run=cmd_voices)
+
+    p = sub.add_parser("sound", parents=[common], help="generate a sound effect from a description (WAV)")
+    p.add_argument("prompt", help='e.g. "rain on a tin roof, distant thunder"')
+    p.add_argument("-d", "--duration", type=float, default=10, help="seconds, 1 to 30 (default 10)")
+    p.add_argument("--seed", type=int, help="repeat a previous result by reusing its seed")
+    p.add_argument("--steps", type=int, default=100, help="quality steps, 10 to 250 (default 100; fewer is faster)")
+    p.add_argument("-o", "--output", help="WAV file or folder (default: ./sound-<time>.wav)")
+    p.set_defaults(run=cmd_sound)
 
     p = sub.add_parser("speak", parents=[common], help="turn text into speech (WAV)")
     p.add_argument("text", help="what to say, up to 4096 characters; - reads it from stdin")

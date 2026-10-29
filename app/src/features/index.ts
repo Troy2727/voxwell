@@ -1,7 +1,7 @@
 import type { ComponentType } from 'react';
 import {
   AudioLines, BookOpen, FileText, FolderOpen, Languages, Layers, LayoutGrid, Library,
-  type LucideIcon, MessagesSquare, Mic, Plug, Wand2, Wrench,
+  type LucideIcon, MessagesSquare, Mic, Plug, Volume2, Wand2, Wrench,
 } from 'lucide-react';
 import AudiobookPage from './audiobook/Page';
 import BatchPage from './batch/Page';
@@ -10,6 +10,7 @@ import DubbingPage from './dubbing/Page';
 import GalleryPage from './gallery/Page';
 import IntegrationsPage from './integrations/Page';
 import ProjectsPage from './projects/Page';
+import SoundPage from './sound/Page';
 import StoriesPage from './stories/Page';
 import ToolsPage from './tools/Page';
 import TranscriptionPage from './transcription/Page';
@@ -30,6 +31,7 @@ export const FEATURES: FeatureEntry[] = [
   { id: 'voice_design', title: 'Voice design', group: 'Create', icon: Wand2, Page: VoiceDesignPage },
   { id: 'voices', title: 'Saved voices', group: 'Voices', icon: Library, Page: VoicesPage },
   { id: 'gallery', title: 'Gallery', group: 'Voices', icon: LayoutGrid, Page: GalleryPage },
+  { id: 'sound', title: 'Sound effects', group: 'Create', icon: Volume2, Page: SoundPage },
   { id: 'stories', title: 'Stories', group: 'Create', icon: MessagesSquare, Page: StoriesPage },
   { id: 'audiobook', title: 'Audiobook', group: 'Create', icon: BookOpen, Page: AudiobookPage },
   { id: 'dubbing', title: 'Dubbing', group: 'Dub & transcribe', icon: Languages, Page: DubbingPage },

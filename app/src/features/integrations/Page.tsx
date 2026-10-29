@@ -25,10 +25,11 @@ const OFFLINE_INFO: Info = {
   mcp: { command: 'uv', args: ['run', '--directory', '<voxwell>/backend', 'voxwell-mcp'], env: { UV_SYSTEM_CERTS: '1' } },
 };
 
-/** The eight tools, the same in the CLI and the MCP server (backend/voxwell/cli.py, mcp_server.py). */
+/** The nine tools, the same in the CLI and the MCP server (backend/voxwell/cli.py, mcp_server.py). */
 const TOOLS: { cli: string; mcp: string; what: string }[] = [
   { cli: 'voices', mcp: 'list_voices', what: 'List saved voices' },
   { cli: 'speak', mcp: 'speak', what: 'Turn text into speech (WAV)' },
+  { cli: 'sound', mcp: 'generate_sound', what: 'Generate a sound effect from a description' },
   { cli: 'transcribe', mcp: 'transcribe', what: 'Transcribe an audio or video file' },
   { cli: 'isolate', mcp: 'isolate_voice', what: 'Split a recording into the voice and the background' },
   { cli: 'clone', mcp: 'clone_voice', what: 'Save a voice from a short, clean recording' },
