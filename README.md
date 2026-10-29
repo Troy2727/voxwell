@@ -6,7 +6,7 @@
 
 ## What's inside
 
-- **Voices**: clone a voice from a short clip, design one from a description, or pick a ready-made one from the Gallery. Saved voices work everywhere.
+- **Voices**: clone a voice from a short clip, design one from a description, or pick a ready-made one from the Gallery. Saved voices work everywhere, and collections keep them organized.
 - **Speech**: Stories (a script with a voice per speaker) and Audiobook (EPUB, TXT or Markdown, chapter by chapter, with resume).
 - **Video**: dub videos into another language, one at a time, in a batch, or by watching a folder.
 - **Text**: dictation and Transcribe (TXT, SRT or VTT).

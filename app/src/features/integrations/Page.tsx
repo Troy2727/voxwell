@@ -25,9 +25,10 @@ const OFFLINE_INFO: Info = {
   mcp: { command: 'uv', args: ['run', '--directory', '<voxwell>/backend', 'voxwell-mcp'], env: { UV_SYSTEM_CERTS: '1' } },
 };
 
-/** The nine tools, the same in the CLI and the MCP server (backend/voxwell/cli.py, mcp_server.py). */
+/** The tools, the same in the CLI and the MCP server (backend/voxwell/cli.py, mcp_server.py). */
 const TOOLS: { cli: string; mcp: string; what: string }[] = [
   { cli: 'voices', mcp: 'list_voices', what: 'List saved voices' },
+  { cli: 'collection', mcp: 'voice_collections', what: 'Organize saved voices into collections' },
   { cli: 'speak', mcp: 'speak', what: 'Turn text into speech (WAV)' },
   { cli: 'transcribe', mcp: 'transcribe', what: 'Transcribe an audio or video file' },
   { cli: 'isolate', mcp: 'isolate_voice', what: 'Split a recording into the voice and the background' },
@@ -116,7 +117,7 @@ export default function Page() {
         </Alert>
       )}
 
-      <Section title="Nine tools, two ways in" description="The command line and MCP share the same nine tools.">
+      <Section title={`${TOOLS.length} tools, two ways in`} description="The command line and MCP share the same tools.">
         <div className="overflow-x-auto rounded-lg border">
           <table className="w-full text-sm">
             <thead className="bg-muted/40 text-left">
@@ -197,7 +198,7 @@ ${info.cli} isolate song.mp3`} />
         title="AI assistants (MCP)"
         description={
           <>
-            Gives AI apps without a terminal, such as Claude Desktop and Cursor, the same nine tools as the command line: speak, transcribe, isolate, clone, design, pronounce, convert, dub and list voices. Keep Voxwell open
+            Gives AI apps without a terminal, such as Claude Desktop and Cursor, the same tools as the command line, listed above. Keep Voxwell open
             while the assistant uses it. Requires <a href="https://docs.astral.sh/uv/">uv</a>.
           </>
         }

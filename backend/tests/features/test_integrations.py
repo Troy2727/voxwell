@@ -224,7 +224,7 @@ def test_mcp_handshake_and_tool_list(mcp):
     assert init["result"]["protocolVersion"] == "2025-03-26" and "tools" in init["result"]["capabilities"]
     assert mcp_server.handle({"jsonrpc": "2.0", "method": "notifications/initialized"}) is None
     names = {t["name"] for t in mcp("tools/list")["result"]["tools"]}
-    assert names == {"list_voices", "speak", "transcribe", "isolate_voice", "clone_voice", "design_voice", "convert_voice", "dub_video", "manage_pronunciations"}
+    assert names == {"list_voices", "voice_collections", "speak", "transcribe", "isolate_voice", "clone_voice", "design_voice", "convert_voice", "dub_video", "manage_pronunciations"}
     assert names == set(mcp_server.HANDLERS)
     assert mcp("ping")["result"] == {}
     assert mcp("resources/list")["error"]["code"] == -32601
@@ -325,3 +325,17 @@ def test_mcp_stdio_loop(monkeypatch, capsys):
     mcp_server.main()
     out = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
     assert out == [{"jsonrpc": "2.0", "id": 7, "result": {}}, {"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "Parse error"}}]
+
+
+def test_mcp_voice_collections(mcp):
+    anna = voices.save_voice("Anna", wav_bytes(), "upload")
+    text = lambda **a: tool(mcp, "voice_collections", **a)["content"][0]["text"]  # noqa: E731
+    assert "No collections yet" in text(action="list")
+    assert "Created the collection 'Leads'" in text(action="create", name="Leads")
+    assert "Added to 'leads'" in text(action="add", name="leads", voices=["anna"])
+    assert anna.id in text(action="show", name="Leads")
+    assert "Renamed the collection to 'Cast'" in text(action="rename", name="Leads", new_name="Cast")
+    assert "Removed from 'Cast'" in text(action="remove", name="Cast", voices=[anna.id])
+    assert "Deleted the collection 'Cast'" in text(action="delete", name="Cast")
+    assert voices.list_voices() == [anna]
+    assert tool(mcp, "voice_collections", action="show", name="Nope")["isError"] is True

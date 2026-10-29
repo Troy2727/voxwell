@@ -128,6 +128,16 @@ def _voice_id(client: Client, voice: str) -> str:
     raise CliError(f"Unknown voice '{voice}'. Saved voices: {names}.")
 
 
+def _collection_id(client: Client, collection: str) -> str:
+    """A voice collection's id from its id or (case-insensitive) name."""
+    saved = client.get_json("/api/voice_collections")
+    for c in saved:
+        if collection in (c["id"], c["name"]) or collection.lower() == c["name"].lower():
+            return c["id"]
+    names = ", ".join(c["name"] for c in saved) or "none yet"
+    raise CliError(f"Unknown collection '{collection}'. Collections: {names}.")
+
+
 def _wait(client: Client, path: str, quiet: bool, label: str) -> dict:
     """Poll a background job until it is done; progress goes to stderr when it is a terminal."""
     quiet = quiet or not sys.stderr.isatty()
@@ -159,6 +169,43 @@ def cmd_voices(client: Client, args) -> tuple[str, dict]:
         return "No saved voices yet. Add one with `voxwell clone` or `voxwell design`.", {"voices": []}
     lines = [f"{v['name']}  (id {v['id']}, {v['source']})" for v in saved]
     return "\n".join(lines), {"voices": saved}
+
+
+def cmd_collection(client: Client, args) -> tuple[str, dict]:
+    action, name, rest = args.action, (args.name or "").strip(), args.rest
+    base = "/api/voice_collections"
+    if action == "list":
+        collections = client.get_json(base)
+        if not collections:
+            return "No collections yet. Make one with `voxwell collection create NAME`.", {"collections": []}
+        return "\n".join(f"{c['name']}  ({len(c['voice_ids'])} voices, id {c['id']})" for c in collections), {"collections": collections}
+    if not name:
+        raise CliError(f"Give the collection name: voxwell collection {action} NAME.")
+    if action == "create":
+        made = json.loads(client.post_json(base, {"name": name}))
+        return f"Created the collection '{made['name']}' (id {made['id']}).", made
+    collection_id = _collection_id(client, name)
+    if action == "show":
+        voices = json.loads(client.request("GET", f"{base}/{collection_id}/voices"))
+        if not voices:
+            return f"'{name}' has no voices yet.", {"voices": []}
+        return "\n".join(f"{v['name']}  (id {v['id']}, {v['source']})" for v in voices), {"voices": voices}
+    if action == "rename":
+        if not rest:
+            raise CliError("Give the new name: voxwell collection rename NAME NEW_NAME.")
+        body = json.dumps({"name": " ".join(rest)}).encode()
+        renamed = json.loads(client.request("PATCH", f"{base}/{collection_id}", body, {"Content-Type": "application/json"}))
+        return f"Renamed the collection to '{renamed['name']}'.", renamed
+    if action == "delete":
+        client.request("DELETE", f"{base}/{collection_id}")
+        return f"Deleted the collection '{name}'. Its voices are still saved.", {"deleted": collection_id}
+    if not rest:
+        raise CliError(f"Give the voices to {action}: voxwell collection {action} NAME VOICE...")
+    result = None
+    for voice in rest:
+        result = json.loads(client.request("PUT" if action == "add" else "DELETE", f"{base}/{collection_id}/voices/{_voice_id(client, voice)}"))
+    verb = "Added to" if action == "add" else "Removed from"
+    return f"{verb} '{name}': {', '.join(rest)}.", result
 
 
 def cmd_speak(client: Client, args) -> tuple[str, dict]:
@@ -284,6 +331,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(run=cmd_status)
     p = sub.add_parser("voices", parents=[common], help="list saved voices")
     p.set_defaults(run=cmd_voices)
+
+    p = sub.add_parser("collection", parents=[common], help="organize saved voices into collections (folders)")
+    p.add_argument("action", choices=["list", "show", "create", "rename", "delete", "add", "remove"],
+                   help="list collections; show a collection's voices; create/rename/delete one; add/remove voices")
+    p.add_argument("name", nargs="?", help="collection name or id")
+    p.add_argument("rest", nargs="*", help="rename: the new name; add/remove: saved voice names or ids")
+    p.set_defaults(run=cmd_collection)
 
     p = sub.add_parser("speak", parents=[common], help="turn text into speech (WAV)")
     p.add_argument("text", help="what to say, up to 4096 characters; - reads it from stdin")

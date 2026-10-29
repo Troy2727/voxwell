@@ -15,6 +15,7 @@ Voxwell runs every model locally; the `voxwell` CLI drives the running Voxwell s
 ## Facts --help does not state
 
 - Voices are referenced by saved name (any case) or id; `voxwell voices` lists them. `speak` without `--voice` uses the built-in voice; `dub` without `--voice` clones the original speaker.
+- Collections are folders of saved voices (`voxwell collection list|show|create|rename|delete|add|remove`); they only organize voices, so deleting a collection never deletes a voice. Collection names are unique in any case.
 - Languages are ISO 639-1 codes. Speech, cloning and dubbing cover about 20 common languages (Japanese is not one of them) and reject others with an error. Transcription detects the language when `--language` is left out.
 - Commands take local file paths and write next to the input (`isolate`) or into the current folder, unless `-o` says otherwise.
 - `pronounce add WORD RESPELLING` teaches every voice a word (`Nguyen` -> `win`); matches are whole-word and case-insensitive unless `--case-sensitive` or `--partial` says otherwise, and it applies to all speech, per `--language`. Write the respelling as plain text the model reads aloud; check it with `speak`.

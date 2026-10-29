@@ -121,6 +121,32 @@ def test_synthesize_sends_the_rewritten_text_to_the_model(monkeypatch):
     assert seen == [("Ask win.", "en"), ("Ask Nguyen.", "es")]
 
 
+def test_voice_design_speaks_the_rewritten_sample(monkeypatch):
+    from voxwell.features.voice_design import engine as design_engine
+
+    seen = []
+
+    class Ids:
+        def to(self, device):
+            return self
+
+    class Tok:
+        def __call__(self, text, return_tensors):
+            seen.append(text)
+            return type("Enc", (), {"input_ids": Ids()})()
+
+    class Model:
+        config = type("Config", (), {"sampling_rate": 24000})()
+
+        def generate(self, **kwargs):
+            return type("Out", (), {"cpu": lambda self: self, "numpy": lambda self: np.zeros(10, dtype="float32")})()
+
+    monkeypatch.setattr(design_engine, "_load", lambda: {"device": "cpu", "model": Model(), "tokenizer": Tok()})
+    store.add_entry("en", "Nguyen", "win")
+    assert design_engine.design("A calm voice.", "Ask Nguyen.")[:4] == b"RIFF"
+    assert seen == ["A calm voice.", "Ask win."]
+
+
 # --- API ---------------------------------------------------------------------------------------
 
 

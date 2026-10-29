@@ -131,6 +131,23 @@ def test_clone_then_convert_by_name(capsys, monkeypatch, audio, tmp_path):
     assert code == 0 and targets == [voices.list_voices()[0].id] and (tmp_path / "out.wav").exists()
 
 
+def test_collections_organize_voices(capsys):
+    voice = voices.save_voice("Narrator", wav_bytes(), "upload")
+    assert "No collections yet" in run(capsys, "collection", "list")[1]
+    assert run(capsys, "collection", "create", "Leads")[0] == 0
+    assert run(capsys, "collection", "create", "leads")[0] == 1  # names are unique, any case
+    assert run(capsys, "collection", "add", "leads", "narrator")[0] == 0
+    code, out, _ = run(capsys, "collection", "show", "Leads", "--json")
+    assert code == 0 and [v["id"] for v in json.loads(out)["voices"]] == [voice.id]
+    assert run(capsys, "collection", "rename", "Leads", "Cast", "Members")[0] == 0
+    code, out, _ = run(capsys, "collection", "list", "--json")
+    assert [(c["name"], c["voice_ids"]) for c in json.loads(out)["collections"]] == [("Cast Members", [voice.id])]
+    assert run(capsys, "collection", "remove", "Cast Members", "Narrator")[0] == 0
+    assert run(capsys, "collection", "delete", "Cast Members")[0] == 0
+    assert run(capsys, "collection", "show", "Cast Members")[0] == 1
+    assert len(voices.list_voices()) == 1
+
+
 def test_design_saves_the_voice_and_preview(capsys, monkeypatch, tmp_path):
     monkeypatch.setattr(design_engine, "design", lambda description, sample: wav_bytes())
     code, out, _ = run(capsys, "design", "deep calm narrator", "--name", "Deep", "--preview", str(tmp_path / "p.wav"), "--json")
