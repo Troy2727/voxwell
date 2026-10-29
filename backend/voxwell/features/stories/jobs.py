@@ -15,6 +15,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from voxwell import voices
+from voxwell.features.audio_effects.dsp import Effects, apply_to_wav
 from voxwell.features.stories.script import parse
 from voxwell.features.voice_cloning import engine
 from voxwell.paths import data_dir
@@ -39,6 +40,7 @@ class Job:
     step: str = "Waiting for other stories"
     percent: int = 0
     error: str | None = None
+    effects: dict | None = None  # Effects settings applied to the finished story
 
 
 _jobs: dict[str, Job] = {}
@@ -66,11 +68,11 @@ def _load(folder: Path) -> Job | None:
     return job
 
 
-def create(title: str, language: str, script: str, cast: dict[str, str]) -> Job:
+def create(title: str, language: str, script: str, cast: dict[str, str], effects: dict | None = None) -> Job:
     job_id = uuid.uuid4().hex[:12]
     folder = _root() / job_id
     folder.mkdir(parents=True)
-    job = Job(job_id, folder, title, language, script, cast, time.time())
+    job = Job(job_id, folder, title, language, script, cast, time.time(), effects=effects)
     with _lock:
         _jobs[job_id] = job
     return job
@@ -144,7 +146,10 @@ def _work(job: Job) -> None:
             for i, line in enumerate(lines):
                 job.step, job.percent = f"Speaking line {i + 1} of {len(lines)}", int(99 * i / len(lines))
                 clips.append(engine.synthesize(line.text, job.language, refs.get(line.speaker)))
-            audio_path(job).write_bytes(_join(clips))
+            story = _join(clips)
+            if job.effects:
+                story = apply_to_wav(story, Effects(**job.effects))
+            audio_path(job).write_bytes(story)
             job.state, job.step, job.percent = "done", "Done", 100
         except ValueError as exc:
             job.state, job.error = "error", str(exc)

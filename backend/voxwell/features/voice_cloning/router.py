@@ -9,6 +9,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from voxwell import voices
+from voxwell.features.audio_effects.dsp import Effects
 from voxwell.features.voice_cloning import engine, history
 from voxwell.paths import data_dir
 
@@ -23,6 +24,7 @@ class SynthesizeRequest(BaseModel):
     text: str
     language: str = "en"
     voice_id: str | None = None
+    effects: Effects | None = None
 
 
 @router.get("/status")
@@ -77,7 +79,8 @@ def synthesize(req: SynthesizeRequest):
         except KeyError:
             raise HTTPException(404, "Unknown voice.")
     try:
-        wav = engine.synthesize(text, req.language, reference)
+        extra = {"effects": req.effects} if req.effects else {}
+        wav = engine.synthesize(text, req.language, reference, **extra)
     except Exception as exc:
         raise HTTPException(500, f"Speech synthesis failed: {exc}")
     audio_id = uuid.uuid4().hex
