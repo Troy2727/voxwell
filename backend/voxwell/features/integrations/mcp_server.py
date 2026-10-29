@@ -30,6 +30,17 @@ TOOLS = [
         "inputSchema": _schema({}, []),
     },
     {
+        "name": "voice_collections",
+        "description": "Organize saved voices into collections (folders). Deleting a collection never deletes its voices.",
+        "inputSchema": _schema({
+            "action": {"type": "string", "enum": ["list", "show", "create", "rename", "delete", "add", "remove"],
+                       "description": "list collections; show a collection's voices; create, rename or delete one; add or remove voices."},
+            "name": {"type": "string", "description": "Collection name or id (not needed for list)."},
+            "new_name": {"type": "string", "description": "The new name, for rename."},
+            "voices": {"type": "array", "items": {"type": "string"}, "description": "Saved voice names or ids, for add and remove."},
+        }, ["action"]),
+    },
+    {
         "name": "speak",
         "description": "Turn text into speech with a Voxwell voice and save it as a WAV file. Returns the file path.",
         "inputSchema": _schema({
@@ -120,6 +131,17 @@ def list_voices(args: dict) -> str:
     return _run(cli.cmd_voices)
 
 
+def voice_collections(args: dict) -> str:
+    action = _required(args, "action")
+    if action == "rename":
+        rest = [_required(args, "new_name")]
+    elif action in ("add", "remove"):
+        rest = [str(v) for v in args.get("voices") or []]
+    else:
+        rest = []
+    return _run(cli.cmd_collection, action=action, name=args.get("name"), rest=rest)
+
+
 def speak(args: dict) -> str:
     text = _required(args, "text")
     if text == "-":  # the CLI reads "-" from stdin, which is this server's protocol stream
@@ -157,7 +179,7 @@ def dub_video(args: dict) -> str:
 
 
 HANDLERS = {
-    "list_voices": list_voices, "speak": speak, "transcribe": transcribe, "isolate_voice": isolate_voice,
+    "list_voices": list_voices, "voice_collections": voice_collections, "speak": speak, "transcribe": transcribe, "isolate_voice": isolate_voice,
     "clone_voice": clone_voice, "design_voice": design_voice, "convert_voice": convert_voice, "dub_video": dub_video,
 }
 

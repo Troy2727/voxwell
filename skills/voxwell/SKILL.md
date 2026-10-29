@@ -15,6 +15,7 @@ Voxwell runs every model locally; the `voxwell` CLI drives the running Voxwell s
 ## Facts --help does not state
 
 - Voices are referenced by saved name (any case) or id; `voxwell voices` lists them. `speak` without `--voice` uses the built-in voice; `dub` without `--voice` clones the original speaker.
+- Collections are folders of saved voices (`voxwell collection list|show|create|rename|delete|add|remove`); they only organize voices, so deleting a collection never deletes a voice. Collection names are unique in any case.
 - Languages are ISO 639-1 codes. Speech, cloning and dubbing cover about 20 common languages (Japanese is not one of them) and reject others with an error. Transcription detects the language when `--language` is left out.
 - Commands take local file paths and write next to the input (`isolate`) or into the current folder, unless `-o` says otherwise.
 - `isolate` accepts up to 10 minutes of audio; `speak` up to 4096 characters per call, so split longer texts and speak each part.

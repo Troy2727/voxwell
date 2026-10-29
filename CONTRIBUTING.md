@@ -2,7 +2,7 @@
 
 ## Layout
 
-- `backend/voxwell/features/<feature>/`: one folder per feature (`voice_cloning`, `voice_design`, `voices`, `gallery`, `stories`, `audiobook`, `dubbing`, `batch`, `dictation`, `transcription`, `tools`, `integrations`, `projects`) with its FastAPI `router.py`, mounted at `/api/<feature>/`. `projects` owns no files: it lists, renames and deletes through each feature's own store (`voice_cloning/history.py`, `stories/jobs.py`, `audiobook/books.py`, `dubbing/jobs.py`, `transcription/jobs.py`). A feature can run a background task while the server is up via `Feature.background` (the watch folder uses it).
+- `backend/voxwell/features/<feature>/`: one folder per feature (`voice_cloning`, `voice_design`, `voices`, `voice_collections`, `gallery`, `stories`, `audiobook`, `dubbing`, `batch`, `dictation`, `transcription`, `tools`, `integrations`, `projects`) with its FastAPI `router.py`, mounted at `/api/<feature>/`. `projects` owns no files: it lists, renames and deletes through each feature's own store (`voice_cloning/history.py`, `stories/jobs.py`, `audiobook/books.py`, `dubbing/jobs.py`, `transcription/jobs.py`). A feature can run a background task while the server is up via `Feature.background` (the watch folder uses it).
 - `app/src/features/<feature>/Page.tsx`: the matching React page.
 - `app/src/components/`: Voxwell's shared page pieces (`Page`, `Section`, `Field`, `FileDrop`, `AudioResult`, `VoiceSelect`, `JobProgress`, `ConfirmButton`).
 - `app/src/components/ui/`: UI components copied from shadcn/ui and ElevenLabs UI (both MIT); see its `LICENSES.md`.
