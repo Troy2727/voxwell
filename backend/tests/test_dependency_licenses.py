@@ -6,6 +6,7 @@ listed explicitly so a new LGPL dependency still needs a deliberate decision.
 
 import importlib.metadata as md
 import re
+from pathlib import Path
 
 LGPL_ALLOWED = {"soxr"}
 
@@ -25,6 +26,11 @@ def _license_text(dist) -> str:
 def test_no_copyleft_or_noncommercial_dependencies():
     offenders = []
     for dist in md.distributions():
+        # Copies bundled inside another package (setuptools/_vendor) belong to that package and are
+        # not installed dependencies; they only appear on sys.path once something imports
+        # pkg_resources (chatterbox does), which made this check depend on test order.
+        if "_vendor" in Path(str(dist.locate_file(""))).parts:
+            continue
         name = dist.metadata["Name"].lower().replace("_", "-")
         text = _license_text(dist)
         if _LGPL.search(text):
