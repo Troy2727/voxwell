@@ -106,7 +106,9 @@ def edit_text(text: str, instruction: str, ask: Callable[..., str] | None = None
         out = []
         for chunk in chunks:
             total += 1
-            reply = clean_reply(ask(SYSTEM_PROMPT, f"Instruction: {instruction}\n\nText:\n{chunk}", max_new_tokens=len(chunk) // 2 + 64))
+            # A token per character: CJK text needs about that, and the model stops at the end of
+            # its answer anyway, so a generous cap never cuts an edited chunk short.
+            reply = clean_reply(ask(SYSTEM_PROMPT, f"Instruction: {instruction}\n\nText:\n{chunk}", max_new_tokens=len(chunk) + 64))
             if usable(chunk, reply):
                 out.append(reply)
             else:

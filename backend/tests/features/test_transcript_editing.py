@@ -77,6 +77,15 @@ def test_long_text_is_sent_in_chunks_and_rejoined(monkeypatch):
     assert result.text == text
 
 
+def test_the_output_budget_fits_a_whole_chunk_in_any_script(monkeypatch):
+    # CJK text is about one token per character; a budget of half the characters cut the
+    # edited chunk short and silently dropped the rest of it.
+    calls = fake_model(monkeypatch, reply=lambda c: c)
+    chunk = "今天天气很好。" * 200
+    editing.edit_text(chunk, "Fix punctuation")
+    assert calls and all(budget >= len(c) for _, c, budget in calls)
+
+
 @pytest.mark.parametrize("bad", ["", "   \n", "...", "```\n```", "x" * 1000])
 def test_unusable_reply_keeps_the_original_chunk(monkeypatch, bad):
     fake_model(monkeypatch, reply=lambda c: bad)
