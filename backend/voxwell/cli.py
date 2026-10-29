@@ -235,6 +235,24 @@ def cmd_transcribe(client: Client, args) -> tuple[str, dict]:
     return f"Saved the transcript to {out}", result
 
 
+def cmd_edit(client: Client, args) -> tuple[str, dict]:
+    if args.text is not None:  # given directly (the MCP tool); a CLI always passes a file
+        text = args.text
+    elif args.file == "-":
+        text = sys.stdin.read()
+    else:
+        text = _existing_file(args.file).read_text(encoding="utf-8", errors="replace")
+    body = {"text": text, **({"preset": args.preset} if args.preset else {"instruction": args.instruction})}
+    if not args.preset and not (args.instruction or "").strip():
+        raise CliError("Give --preset or --instruction.")
+    result = json.loads(client.post_json("/api/transcription/edit", body))
+    if not args.output:
+        return result["text"], result
+    out = _output_path(args.output, f"{Path(args.file).stem}.edited.txt", ".txt")
+    out.write_text(result["text"] + "\n", encoding="utf-8")
+    return f"Saved the edited text to {out}", {**result, "path": str(out)}
+
+
 def cmd_isolate(client: Client, args) -> tuple[str, dict]:
     source = _existing_file(args.file)
     result = client.post_form("/api/tools/isolate", {}, source)
@@ -360,6 +378,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("-f", "--format", choices=["txt", "srt", "vtt"], default="txt", help="output format (default txt)")
     p.add_argument("-o", "--output", help="save to this file instead of printing the text")
     p.set_defaults(run=cmd_transcribe)
+
+    p = sub.add_parser("edit", parents=[common], help="clean up a transcript with the local AI model")
+    p.add_argument("file", help="a text file, e.g. from `transcribe -o`; - reads it from stdin")
+    p.add_argument("-p", "--preset", help="filler (remove filler words), punctuation, formal or concise")
+    p.add_argument("-i", "--instruction", help='your own instruction, e.g. "remove filler words"')
+    p.add_argument("-o", "--output", help="save to this .txt file or folder instead of printing the text")
+    p.set_defaults(run=cmd_edit, text=None)
 
     p = sub.add_parser("isolate", parents=[common], help="split a recording into the voice and the background")
     p.add_argument("file", help="WAV, MP3, FLAC or OGG, up to 10 minutes")

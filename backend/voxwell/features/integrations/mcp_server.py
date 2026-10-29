@@ -56,6 +56,17 @@ TOOLS = [
         "inputSchema": _schema({"file_path": _FILE, "language": {**_LANGUAGE, "description": "ISO 639-1 code; omit to detect it."}}, ["file_path"]),
     },
     {
+        "name": "edit_transcript",
+        "description": "Clean up a transcript with Voxwell's local AI model, following a short instruction. Give the "
+        "text or a text file, and a preset or your own instruction. Returns the edited text.",
+        "inputSchema": _schema({
+            "text": {"type": "string", "description": "The transcript text. Alternative to file_path."},
+            "file_path": {**_FILE, "description": "Path to a text file with the transcript. Alternative to text."},
+            "preset": {"type": "string", "description": "filler (remove filler words), punctuation, formal or concise."},
+            "instruction": {"type": "string", "description": "Your own instruction, e.g. 'remove filler words'. Alternative to preset."},
+        }, []),
+    },
+    {
         "name": "isolate_voice",
         "description": "Split a recording (up to 10 minutes) into the voice alone and the background (music, noise, "
         "effects). Saves <name>.voice.wav and <name>.background.wav and returns their paths.",
@@ -182,6 +193,15 @@ def transcribe(args: dict) -> str:
     return text or "(no speech found)"
 
 
+def edit_transcript(args: dict) -> str:
+    text, path = args.get("text"), str(args.get("file_path") or "").strip()
+    if (text is None) == (not path):
+        raise ToolError("Give either text or file_path.")
+    if text is not None and not str(text).strip():
+        raise ToolError("text is required.")
+    return _run(cli.cmd_edit, file=path or "text", text=text, preset=args.get("preset"), instruction=args.get("instruction"), output=None)
+
+
 def isolate_voice(args: dict) -> str:
     return _run(cli.cmd_isolate, file=_required(args, "file_path"), output=args.get("output_folder"))
 
@@ -222,7 +242,7 @@ def manage_pronunciations(args: dict) -> str:
 
 
 HANDLERS = {
-    "list_voices": list_voices, "voice_collections": voice_collections, "speak": speak, "transcribe": transcribe, "isolate_voice": isolate_voice,
+    "list_voices": list_voices, "voice_collections": voice_collections, "speak": speak, "transcribe": transcribe, "edit_transcript": edit_transcript, "isolate_voice": isolate_voice,
     "clone_voice": clone_voice, "design_voice": design_voice, "convert_voice": convert_voice, "dub_video": dub_video,
     "apply_effects": apply_effects,
     "manage_pronunciations": manage_pronunciations,
