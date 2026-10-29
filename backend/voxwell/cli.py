@@ -288,6 +288,33 @@ def cmd_dub(client: Client, args) -> tuple[str, dict]:
     return f"Saved the dubbed video to {out}\nSaved the subtitles to {subtitles}", {"path": str(out), "subtitles": str(subtitles)}
 
 
+def cmd_pronounce(client: Client, args) -> tuple[str, dict]:
+    language = urllib.parse.quote(args.language)
+    entries = client.get_json(f"/api/pronunciation/entries?language={language}")
+    if args.action == "list":
+        if not entries:
+            return f"No pronunciations for '{args.language}' yet. Add one with `voxwell pronounce add WORD RESPELLING`.", {"entries": []}
+        return "\n".join(f"{e['word']} -> {e['respelling']}" for e in entries), {"entries": entries}
+    if not args.word:
+        raise CliError("Give the word.")
+    existing = next((e for e in entries if e["word"].lower() == args.word.strip().lower()), None)
+    if args.action == "remove":
+        if existing is None:
+            raise CliError(f"'{args.word}' has no pronunciation for '{args.language}'.")
+        client.request("DELETE", f"/api/pronunciation/entries/{existing['id']}?language={language}")
+        return f"Removed the pronunciation of '{existing['word']}'.", {"removed": existing}
+    if not args.respelling:
+        raise CliError("Give the respelling, e.g. `voxwell pronounce add Nguyen win`.")
+    body = {"language": args.language, "word": args.word, "respelling": args.respelling,
+            "case_sensitive": args.case_sensitive, "whole_word": not args.partial}
+    if existing is None:
+        entry = json.loads(client.post_json("/api/pronunciation/entries", body))
+    else:
+        entry = json.loads(client.request("PUT", f"/api/pronunciation/entries/{existing['id']}", json.dumps(body).encode(),
+                                          {"Content-Type": "application/json"}))
+    return f"'{entry['word']}' will be spoken as '{entry['respelling']}'.", entry
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="voxwell",
@@ -343,6 +370,15 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--sample", help="text the preview says")
     p.add_argument("--preview", metavar="FILE", help="also save the preview WAV here")
     p.set_defaults(run=cmd_design)
+
+    p = sub.add_parser("pronounce", parents=[common], help="list, add or remove how a word is pronounced")
+    p.add_argument("action", choices=["list", "add", "remove"], help="add also updates an existing word")
+    p.add_argument("word", nargs="?", help="the word as written")
+    p.add_argument("respelling", nargs="?", help="how to write it so it is spoken right, e.g. win for Nguyen")
+    p.add_argument("-l", "--language", default="en", help="ISO 639-1 code (default en)")
+    p.add_argument("--case-sensitive", action="store_true", help="match only this exact capitalization")
+    p.add_argument("--partial", action="store_true", help="also match inside longer words")
+    p.set_defaults(run=cmd_pronounce)
 
     p = sub.add_parser("convert", parents=[common], help="re-speak a recording in a saved voice")
     p.add_argument("file")
