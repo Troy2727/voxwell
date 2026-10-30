@@ -1,8 +1,9 @@
 import type { ComponentType } from 'react';
 import {
-  AudioLines, AudioWaveform, BookOpen, FileText, FolderOpen, Languages, Layers, LayoutGrid, Library,
+  AudioLines, AudioWaveform, BookOpen, Bot, FileText, FolderOpen, Languages, Layers, LayoutGrid, Library,
   type LucideIcon, MessagesSquare, Mic, Plug, Speech, SpellCheck, Volume2, Wand2, Wrench,
 } from 'lucide-react';
+import AgentsPage from './agents/Page';
 import AudioEffectsPage from './audio_effects/Page';
 import AudiobookPage from './audiobook/Page';
 import BatchPage from './batch/Page';
@@ -43,6 +44,7 @@ export const FEATURES: FeatureEntry[] = [
   { id: 'transcription', title: 'Transcribe', group: 'Dub & transcribe', icon: FileText, Page: TranscriptionPage },
   { id: 'translation', title: 'Live translation', group: 'Dub & transcribe', icon: Speech, Page: TranslationPage },
   { id: 'tools', title: 'Tools', group: 'More', icon: Wrench, Page: ToolsPage },
+  { id: 'agents', title: 'Voice agents', group: 'More', icon: Bot, Page: AgentsPage },
   { id: 'integrations', title: 'Integrations', group: 'More', icon: Plug, Page: IntegrationsPage },
   { id: 'audio_effects', title: 'Audio effects', group: 'Create', icon: AudioWaveform, Page: AudioEffectsPage },
   { id: 'pronunciation', title: 'Pronunciation', group: 'Voices', icon: SpellCheck, Page: PronunciationPage },

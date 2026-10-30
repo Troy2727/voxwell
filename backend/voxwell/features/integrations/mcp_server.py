@@ -167,6 +167,15 @@ TOOLS = [
         }, ["file_path", "target_language"]),
     },
     {
+        "name": "chat_with_agent",
+        "description": "Send a message to a voice agent saved in Voxwell (a local AI model with its own instructions and "
+        "tools) and return its text reply. One turn, no memory of earlier calls.",
+        "inputSchema": _schema({
+            "agent": {"type": "string", "description": "A saved agent's name or id."},
+            "message": {"type": "string", "description": "What to say to the agent."},
+        }, ["agent", "message"]),
+    },
+    {
         "name": "translate_speech",
         "description": "Translate text, or the speech in an audio or video file, into another language and speak it. "
         "Saves a WAV and returns the translation and the file path.",
@@ -322,9 +331,17 @@ def translate_speech(args: dict) -> str:
                 source=args.get("source_language"), voice=args.get("voice"), output=args.get("output_path") or _default_folder())
 
 
+def chat_with_agent(args: dict) -> str:
+    message = _required(args, "message")
+    if message == "-":  # the CLI reads "-" from stdin, which is this server's protocol stream
+        raise ToolError("message is required.")
+    return _run(cli.cmd_chat, agent=_required(args, "agent"), message=message)
+
+
 HANDLERS = {
     "list_voices": list_voices, "voice_collections": voice_collections, "speak": speak, "generate_sound": generate_sound, "transcribe": transcribe, "edit_transcript": edit_transcript, "align_script": align_script, "isolate_voice": isolate_voice,
     "clone_voice": clone_voice, "design_voice": design_voice, "convert_voice": convert_voice, "dub_video": dub_video,
+    "chat_with_agent": chat_with_agent,
     "translate_speech": translate_speech,
     "apply_effects": apply_effects,
     "manage_pronunciations": manage_pronunciations,

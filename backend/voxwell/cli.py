@@ -349,6 +349,20 @@ def cmd_dub(client: Client, args) -> tuple[str, dict]:
     return f"Saved the dubbed video to {out}\nSaved the subtitles to {subtitles}", {"path": str(out), "subtitles": str(subtitles)}
 
 
+def cmd_chat(client: Client, args) -> tuple[str, dict]:
+    message = sys.stdin.read() if args.message == "-" else args.message
+    if not message.strip():
+        raise CliError("Give the message (or - to read it from stdin).")
+    saved = client.get_json("/api/agents/agents")
+    agent = next((a for a in saved if args.agent in (a["id"], a["name"]) or args.agent.lower() == a["name"].lower()), None)
+    if agent is None:
+        names = ", ".join(a["name"] for a in saved) or "none yet (create one on the Voice agents page)"
+        raise CliError(f"Unknown agent '{args.agent}'. Saved agents: {names}.")
+    result = json.loads(client.post_json(f"/api/agents/agents/{agent['id']}/chat", {"message": message.strip(), "speak": False}))
+    lines = [f"[{c['tool'] or 'tool'}: {c.get('result', c.get('error'))}]" for c in result["tool_calls"]]
+    return "\n".join([*lines, result["reply"]]), {"agent": agent["name"], **result}
+
+
 def cmd_translate(client: Client, args) -> tuple[str, dict]:
     if args.file and args.text:
         raise CliError("Give the text or --file, not both.")
@@ -412,7 +426,7 @@ def cmd_pronounce(client: Client, args) -> tuple[str, dict]:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="voxwell",
-        description="Voxwell: local voice cloning, voice design, dubbing, translation, transcription and voice isolation. "
+        description="Voxwell: local voice cloning, voice design, dubbing, translation, transcription, voice isolation and voice agents. "
         "Commands other than `serve` need Voxwell running (the desktop app, or `voxwell serve`).",
         epilog="Add --json to any command for machine-readable output.",
     )
@@ -520,6 +534,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("-o", "--output", help="MP4 file or folder (default: <name>.<lang>.mp4 in the current folder)")
     _add_speaker_options(p, "keep each speaker's own voice (with the original voice) and label them in the subtitles")
     p.set_defaults(run=cmd_dub)
+
+    p = sub.add_parser("chat", parents=[common], help="send a message to a saved voice agent and print its reply")
+    p.add_argument("agent", help="saved agent name or id")
+    p.add_argument("message", help="what to say; - reads it from stdin")
+    p.set_defaults(run=cmd_chat)
 
     p = sub.add_parser("translate", parents=[common], help="translate text or a recording and speak it in another language (WAV)")
     p.add_argument("text", nargs="?", help="what to translate; - reads it from stdin (or use --file)")
