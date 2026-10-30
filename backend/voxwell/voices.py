@@ -6,6 +6,7 @@ import uuid
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from voxwell import voice_collections
 from voxwell.paths import data_dir
 
 _ID = re.compile(r"^[0-9a-f]{12}$")
@@ -58,3 +59,4 @@ def delete_voice(voice_id: str) -> None:
     audio = voice_audio_path(voice_id)
     audio.with_suffix(".json").unlink(missing_ok=True)
     audio.unlink()
+    voice_collections.remove_voice_everywhere(voice_id)

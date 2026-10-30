@@ -132,6 +132,24 @@ def test_align_writes_subtitles(capsys, monkeypatch, audio, tmp_path):
     assert run(capsys, "align", str(audio), str(script), "--max-chars", "1")[0] == 1
 
 
+def test_edit_prints_or_saves(capsys, monkeypatch, tmp_path):
+    from voxwell.features.tools import direction
+
+    monkeypatch.setattr(direction, "complete", lambda system, user, max_new_tokens=80: "Edited.")
+    source = tmp_path / "talk.txt"
+    source.write_text("Um, hello.", encoding="utf-8")
+    code, out, _ = run(capsys, "edit", str(source), "-p", "filler")
+    assert code == 0 and out.strip() == "Edited."
+    code, out, _ = run(capsys, "edit", str(source), "-i", "make it formal", "-o", str(tmp_path / "out"), "--json")
+    result = json.loads(out)
+    assert code == 0 and Path(result["path"]).read_text(encoding="utf-8") == "Edited.\n" and Path(result["path"]).name == "out.txt"
+    monkeypatch.setattr("sys.stdin", io.StringIO("From a pipe"))
+    assert run(capsys, "edit", "-", "-p", "filler")[1].strip() == "Edited."
+    code, _, err = run(capsys, "edit", str(source))
+    assert code == 1 and "--preset or --instruction" in err
+    assert run(capsys, "edit", str(source), "-p", "nope")[0] == 1
+
+
 def test_isolate_writes_two_tracks(capsys, monkeypatch, audio, tmp_path):
     def fake_isolate(source, voice_out, background_out):
         voice_out.write_bytes(wav_bytes())
@@ -152,6 +170,23 @@ def test_clone_then_convert_by_name(capsys, monkeypatch, audio, tmp_path):
     monkeypatch.setattr(tools_engine, "convert", lambda source, target: targets.append(target.stem) or wav_bytes())
     code, out, _ = run(capsys, "convert", str(audio), "-v", "my voice", "-o", str(tmp_path / "out.wav"))
     assert code == 0 and targets == [voices.list_voices()[0].id] and (tmp_path / "out.wav").exists()
+
+
+def test_collections_organize_voices(capsys):
+    voice = voices.save_voice("Narrator", wav_bytes(), "upload")
+    assert "No collections yet" in run(capsys, "collection", "list")[1]
+    assert run(capsys, "collection", "create", "Leads")[0] == 0
+    assert run(capsys, "collection", "create", "leads")[0] == 1  # names are unique, any case
+    assert run(capsys, "collection", "add", "leads", "narrator")[0] == 0
+    code, out, _ = run(capsys, "collection", "show", "Leads", "--json")
+    assert code == 0 and [v["id"] for v in json.loads(out)["voices"]] == [voice.id]
+    assert run(capsys, "collection", "rename", "Leads", "Cast", "Members")[0] == 0
+    code, out, _ = run(capsys, "collection", "list", "--json")
+    assert [(c["name"], c["voice_ids"]) for c in json.loads(out)["collections"]] == [("Cast Members", [voice.id])]
+    assert run(capsys, "collection", "remove", "Cast Members", "Narrator")[0] == 0
+    assert run(capsys, "collection", "delete", "Cast Members")[0] == 0
+    assert run(capsys, "collection", "show", "Cast Members")[0] == 1
+    assert len(voices.list_voices()) == 1
 
 
 def test_design_saves_the_voice_and_preview(capsys, monkeypatch, tmp_path):
