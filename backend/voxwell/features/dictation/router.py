@@ -1,11 +1,13 @@
 import importlib.util
 import os
+import re
 import tempfile
 from dataclasses import asdict
 from pathlib import Path
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile, WebSocket
 
+from voxwell import live_audio
 from voxwell.features.dictation import engine
 from voxwell.paths import data_dir
 
@@ -41,3 +43,26 @@ async def transcribe(file: UploadFile = File(...), language: str | None = Form(N
         }
     finally:
         path.unlink(missing_ok=True)
+
+
+@router.websocket("/live")
+async def live(ws: WebSocket):
+    """Live dictation: each turn (speech up to a pause) is transcribed as it ends. See voxwell.live_audio."""
+
+    def open_session(config: dict):
+        language = config.get("language") or None
+        if language is not None and not (isinstance(language, str) and re.fullmatch(r"[a-z]{2,3}", language)):
+            raise ValueError("language must be an ISO 639-1 code such as en.")
+
+        def process(pcm: bytes, index: int) -> dict:
+            try:
+                result = live_audio.transcribe_turn(pcm, language)
+            except engine.AudioError:
+                raise  # its message is already for the user
+            except Exception as exc:
+                raise RuntimeError(f"Transcription failed: {exc}") from exc
+            return {"text": result.text, "language": result.language}
+
+        return process
+
+    await live_audio.run_session(ws, open_session)
