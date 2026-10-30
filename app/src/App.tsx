@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
-import { LogOut, Moon, PlugZap, Sun } from 'lucide-react';
+import { House, LogOut, Moon, PlugZap, Sun } from 'lucide-react';
 import { api } from './api';
 import { AuthPage } from './auth/AuthPage';
 import { FEATURES } from './features';
+import { HomePage } from './home/Page';
 import { LogoMark } from '@/components/logo';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -30,6 +31,7 @@ import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 
 const GROUPS = [...new Set(FEATURES.map((f) => f.group))];
+const HOME = 'home';
 
 function ThemeToggle() {
   const { theme, setTheme } = useTheme();
@@ -79,7 +81,28 @@ function BackendOffline() {
 function FeatureMenu({ active, onSelect }: { active: string; onSelect: (id: string) => void }) {
   // On phones the sidebar is a slide-over panel; picking a page must also close it.
   const { setOpenMobile } = useSidebar();
-  return GROUPS.map((group) => (
+  const home = (
+    <SidebarGroup key="home">
+      <SidebarGroupContent>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              isActive={active === HOME}
+              tooltip="Home"
+              onClick={() => {
+                onSelect(HOME);
+                setOpenMobile(false);
+              }}
+            >
+              <House />
+              <span>Home</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarGroupContent>
+    </SidebarGroup>
+  );
+  return [home, ...GROUPS.map((group) => (
     <SidebarGroup key={group}>
       <SidebarGroupLabel>{group}</SidebarGroupLabel>
       <SidebarGroupContent>
@@ -102,11 +125,11 @@ function FeatureMenu({ active, onSelect }: { active: string; onSelect: (id: stri
         </SidebarMenu>
       </SidebarGroupContent>
     </SidebarGroup>
-  ));
+  ))];
 }
 
 function Shell({ user }: { user?: User }) {
-  const [active, setActive] = useState(FEATURES[0].id);
+  const [active, setActive] = useState(HOME);
   const [online, setOnline] = useState<boolean | null>(null);
   // Bumped when the backend comes back, so the open page reloads its data.
   const [connection, setConnection] = useState(0);
@@ -126,7 +149,7 @@ function Shell({ user }: { user?: User }) {
     return () => window.clearInterval(timer);
   }, [online]);
 
-  const feature = FEATURES.find((f) => f.id === active)!;
+  const feature = FEATURES.find((f) => f.id === active);
 
   return (
     <SidebarProvider>
@@ -158,13 +181,23 @@ function Shell({ user }: { user?: User }) {
       <SidebarInset className="min-w-0">
         <header className="bg-background/80 sticky top-0 z-10 flex h-12 items-center gap-2 border-b px-4 backdrop-blur">
           <SidebarTrigger className="-ml-1 size-9 md:size-7" />
-          <span className="text-muted-foreground text-sm">{feature.group}</span>
-          <span className="text-muted-foreground text-sm">/</span>
-          <span className="text-sm font-medium">{feature.title}</span>
+          {feature ? (
+            <>
+              <span className="text-muted-foreground text-sm">{feature.group}</span>
+              <span className="text-muted-foreground text-sm">/</span>
+              <span className="text-sm font-medium">{feature.title}</span>
+            </>
+          ) : (
+            <span className="text-sm font-medium">Home</span>
+          )}
         </header>
         <main className="flex-1 p-4 sm:p-6 md:p-8">
           {online === false && <BackendOffline />}
-          <feature.Page key={`${feature.id}-${connection}`} />
+          {feature ? (
+            <feature.Page key={`${feature.id}-${connection}`} />
+          ) : (
+            <HomePage key={connection} name={user?.user_metadata.full_name || user?.email} online={online} onOpen={setActive} />
+          )}
         </main>
       </SidebarInset>
     </SidebarProvider>
