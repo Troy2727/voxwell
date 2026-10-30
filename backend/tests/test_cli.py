@@ -212,6 +212,23 @@ def test_jobs_are_titled_after_the_file(capsys, monkeypatch, audio, tmp_path, na
     assert title in [item["title"] for item in items if item["kind"] == "transcript"]
 
 
+def test_translate_text_or_file(capsys, monkeypatch, audio, tmp_path):
+    calls = []
+    monkeypatch.setattr(translator, "translate", lambda texts, s, t: calls.append((s, t)) or [f"[{t}] {x}" for x in texts])
+    monkeypatch.setattr(cloning_engine, "synthesize", lambda *a, **k: wav_bytes())
+    monkeypatch.setattr(dictation_engine, "transcribe", lambda p, language=None: Transcript("hola", "es", []))
+    code, out, _ = run(capsys, "translate", "Hello there.", "--to", "fr", "-o", str(tmp_path / "fr"), "--json")
+    result = json.loads(out)
+    assert code == 0 and result["translation"] == "[fr] Hello there." and Path(result["path"]) == tmp_path / "fr.wav"
+    code, out, _ = run(capsys, "translate", "--file", str(audio), "--to", "en", "-o", str(tmp_path / "en.wav"))
+    assert code == 0 and out.startswith("[en] hola") and (tmp_path / "en.wav").exists()
+    assert calls == [("en", "fr"), ("es", "en")]
+    code, _, err = run(capsys, "translate", "Hi", "--to", "xx")
+    assert code == 1 and "Unsupported target language 'xx'" in err
+    code, _, err = run(capsys, "translate", "--to", "es")
+    assert code == 1 and "Give the text" in err
+
+
 def test_dub_downloads_video_and_subtitles(capsys, monkeypatch, tmp_path):
     def fake_ffmpeg(args):
         out = Path(args[-1])

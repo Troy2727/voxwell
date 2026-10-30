@@ -1,7 +1,7 @@
 import type { ComponentType } from 'react';
 import {
   AudioLines, AudioWaveform, BookOpen, FileText, FolderOpen, Languages, Layers, LayoutGrid, Library,
-  type LucideIcon, MessagesSquare, Mic, Plug, SpellCheck, Volume2, Wand2, Wrench,
+  type LucideIcon, MessagesSquare, Mic, Plug, Speech, SpellCheck, Volume2, Wand2, Wrench,
 } from 'lucide-react';
 import AudioEffectsPage from './audio_effects/Page';
 import AudiobookPage from './audiobook/Page';
@@ -16,6 +16,7 @@ import PronunciationPage from './pronunciation/Page';
 import StoriesPage from './stories/Page';
 import ToolsPage from './tools/Page';
 import TranscriptionPage from './transcription/Page';
+import TranslationPage from './translation/Page';
 import VoiceCloningPage from './voice_cloning/Page';
 import VoiceDesignPage from './voice_design/Page';
 import VoicesPage from './voices/Page';
@@ -40,6 +41,7 @@ export const FEATURES: FeatureEntry[] = [
   { id: 'batch', title: 'Batch dub', group: 'Dub & transcribe', icon: Layers, Page: BatchPage },
   { id: 'dictation', title: 'Dictation', group: 'Dub & transcribe', icon: Mic, Page: DictationPage },
   { id: 'transcription', title: 'Transcribe', group: 'Dub & transcribe', icon: FileText, Page: TranscriptionPage },
+  { id: 'translation', title: 'Live translation', group: 'Dub & transcribe', icon: Speech, Page: TranslationPage },
   { id: 'tools', title: 'Tools', group: 'More', icon: Wrench, Page: ToolsPage },
   { id: 'integrations', title: 'Integrations', group: 'More', icon: Plug, Page: IntegrationsPage },
   { id: 'audio_effects', title: 'Audio effects', group: 'Create', icon: AudioWaveform, Page: AudioEffectsPage },

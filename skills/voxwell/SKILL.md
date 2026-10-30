@@ -1,6 +1,6 @@
 ---
 name: voxwell
-description: Voice work on this computer with the local Voxwell app, through its `voxwell` CLI. Use for text-to-speech (speak, narrate, voiceover, read aloud), transcribing audio or video (subtitles, SRT), isolating a voice from music or noise (remove vocals, karaoke, clean up a recording), cloning or designing a voice, converting a recording to another voice, or dubbing a video into another language.
+description: Voice work on this computer with the local Voxwell app, through its `voxwell` CLI. Use for text-to-speech (speak, narrate, voiceover, read aloud), transcribing audio or video (subtitles, SRT), isolating a voice from music or noise (remove vocals, karaoke, clean up a recording), cloning or designing a voice, converting a recording to another voice, dubbing a video into another language, or translating text or speech into another language and speaking it.
 ---
 
 # Voxwell
@@ -18,6 +18,7 @@ Voxwell runs every model locally; the `voxwell` CLI drives the running Voxwell s
 - `sound` makes sound effects from a text description (1 to 30 seconds; reuse the printed `seed` to repeat a result). It needs a free Hugging Face token with the Stable Audio Open terms accepted, set on the Voxwell Sound page or as `HF_TOKEN`; if the command says the model is gated, tell the user to do that rather than retrying. Expect minutes per clip on CPU.
 - Collections are folders of saved voices (`voxwell collection list|show|create|rename|delete|add|remove`); they only organize voices, so deleting a collection never deletes a voice. Collection names are unique in any case.
 - Languages are ISO 639-1 codes. Speech, cloning and dubbing cover about 20 common languages (Japanese is not one of them) and reject others with an error. Transcription detects the language when `--language` is left out.
+- `translate` speaks the translation of text (`--from`, default en) or of the speech in `--file` (its language is detected). Its target languages are the speech languages above. Live translation, speaking and hearing turn by turn, is only in the app.
 - Commands take local file paths and write next to the input (`isolate`) or into the current folder, unless `-o` says otherwise.
 - `effects` post-processes an existing recording (`--reverb`, `--distance`, `--noise`, `--pan`, each a number; 0 leaves it off). A non-zero `--pan` makes the WAV stereo and reverb adds a tail, so the file gets slightly longer. The same settings are available as optional `effects` on the app's voice cloning and Stories requests.
 - `pronounce add WORD RESPELLING` teaches every voice a word (`Nguyen` -> `win`); matches are whole-word and case-insensitive unless `--case-sensitive` or `--partial` says otherwise, and it applies to all speech, per `--language`. Write the respelling as plain text the model reads aloud; check it with `speak`.

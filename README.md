@@ -11,11 +11,12 @@
 - **Video**: dub videos into another language, one at a time, in a batch, or by watching a folder; optionally keep each speaker's own voice.
 - **Sound effects**: describe a sound and generate it (Stable Audio Open; needs a free Hugging Face token and accepting the model's terms).
 - **Text**: dictation (record and transcribe, or live: each turn is transcribed when you pause) and Transcribe (TXT, SRT or VTT, optionally with speaker labels such as "Speaker 1"), with AI clean-up of a transcript (remove filler words, fix punctuation, make it formal), plus subtitles from a script you already have: paste it, add the recording, and every word is timed against the audio.
+- **Live translation**: speak in one language and hear the translation in another, turn by turn, in a saved voice or the default one.
 - **Tools**: convert a recording to another voice, isolate a voice from music and noise, AI direction (describe how a line should sound; a local AI model sets the delivery), compare voices, fit audio to a length, inspect media files.
 - **Effects**: add reverb, distance, background noise or stereo pan to speech (also optional when generating in Voice cloning and Stories) or to any recording, from the Effects page or `voxwell effects`.
 - **Pronunciation**: teach every voice how to say names, brands and jargon; the per-language list applies to all speech, and `voxwell pronounce` manages it.
 - **Projects**: everything you make, in one list.
-- **Integrations**: a `voxwell` command line (speak, transcribe, edit, align, isolate, clone, design, convert, dub; `--json` for scripts) with a skill that teaches Claude Code and Codex to use it, an OpenAI-compatible API at `http://127.0.0.1:8765/v1`, an MCP server for AI assistants, and optional phone calls (Twilio callers hear a greeting in your voice; off by default, and only a small separate server is ever exposed). The Integrations page shows how to connect them.
+- **Integrations**: a `voxwell` command line (speak, transcribe, edit, align, isolate, clone, design, convert, dub, translate; `--json` for scripts) with a skill that teaches Claude Code and Codex to use it, an OpenAI-compatible API at `http://127.0.0.1:8765/v1`, an MCP server for AI assistants, and optional phone calls (Twilio callers hear a greeting in your voice; off by default, and only a small separate server is ever exposed). The Integrations page shows how to connect them.
 
 ## Develop
 

@@ -349,6 +349,25 @@ def cmd_dub(client: Client, args) -> tuple[str, dict]:
     return f"Saved the dubbed video to {out}\nSaved the subtitles to {subtitles}", {"path": str(out), "subtitles": str(subtitles)}
 
 
+def cmd_translate(client: Client, args) -> tuple[str, dict]:
+    if args.file and args.text:
+        raise CliError("Give the text or --file, not both.")
+    voice = _voice_id(client, args.voice) if args.voice else ""
+    if args.file:
+        fields = {"target": args.to, "source": args.source or "", "voice": voice}
+        result = client.post_form("/api/translation/file", fields, _existing_file(args.file))
+    else:
+        text = sys.stdin.read() if args.text == "-" else (args.text or "")
+        if not text.strip():
+            raise CliError("Give the text to translate (or - to read it from stdin), or --file with a recording.")
+        body = {"text": text.strip(), "source": args.source or "en", "target": args.to, "voice": voice or None}
+        result = json.loads(client.post_json("/api/translation/speak", body))
+    out = _output_path(args.output, f"translation-{_stamp()}.{args.to}.wav", ".wav")
+    out.write_bytes(client.request("GET", result["url"]))
+    data = {"transcript": result["transcript"], "source": result["source"], "translation": result["translation"], "path": str(out)}
+    return f"{result['translation']}\nSaved the speech to {out}", data
+
+
 def _add_speaker_options(p: argparse.ArgumentParser, speakers_help: str) -> None:
     p.add_argument("--speakers", action="store_true", help=speakers_help)
     p.add_argument("--num-speakers", type=int, default=0, metavar="N", help="with --speakers: how many people speak, 1 to 20 (default: find out)")
@@ -393,7 +412,7 @@ def cmd_pronounce(client: Client, args) -> tuple[str, dict]:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="voxwell",
-        description="Voxwell: local voice cloning, voice design, dubbing, transcription and voice isolation. "
+        description="Voxwell: local voice cloning, voice design, dubbing, translation, transcription and voice isolation. "
         "Commands other than `serve` need Voxwell running (the desktop app, or `voxwell serve`).",
         epilog="Add --json to any command for machine-readable output.",
     )
@@ -501,6 +520,15 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("-o", "--output", help="MP4 file or folder (default: <name>.<lang>.mp4 in the current folder)")
     _add_speaker_options(p, "keep each speaker's own voice (with the original voice) and label them in the subtitles")
     p.set_defaults(run=cmd_dub)
+
+    p = sub.add_parser("translate", parents=[common], help="translate text or a recording and speak it in another language (WAV)")
+    p.add_argument("text", nargs="?", help="what to translate; - reads it from stdin (or use --file)")
+    p.add_argument("--file", help="translate the speech in this audio or video file instead")
+    p.add_argument("-t", "--to", required=True, help="target language, ISO 639-1 code")
+    p.add_argument("--from", dest="source", help="source language (default: en for text, detected for --file)")
+    p.add_argument("-v", "--voice", help="saved voice name or id (default: the built-in voice)")
+    p.add_argument("-o", "--output", help="WAV file or folder (default: ./translation-<time>.<lang>.wav)")
+    p.set_defaults(run=cmd_translate)
     return parser
 
 

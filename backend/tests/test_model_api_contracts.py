@@ -111,6 +111,13 @@ def test_faster_whisper_calls_match_installed_api(monkeypatch, tmp_path):
     assert [(w.start, w.end, w.text) for w in timings.words] == [(0.0, 0.5, "hello")]
 
 
+def test_translation_source_languages_match_installed_whisper():
+    tokenizer = pytest.importorskip("faster_whisper.tokenizer")
+    from voxwell.features.translation import pipeline
+
+    assert pipeline.WHISPER_LANGUAGES == set(tokenizer._LANGUAGE_CODES)
+
+
 def test_m2m100_calls_match_installed_api(monkeypatch):
     transformers = pytest.importorskip("transformers")
     from voxwell.features.dubbing import translate
