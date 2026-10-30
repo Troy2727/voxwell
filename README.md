@@ -14,13 +14,24 @@
 </p>
 
 <p>
+  <a href="https://voxwell.vercel.app"><img alt="Web UI: voxwell.vercel.app" src="https://img.shields.io/badge/web%20UI-voxwell.vercel.app-FFA800?style=flat-square&logo=vercel&logoColor=white&labelColor=0F141C" /></a>
   <a href="https://github.com/Troy2727/voxwell/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Troy2727/voxwell/actions/workflows/ci.yml/badge.svg" /></a>
-  <a href="https://voxwell.vercel.app"><img alt="Web UI: voxwell.vercel.app" src="https://img.shields.io/badge/web%20UI-voxwell.vercel.app-FFA800?style=flat-square&labelColor=0F141C" /></a>
-  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-FFA800?style=flat-square&labelColor=0F141C" /></a>
-  <img alt="Runs locally" src="https://img.shields.io/badge/runs-100%25%20local-FFA800?style=flat-square&labelColor=0F141C" />
-  <img alt="Windows, macOS, Linux" src="https://img.shields.io/badge/Windows%20%C2%B7%20macOS%20%C2%B7%20Linux-182433?style=flat-square" />
   <a href="https://www.python.org"><img alt="Python 3.11" src="https://img.shields.io/badge/Python%203.11-3776AB?style=flat-square&logo=python&logoColor=white" /></a>
+  <a href="https://fastapi.tiangolo.com"><img alt="FastAPI" src="https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white" /></a>
+  <a href="https://pytorch.org"><img alt="PyTorch" src="https://img.shields.io/badge/PyTorch-EE4C2C?style=flat-square&logo=pytorch&logoColor=white" /></a>
+  <a href="https://huggingface.co"><img alt="Hugging Face" src="https://img.shields.io/badge/Hugging%20Face-FFD21E?style=flat-square&logo=huggingface&logoColor=black" /></a>
+  <a href="https://docs.astral.sh/uv/"><img alt="uv" src="https://img.shields.io/badge/uv-DE5FE9?style=flat-square&logo=uv&logoColor=white" /></a>
+  <a href="https://ffmpeg.org"><img alt="FFmpeg" src="https://img.shields.io/badge/FFmpeg-007808?style=flat-square&logo=ffmpeg&logoColor=white" /></a>
   <a href="https://react.dev"><img alt="React 19" src="https://img.shields.io/badge/React%2019-61DAFB?style=flat-square&logo=react&logoColor=black" /></a>
+  <a href="https://www.typescriptlang.org"><img alt="TypeScript 5" src="https://img.shields.io/badge/TypeScript%205-3178C6?style=flat-square&logo=typescript&logoColor=white" /></a>
+  <a href="https://vite.dev"><img alt="Vite 6" src="https://img.shields.io/badge/Vite%206-646CFF?style=flat-square&logo=vite&logoColor=white" /></a>
+  <a href="https://tailwindcss.com"><img alt="Tailwind CSS 4" src="https://img.shields.io/badge/Tailwind%20CSS%204-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white" /></a>
+  <a href="https://ui.shadcn.com"><img alt="shadcn/ui" src="https://img.shields.io/badge/shadcn%2Fui-000000?style=flat-square&logo=shadcnui&logoColor=white" /></a>
+  <a href="https://www.electronjs.org"><img alt="Electron 33" src="https://img.shields.io/badge/Electron%2033-47848F?style=flat-square&logo=electron&logoColor=white" /></a>
+  <a href="https://supabase.com"><img alt="Supabase (optional)" src="https://img.shields.io/badge/Supabase%20(optional)-3FCF8E?style=flat-square&logo=supabase&logoColor=white" /></a>
+  <a href="https://vercel.com"><img alt="Vercel" src="https://img.shields.io/badge/Vercel-000000?style=flat-square&logo=vercel&logoColor=white" /></a>
+  <a href="https://github.com/features/actions"><img alt="GitHub Actions" src="https://img.shields.io/badge/GitHub%20Actions-2088FF?style=flat-square&logo=githubactions&logoColor=white" /></a>
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-FFA800?style=flat-square&labelColor=0F141C" /></a>
 </p>
 
 <p>
@@ -34,11 +45,11 @@
 
 <br/>
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/readme/screenshots/gallery-dark.png" />
-  <source media="(prefers-color-scheme: light)" srcset="docs/readme/screenshots/gallery-light.png" />
-  <img src="docs/readme/screenshots/gallery-light.png" alt="The Voxwell dashboard on the Gallery page: a sidebar of features grouped into Create, Voices, Dub and transcribe, and More, next to cards of ready-made voices such as Calm Narrator and Bright Storyteller, each with a Listen button." width="100%" />
-</picture>
+<a href="https://github.com/Troy2727/voxwell/blob/main/docs/readme/screenshots/animated/tour.gif" title="Open this screenshot full size">
+  <img src="docs/readme/screenshots/animated/tour.gif" alt="A tour of the Voxwell dashboard: the Gallery of ready-made voices, then the Voice cloning, Dubbing, Voice agents, Live translation, Transcribe and Integrations pages." width="100%" />
+</a>
+<br />
+<sub>Click the screenshot to see it full size.</sub>
 
 </div>
 
@@ -59,59 +70,49 @@ Voxwell is **MIT licensed**, and every model it runs allows commercial use ([one
 <table>
   <tr>
     <td width="50%" valign="top">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="docs/readme/screenshots/voice-cloning-dark.png" />
-        <source media="(prefers-color-scheme: light)" srcset="docs/readme/screenshots/voice-cloning-light.png" />
-        <img src="docs/readme/screenshots/voice-cloning-light.png" alt="Voice cloning page: add a voice from a reference clip, then generate speech with it." width="100%" />
-      </picture>
+      <a href="https://github.com/Troy2727/voxwell/blob/main/docs/readme/screenshots/animated/voice-cloning.gif" title="Open this screenshot full size">
+        <img src="docs/readme/screenshots/animated/voice-cloning.gif" alt="Voice cloning page, with the reference clip drop zone highlighted." width="100%" />
+      </a>
       <p><b>Voice cloning</b><br/><sub>Upload a few seconds of speech, then make it say anything.</sub></p>
     </td>
     <td width="50%" valign="top">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="docs/readme/screenshots/dubbing-dark.png" />
-        <source media="(prefers-color-scheme: light)" srcset="docs/readme/screenshots/dubbing-light.png" />
-        <img src="docs/readme/screenshots/dubbing-light.png" alt="Dubbing page: drop a video, pick a target language and a voice, optionally label speakers." width="100%" />
-      </picture>
+      <a href="https://github.com/Troy2727/voxwell/blob/main/docs/readme/screenshots/animated/dubbing.gif" title="Open this screenshot full size">
+        <img src="docs/readme/screenshots/animated/dubbing.gif" alt="Dubbing page, with the target language and voice pickers highlighted." width="100%" />
+      </a>
       <p><b>Dubbing</b><br/><sub>Pick a language; keep the original voice or use one of yours.</sub></p>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="docs/readme/screenshots/voice-agents-dark.png" />
-        <source media="(prefers-color-scheme: light)" srcset="docs/readme/screenshots/voice-agents-light.png" />
-        <img src="docs/readme/screenshots/voice-agents-light.png" alt="Voice agents page: a saved agent with a message box, a hold-to-talk button and a live conversation button." width="100%" />
-      </picture>
+      <a href="https://github.com/Troy2727/voxwell/blob/main/docs/readme/screenshots/animated/voice-agents.gif" title="Open this screenshot full size">
+        <img src="docs/readme/screenshots/animated/voice-agents.gif" alt="Voice agents page, with the Hold to talk and Live conversation buttons highlighted." width="100%" />
+      </a>
       <p><b>Voice agents</b><br/><sub>Type, hold to talk, or have a live conversation.</sub></p>
     </td>
     <td width="50%" valign="top">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="docs/readme/screenshots/live-translation-dark.png" />
-        <source media="(prefers-color-scheme: light)" srcset="docs/readme/screenshots/live-translation-light.png" />
-        <img src="docs/readme/screenshots/live-translation-light.png" alt="Live translation page: a Start button, microphone and voice pickers, and the source and target languages." width="100%" />
-      </picture>
+      <a href="https://github.com/Troy2727/voxwell/blob/main/docs/readme/screenshots/animated/live-translation.gif" title="Open this screenshot full size">
+        <img src="docs/readme/screenshots/animated/live-translation.gif" alt="Live translation page, with the Start button highlighted." width="100%" />
+      </a>
       <p><b>Live translation</b><br/><sub>Speak one language, hear another, turn by turn.</sub></p>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="docs/readme/screenshots/transcribe-dark.png" />
-        <source media="(prefers-color-scheme: light)" srcset="docs/readme/screenshots/transcribe-light.png" />
-        <img src="docs/readme/screenshots/transcribe-light.png" alt="Transcribe page: drop an audio or video file, optionally label speakers, or time an existing script against a recording." width="100%" />
-      </picture>
+      <a href="https://github.com/Troy2727/voxwell/blob/main/docs/readme/screenshots/animated/transcribe.gif" title="Open this screenshot full size">
+        <img src="docs/readme/screenshots/animated/transcribe.gif" alt="Transcribe page, with the file drop zone and the speaker labels option highlighted." width="100%" />
+      </a>
       <p><b>Transcribe</b><br/><sub>TXT, SRT or VTT, with speaker labels or your own script.</sub></p>
     </td>
     <td width="50%" valign="top">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="docs/readme/screenshots/integrations-dark.png" />
-        <source media="(prefers-color-scheme: light)" srcset="docs/readme/screenshots/integrations-light.png" />
-        <img src="docs/readme/screenshots/integrations-light.png" alt="Integrations page: a table of the command line commands and matching MCP tools." width="100%" />
-      </picture>
+      <a href="https://github.com/Troy2727/voxwell/blob/main/docs/readme/screenshots/animated/integrations.gif" title="Open this screenshot full size">
+        <img src="docs/readme/screenshots/animated/integrations.gif" alt="Integrations page, with the table of CLI commands and matching MCP tools highlighted." width="100%" />
+      </a>
       <p><b>Integrations</b><br/><sub>Every CLI command, with its matching MCP tool.</sub></p>
     </td>
   </tr>
 </table>
+
+<p align="center"><sub>Click any screenshot to see it full size.</sub></p>
 
 <br/>
 
@@ -166,11 +167,11 @@ Voxwell is **MIT licensed**, and every model it runs allows commercial use ([one
 ## <img src="docs/readme/icons/network.svg" width="24" height="24" alt="" /> How it fits together
 
 <p align="center">
-  <a href="docs/readme/diagrams/architecture-dark.svg" title="Open this diagram full size">
+  <a href="https://github.com/Troy2727/voxwell/blob/main/docs/readme/diagrams/animated/architecture-dark.gif" title="Open this diagram full size">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="docs/readme/diagrams/animated/architecture-dark.gif" />
-      <source media="(prefers-color-scheme: light)" srcset="docs/readme/diagrams/animated/architecture-light.gif" />
-      <img src="docs/readme/diagrams/animated/architecture-light.gif" alt="Voxwell architecture: the desktop and web app, the voxwell command line with its MCP server and agent skill, and any OpenAI SDK all call one local Voxwell server on 127.0.0.1:8765. The server runs local speech, listening and language models and keeps voices and projects in a local data folder. Only model weights come from Hugging Face, once, on first use." width="100%" />
+      <source media="(prefers-color-scheme: light)" srcset="docs/readme/diagrams/animated/architecture-dark.gif" />
+      <img src="docs/readme/diagrams/animated/architecture-dark.gif" alt="Voxwell architecture: the desktop and web app, the voxwell command line with its MCP server and agent skill, and any OpenAI SDK all call one local Voxwell server on 127.0.0.1:8765. The server runs local speech, listening and language models and keeps voices and projects in a local data folder. Only model weights come from Hugging Face, once, on first use." width="100%" />
     </picture>
   </a>
   <br />
@@ -186,11 +187,11 @@ Models load **lazily**, on the first request that needs them, and use CUDA, then
 ## <img src="docs/readme/icons/languages.svg" width="24" height="24" alt="" /> How dubbing works
 
 <p align="center">
-  <a href="docs/readme/diagrams/dubbing-dark.svg" title="Open this diagram full size">
+  <a href="https://github.com/Troy2727/voxwell/blob/main/docs/readme/diagrams/animated/dubbing-dark.gif" title="Open this diagram full size">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="docs/readme/diagrams/animated/dubbing-dark.gif" />
-      <source media="(prefers-color-scheme: light)" srcset="docs/readme/diagrams/animated/dubbing-light.gif" />
-      <img src="docs/readme/diagrams/animated/dubbing-light.gif" alt="The dubbing pipeline: ffmpeg extracts the audio, faster-whisper transcribes it, sherpa-onnx optionally labels the speakers, M2M100 translates each line, Chatterbox speaks every line in the cloned original voice or a saved one, each clip is fitted to its original timing, and ffmpeg puts the new track back on the video with matching subtitles." width="100%" />
+      <source media="(prefers-color-scheme: light)" srcset="docs/readme/diagrams/animated/dubbing-dark.gif" />
+      <img src="docs/readme/diagrams/animated/dubbing-dark.gif" alt="The dubbing pipeline: ffmpeg extracts the audio, faster-whisper transcribes it, sherpa-onnx optionally labels the speakers, M2M100 translates each line, Chatterbox speaks every line in the cloned original voice or a saved one, each clip is fitted to its original timing, and ffmpeg puts the new track back on the video with matching subtitles." width="100%" />
     </picture>
   </a>
   <br />
@@ -319,28 +320,19 @@ Accounts only control who can open the app. Voices, audio and models stay on you
 
 <br/>
 
-## <img src="docs/readme/icons/layers.svg" width="24" height="24" alt="" /> Tech stack
+## <img src="docs/readme/icons/user.svg" width="24" height="24" alt="" /> Author
 
-**Backend**<br/>
-<a href="https://www.python.org"><img alt="Python 3.11" src="https://img.shields.io/badge/Python%203.11-3776AB?style=flat-square&logo=python&logoColor=white" /></a>
-<a href="https://fastapi.tiangolo.com"><img alt="FastAPI" src="https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white" /></a>
-<a href="https://pytorch.org"><img alt="PyTorch" src="https://img.shields.io/badge/PyTorch-EE4C2C?style=flat-square&logo=pytorch&logoColor=white" /></a>
-<a href="https://huggingface.co"><img alt="Hugging Face" src="https://img.shields.io/badge/Hugging%20Face-FFD21E?style=flat-square&logo=huggingface&logoColor=black" /></a>
-<a href="https://docs.astral.sh/uv/"><img alt="uv" src="https://img.shields.io/badge/uv-DE5FE9?style=flat-square&logo=uv&logoColor=white" /></a>
-<a href="https://ffmpeg.org"><img alt="FFmpeg" src="https://img.shields.io/badge/FFmpeg-007808?style=flat-square&logo=ffmpeg&logoColor=white" /></a>
+**Alex Mieses** · [GitHub](https://github.com/Troy2727)
 
-**App**<br/>
-<a href="https://react.dev"><img alt="React 19" src="https://img.shields.io/badge/React%2019-61DAFB?style=flat-square&logo=react&logoColor=black" /></a>
-<a href="https://www.typescriptlang.org"><img alt="TypeScript 5" src="https://img.shields.io/badge/TypeScript%205-3178C6?style=flat-square&logo=typescript&logoColor=white" /></a>
-<a href="https://vite.dev"><img alt="Vite 6" src="https://img.shields.io/badge/Vite%206-646CFF?style=flat-square&logo=vite&logoColor=white" /></a>
-<a href="https://tailwindcss.com"><img alt="Tailwind CSS 4" src="https://img.shields.io/badge/Tailwind%20CSS%204-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white" /></a>
-<a href="https://ui.shadcn.com"><img alt="shadcn/ui" src="https://img.shields.io/badge/shadcn%2Fui-000000?style=flat-square&logo=shadcnui&logoColor=white" /></a>
-<a href="https://www.electronjs.org"><img alt="Electron 33" src="https://img.shields.io/badge/Electron%2033-47848F?style=flat-square&logo=electron&logoColor=white" /></a>
-<a href="https://supabase.com"><img alt="Supabase (optional)" src="https://img.shields.io/badge/Supabase%20(optional)-3FCF8E?style=flat-square&logo=supabase&logoColor=white" /></a>
+Alex builds Voxwell end to end: the choice of voice models, the FastAPI backend, the React and Electron app, and the integrations that let AI assistants use it. Voxwell exists so that a complete voice studio can run on your own machine, with no cloud service, no per-minute billing and no uploads.
 
-**CI**<br/>
-<a href="https://github.com/features/actions"><img alt="GitHub Actions" src="https://img.shields.io/badge/GitHub%20Actions-2088FF?style=flat-square&logo=githubactions&logoColor=white" /></a>
-Backend tests on Ubuntu, Windows and macOS, plus a frontend typecheck and build, on every pull request and every push to `main`.
+Before software, Alex spent about ten years in cybersecurity, and Voxwell is built that way. The server only listens on your own computer. The optional phone gateway is the only part that can ever be exposed, and it rejects any request without a valid Twilio signature. A test fails the build if a dependency's license ever stops allowing commercial use.
+
+<br/>
+
+## <img src="docs/readme/icons/git-pull-request.svg" width="24" height="24" alt="" /> Contributing
+
+Read [`CONTRIBUTING.md`](CONTRIBUTING.md) first. In short: one folder per feature, heavy imports inside functions so the app starts fast, a CLI command and MCP tool for every user-facing feature, and only permissively licensed code and models. Never copy from GPL or AGPL projects. CI runs the backend tests on Ubuntu, Windows and macOS, plus a frontend typecheck and build, on every pull request.
 
 <details>
 <summary><b>Repository layout</b></summary>
@@ -370,12 +362,6 @@ voxwell/
 
 <br/>
 
-## <img src="docs/readme/icons/git-pull-request.svg" width="24" height="24" alt="" /> Contributing
-
-Read [`CONTRIBUTING.md`](CONTRIBUTING.md) first. In short: one folder per feature, heavy imports inside functions so the app starts fast, a CLI command and MCP tool for every user-facing feature, and only permissively licensed code and models. Never copy from GPL or AGPL projects.
-
-<br/>
-
 ## <img src="docs/readme/icons/scale.svg" width="24" height="24" alt="" /> License
 
 [MIT](LICENSE). Each model keeps its own license; see [Models and licenses](#-models-and-licenses).
@@ -384,10 +370,10 @@ Read [`CONTRIBUTING.md`](CONTRIBUTING.md) first. In short: one folder per featur
 
 <div align="center">
 
-<img src="docs/logo.svg" alt="Voxwell" width="72" />
+<b>Built with FastAPI, React 19 and open models that never leave your machine.</b>
 
-<br/>
+<br/><br/>
 
-<sub><b>Your voice, on your machine.</b></sub>
+<img src="docs/logo.svg" alt="Voxwell" width="96" />
 
 </div>
