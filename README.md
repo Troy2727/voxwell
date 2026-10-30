@@ -1,17 +1,6 @@
 <div align="center">
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/design/voxwell-lockup-dark.svg" />
-  <source media="(prefers-color-scheme: light)" srcset="docs/readme/voxwell-lockup-light.svg" />
-  <img src="docs/readme/voxwell-lockup-light.svg" alt="Voxwell Voice Studio" width="440" />
-</picture>
-
-<h3>A complete voice studio that runs on your own machine.</h3>
-
-<p>
-  <em>Clone and design voices, dub videos, transcribe, translate live and talk to voice agents.</em><br/>
-  <em>Every model runs locally. Your voices and recordings never leave your computer.</em>
-</p>
+<img src="docs/readme/voxwell-banner.jpg" alt="Voxwell Voice Studio: a complete voice studio that runs on your machine. Clone and design voices, dub videos, transcribe and talk to voice agents. Every model runs locally. 100% local, MIT licensed, CLI + MCP, OpenAI-compatible API." width="100%" />
 
 <p>
   <a href="https://voxwell.vercel.app"><img alt="Web UI: voxwell.vercel.app" src="docs/readme/badges/web-ui-voxwell-vercel-app.svg" /></a>
