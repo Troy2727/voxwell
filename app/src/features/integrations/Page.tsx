@@ -129,15 +129,19 @@ export default function Page() {
             <thead className="bg-muted/40 text-left">
               <tr>
                 <th className="px-3 py-2 font-medium">Command line</th>
-                <th className="px-3 py-2 font-medium">MCP tool</th>
+                <th className="hidden px-3 py-2 font-medium sm:table-cell">MCP tool</th>
                 <th className="px-3 py-2 font-medium">What it does</th>
               </tr>
             </thead>
             <tbody>
               {TOOLS.map((t) => (
                 <tr key={t.mcp} className="border-t">
-                  <td className="px-3 py-2 font-mono text-xs">voxwell {t.cli}</td>
-                  <td className="px-3 py-2 font-mono text-xs">{t.mcp}</td>
+                  <td className="px-3 py-2 font-mono text-xs">
+                    voxwell {t.cli}
+                    {/* Phones have no room for a third column: the MCP name goes under the command. */}
+                    <span className="text-muted-foreground block sm:hidden">{t.mcp}</span>
+                  </td>
+                  <td className="hidden px-3 py-2 font-mono text-xs sm:table-cell">{t.mcp}</td>
                   <td className="text-muted-foreground px-3 py-2">{t.what}</td>
                 </tr>
               ))}
