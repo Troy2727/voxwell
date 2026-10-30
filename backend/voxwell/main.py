@@ -31,6 +31,8 @@ app = FastAPI(title="Voxwell", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=list(APP_ORIGINS),
+    # Chrome asks before a public page (the hosted web build) may reach 127.0.0.1.
+    allow_private_network=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )

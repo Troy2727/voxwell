@@ -21,6 +21,29 @@ def test_https_trusts_the_os_certificate_store():
     assert ssl.SSLContext is truststore.SSLContext
 
 
+def _preflight(origin: str):
+    return client.options("/api/voices", headers={
+        "Origin": origin,
+        "Access-Control-Request-Method": "GET",
+        "Access-Control-Request-Private-Network": "true",
+    })
+
+
+def test_the_website_may_use_the_local_backend():
+    """voxwell.vercel.app is the hosted UI; it talks to the backend on the visitor's own computer.
+    Chrome asks a public page's permission to reach 127.0.0.1 with a private-network preflight."""
+    r = _preflight("https://voxwell.vercel.app")
+    assert r.status_code == 200
+    assert r.headers["access-control-allow-origin"] == "https://voxwell.vercel.app"
+    assert r.headers["access-control-allow-private-network"] == "true"
+
+
+@pytest.mark.parametrize("origin", ["https://evil.example", "https://voxwell.vercel.app.evil.example", "http://voxwell.vercel.app"])
+def test_other_web_pages_still_may_not(origin):
+    r = _preflight(origin)
+    assert r.status_code == 400 and "access-control-allow-origin" not in r.headers
+
+
 @pytest.mark.parametrize("feature", FEATURE_IDS)
 def test_feature_packages_are_not_shadowed_by_their_routers(feature):
     """voxwell.features.<id> must stay the package (string-based patching and imports rely on it)."""

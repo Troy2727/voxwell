@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
-import { LogOut, Moon, Sun } from 'lucide-react';
+import { LogOut, Moon, PlugZap, Sun } from 'lucide-react';
 import { api } from './api';
 import { AuthPage } from './auth/AuthPage';
 import { FEATURES } from './features';
 import { LogoMark } from '@/components/logo';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
   Sidebar,
@@ -59,6 +60,22 @@ function Account({ user }: { user: User }) {
   );
 }
 
+function BackendOffline() {
+  return (
+    <Alert className="mx-auto mb-6 max-w-3xl">
+      <PlugZap />
+      <AlertTitle>Voxwell isn't running on this computer</AlertTitle>
+      <AlertDescription>
+        <p>
+          Everything Voxwell does happens on your own computer: this page only shows the controls. Start Voxwell (the
+          desktop app, or <code>uv run voxwell</code> in the <code>backend</code> folder) and this page connects by itself.
+        </p>
+        <p>If your browser asks whether this site may connect to apps on your device, choose Allow.</p>
+      </AlertDescription>
+    </Alert>
+  );
+}
+
 function FeatureMenu({ active, onSelect }: { active: string; onSelect: (id: string) => void }) {
   // On phones the sidebar is a slide-over panel; picking a page must also close it.
   const { setOpenMobile } = useSidebar();
@@ -91,10 +108,23 @@ function FeatureMenu({ active, onSelect }: { active: string; onSelect: (id: stri
 function Shell({ user }: { user?: User }) {
   const [active, setActive] = useState(FEATURES[0].id);
   const [online, setOnline] = useState<boolean | null>(null);
+  // Bumped when the backend comes back, so the open page reloads its data.
+  const [connection, setConnection] = useState(0);
 
   useEffect(() => {
     api('/api/health').then(() => setOnline(true), () => setOnline(false));
   }, []);
+
+  useEffect(() => {
+    if (online !== false) return;
+    const timer = window.setInterval(() => {
+      api('/api/health').then(() => {
+        setOnline(true);
+        setConnection((n) => n + 1);
+      }, () => {});
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [online]);
 
   const feature = FEATURES.find((f) => f.id === active)!;
 
@@ -132,7 +162,8 @@ function Shell({ user }: { user?: User }) {
           <span className="text-sm font-medium">{feature.title}</span>
         </header>
         <main className="flex-1 p-6 md:p-8">
-          <feature.Page key={feature.id} />
+          {online === false && <BackendOffline />}
+          <feature.Page key={`${feature.id}-${connection}`} />
         </main>
       </SidebarInset>
     </SidebarProvider>
