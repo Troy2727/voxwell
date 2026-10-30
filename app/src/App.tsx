@@ -154,14 +154,15 @@ function Shell({ user }: { user?: User }) {
           </div>
         </SidebarFooter>
       </Sidebar>
-      <SidebarInset>
+      {/* min-w-0: a long code line must scroll in its own box, not widen the page past the sidebar. */}
+      <SidebarInset className="min-w-0">
         <header className="bg-background/80 sticky top-0 z-10 flex h-12 items-center gap-2 border-b px-4 backdrop-blur">
-          <SidebarTrigger className="-ml-1" />
+          <SidebarTrigger className="-ml-1 size-9 md:size-7" />
           <span className="text-muted-foreground text-sm">{feature.group}</span>
           <span className="text-muted-foreground text-sm">/</span>
           <span className="text-sm font-medium">{feature.title}</span>
         </header>
-        <main className="flex-1 p-6 md:p-8">
+        <main className="flex-1 p-4 sm:p-6 md:p-8">
           {online === false && <BackendOffline />}
           <feature.Page key={`${feature.id}-${connection}`} />
         </main>

@@ -65,7 +65,7 @@ export default function Page() {
         </Field>
         <div className="flex flex-wrap gap-2">
           {EXAMPLES.map((ex) => (
-            <Button key={ex} type="button" variant="secondary" size="sm" className="h-auto py-1.5 text-left whitespace-normal" onClick={() => setDescription(ex)}>
+            <Button key={ex} type="button" variant="secondary" size="sm" className="h-auto max-w-full py-1.5 text-left whitespace-normal" onClick={() => setDescription(ex)}>
               {ex}
             </Button>
           ))}

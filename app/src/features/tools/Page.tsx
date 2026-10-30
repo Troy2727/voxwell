@@ -36,9 +36,10 @@ export default function Page() {
   return (
     <PageLayout title="Tools" description="Small jobs for audio you already have.">
       <Tabs value={tool} onValueChange={(v) => setTool(v as ToolId)}>
-        <TabsList className="h-auto flex-wrap">
+        {/* Wraps onto more rows on a phone; the list's own height must follow, and so must the tabs'. */}
+        <TabsList className="flex-wrap group-data-[orientation=horizontal]/tabs:h-auto">
           {TOOLS.map((t) => (
-            <TabsTrigger key={t.id} value={t.id}>{t.title}</TabsTrigger>
+            <TabsTrigger key={t.id} value={t.id} className="h-8 flex-none">{t.title}</TabsTrigger>
           ))}
         </TabsList>
         {TOOLS.map((t) => (
