@@ -14,24 +14,24 @@
 </p>
 
 <p>
-  <a href="https://voxwell.vercel.app"><img alt="Web UI: voxwell.vercel.app" src="https://img.shields.io/badge/web%20UI-voxwell.vercel.app-FFA800?style=flat-square&logo=vercel&logoColor=white&labelColor=0F141C" /></a>
+  <a href="https://voxwell.vercel.app"><img alt="Web UI: voxwell.vercel.app" src="docs/readme/badges/web-ui-voxwell-vercel-app.svg" /></a>
   <a href="https://github.com/Troy2727/voxwell/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Troy2727/voxwell/actions/workflows/ci.yml/badge.svg" /></a>
-  <a href="https://www.python.org"><img alt="Python 3.11" src="https://img.shields.io/badge/Python%203.11-3776AB?style=flat-square&logo=python&logoColor=white" /></a>
-  <a href="https://fastapi.tiangolo.com"><img alt="FastAPI" src="https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white" /></a>
-  <a href="https://pytorch.org"><img alt="PyTorch" src="https://img.shields.io/badge/PyTorch-EE4C2C?style=flat-square&logo=pytorch&logoColor=white" /></a>
-  <a href="https://huggingface.co"><img alt="Hugging Face" src="https://img.shields.io/badge/Hugging%20Face-FFD21E?style=flat-square&logo=huggingface&logoColor=black" /></a>
-  <a href="https://docs.astral.sh/uv/"><img alt="uv" src="https://img.shields.io/badge/uv-DE5FE9?style=flat-square&logo=uv&logoColor=white" /></a>
-  <a href="https://ffmpeg.org"><img alt="FFmpeg" src="https://img.shields.io/badge/FFmpeg-007808?style=flat-square&logo=ffmpeg&logoColor=white" /></a>
-  <a href="https://react.dev"><img alt="React 19" src="https://img.shields.io/badge/React%2019-61DAFB?style=flat-square&logo=react&logoColor=black" /></a>
-  <a href="https://www.typescriptlang.org"><img alt="TypeScript 5" src="https://img.shields.io/badge/TypeScript%205-3178C6?style=flat-square&logo=typescript&logoColor=white" /></a>
-  <a href="https://vite.dev"><img alt="Vite 6" src="https://img.shields.io/badge/Vite%206-646CFF?style=flat-square&logo=vite&logoColor=white" /></a>
-  <a href="https://tailwindcss.com"><img alt="Tailwind CSS 4" src="https://img.shields.io/badge/Tailwind%20CSS%204-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white" /></a>
-  <a href="https://ui.shadcn.com"><img alt="shadcn/ui" src="https://img.shields.io/badge/shadcn%2Fui-000000?style=flat-square&logo=shadcnui&logoColor=white" /></a>
-  <a href="https://www.electronjs.org"><img alt="Electron 33" src="https://img.shields.io/badge/Electron%2033-47848F?style=flat-square&logo=electron&logoColor=white" /></a>
-  <a href="https://supabase.com"><img alt="Supabase (optional)" src="https://img.shields.io/badge/Supabase%20(optional)-3FCF8E?style=flat-square&logo=supabase&logoColor=white" /></a>
-  <a href="https://vercel.com"><img alt="Vercel" src="https://img.shields.io/badge/Vercel-000000?style=flat-square&logo=vercel&logoColor=white" /></a>
-  <a href="https://github.com/features/actions"><img alt="GitHub Actions" src="https://img.shields.io/badge/GitHub%20Actions-2088FF?style=flat-square&logo=githubactions&logoColor=white" /></a>
-  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-FFA800?style=flat-square&labelColor=0F141C" /></a>
+  <a href="https://www.python.org"><img alt="Python 3.11" src="docs/readme/badges/python-3-11.svg" /></a>
+  <a href="https://fastapi.tiangolo.com"><img alt="FastAPI" src="docs/readme/badges/fastapi.svg" /></a>
+  <a href="https://pytorch.org"><img alt="PyTorch" src="docs/readme/badges/pytorch.svg" /></a>
+  <a href="https://huggingface.co"><img alt="Hugging Face" src="docs/readme/badges/hugging-face.svg" /></a>
+  <a href="https://docs.astral.sh/uv/"><img alt="uv" src="docs/readme/badges/uv.svg" /></a>
+  <a href="https://ffmpeg.org"><img alt="FFmpeg" src="docs/readme/badges/ffmpeg.svg" /></a>
+  <a href="https://react.dev"><img alt="React 19" src="docs/readme/badges/react-19.svg" /></a>
+  <a href="https://www.typescriptlang.org"><img alt="TypeScript 5" src="docs/readme/badges/typescript-5.svg" /></a>
+  <a href="https://vite.dev"><img alt="Vite 6" src="docs/readme/badges/vite-6.svg" /></a>
+  <a href="https://tailwindcss.com"><img alt="Tailwind CSS 4" src="docs/readme/badges/tailwind-css-4.svg" /></a>
+  <a href="https://ui.shadcn.com"><img alt="shadcn/ui" src="docs/readme/badges/shadcn-ui.svg" /></a>
+  <a href="https://www.electronjs.org"><img alt="Electron 33" src="docs/readme/badges/electron-33.svg" /></a>
+  <a href="https://supabase.com"><img alt="Supabase (optional)" src="docs/readme/badges/supabase-optional.svg" /></a>
+  <a href="https://vercel.com"><img alt="Vercel" src="docs/readme/badges/vercel.svg" /></a>
+  <a href="https://github.com/features/actions"><img alt="GitHub Actions" src="docs/readme/badges/github-actions.svg" /></a>
+  <a href="LICENSE"><img alt="License: MIT" src="docs/readme/badges/license-mit.svg" /></a>
 </p>
 
 <p>
@@ -323,24 +323,24 @@ Accounts only control who can open the app. Voices, audio and models stay on you
 ## <img src="docs/readme/icons/layers.svg" width="24" height="24" alt="" /> Tech stack
 
 **Backend**<br/>
-<a href="https://www.python.org"><img alt="Python 3.11" src="https://img.shields.io/badge/Python%203.11-3776AB?style=flat-square&logo=python&logoColor=white" /></a>
-<a href="https://fastapi.tiangolo.com"><img alt="FastAPI" src="https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white" /></a>
-<a href="https://pytorch.org"><img alt="PyTorch" src="https://img.shields.io/badge/PyTorch-EE4C2C?style=flat-square&logo=pytorch&logoColor=white" /></a>
-<a href="https://huggingface.co"><img alt="Hugging Face" src="https://img.shields.io/badge/Hugging%20Face-FFD21E?style=flat-square&logo=huggingface&logoColor=black" /></a>
-<a href="https://docs.astral.sh/uv/"><img alt="uv" src="https://img.shields.io/badge/uv-DE5FE9?style=flat-square&logo=uv&logoColor=white" /></a>
-<a href="https://ffmpeg.org"><img alt="FFmpeg" src="https://img.shields.io/badge/FFmpeg-007808?style=flat-square&logo=ffmpeg&logoColor=white" /></a>
+<a href="https://www.python.org"><img alt="Python 3.11" src="docs/readme/badges/python-3-11.svg" /></a>
+<a href="https://fastapi.tiangolo.com"><img alt="FastAPI" src="docs/readme/badges/fastapi.svg" /></a>
+<a href="https://pytorch.org"><img alt="PyTorch" src="docs/readme/badges/pytorch.svg" /></a>
+<a href="https://huggingface.co"><img alt="Hugging Face" src="docs/readme/badges/hugging-face.svg" /></a>
+<a href="https://docs.astral.sh/uv/"><img alt="uv" src="docs/readme/badges/uv.svg" /></a>
+<a href="https://ffmpeg.org"><img alt="FFmpeg" src="docs/readme/badges/ffmpeg.svg" /></a>
 
 **App**<br/>
-<a href="https://react.dev"><img alt="React 19" src="https://img.shields.io/badge/React%2019-61DAFB?style=flat-square&logo=react&logoColor=black" /></a>
-<a href="https://www.typescriptlang.org"><img alt="TypeScript 5" src="https://img.shields.io/badge/TypeScript%205-3178C6?style=flat-square&logo=typescript&logoColor=white" /></a>
-<a href="https://vite.dev"><img alt="Vite 6" src="https://img.shields.io/badge/Vite%206-646CFF?style=flat-square&logo=vite&logoColor=white" /></a>
-<a href="https://tailwindcss.com"><img alt="Tailwind CSS 4" src="https://img.shields.io/badge/Tailwind%20CSS%204-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white" /></a>
-<a href="https://ui.shadcn.com"><img alt="shadcn/ui" src="https://img.shields.io/badge/shadcn%2Fui-000000?style=flat-square&logo=shadcnui&logoColor=white" /></a>
-<a href="https://www.electronjs.org"><img alt="Electron 33" src="https://img.shields.io/badge/Electron%2033-47848F?style=flat-square&logo=electron&logoColor=white" /></a>
-<a href="https://supabase.com"><img alt="Supabase (optional)" src="https://img.shields.io/badge/Supabase%20(optional)-3FCF8E?style=flat-square&logo=supabase&logoColor=white" /></a>
+<a href="https://react.dev"><img alt="React 19" src="docs/readme/badges/react-19.svg" /></a>
+<a href="https://www.typescriptlang.org"><img alt="TypeScript 5" src="docs/readme/badges/typescript-5.svg" /></a>
+<a href="https://vite.dev"><img alt="Vite 6" src="docs/readme/badges/vite-6.svg" /></a>
+<a href="https://tailwindcss.com"><img alt="Tailwind CSS 4" src="docs/readme/badges/tailwind-css-4.svg" /></a>
+<a href="https://ui.shadcn.com"><img alt="shadcn/ui" src="docs/readme/badges/shadcn-ui.svg" /></a>
+<a href="https://www.electronjs.org"><img alt="Electron 33" src="docs/readme/badges/electron-33.svg" /></a>
+<a href="https://supabase.com"><img alt="Supabase (optional)" src="docs/readme/badges/supabase-optional.svg" /></a>
 
 **CI**<br/>
-<a href="https://github.com/features/actions"><img alt="GitHub Actions" src="https://img.shields.io/badge/GitHub%20Actions-2088FF?style=flat-square&logo=githubactions&logoColor=white" /></a>
+<a href="https://github.com/features/actions"><img alt="GitHub Actions" src="docs/readme/badges/github-actions.svg" /></a>
 Backend tests on Ubuntu, Windows and macOS, plus a frontend typecheck and build, on every pull request and every push to `main`.
 
 <br/>
