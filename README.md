@@ -320,6 +320,31 @@ Accounts only control who can open the app. Voices, audio and models stay on you
 
 <br/>
 
+## <img src="docs/readme/icons/layers.svg" width="24" height="24" alt="" /> Tech stack
+
+**Backend**<br/>
+<a href="https://www.python.org"><img alt="Python 3.11" src="https://img.shields.io/badge/Python%203.11-3776AB?style=flat-square&logo=python&logoColor=white" /></a>
+<a href="https://fastapi.tiangolo.com"><img alt="FastAPI" src="https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white" /></a>
+<a href="https://pytorch.org"><img alt="PyTorch" src="https://img.shields.io/badge/PyTorch-EE4C2C?style=flat-square&logo=pytorch&logoColor=white" /></a>
+<a href="https://huggingface.co"><img alt="Hugging Face" src="https://img.shields.io/badge/Hugging%20Face-FFD21E?style=flat-square&logo=huggingface&logoColor=black" /></a>
+<a href="https://docs.astral.sh/uv/"><img alt="uv" src="https://img.shields.io/badge/uv-DE5FE9?style=flat-square&logo=uv&logoColor=white" /></a>
+<a href="https://ffmpeg.org"><img alt="FFmpeg" src="https://img.shields.io/badge/FFmpeg-007808?style=flat-square&logo=ffmpeg&logoColor=white" /></a>
+
+**App**<br/>
+<a href="https://react.dev"><img alt="React 19" src="https://img.shields.io/badge/React%2019-61DAFB?style=flat-square&logo=react&logoColor=black" /></a>
+<a href="https://www.typescriptlang.org"><img alt="TypeScript 5" src="https://img.shields.io/badge/TypeScript%205-3178C6?style=flat-square&logo=typescript&logoColor=white" /></a>
+<a href="https://vite.dev"><img alt="Vite 6" src="https://img.shields.io/badge/Vite%206-646CFF?style=flat-square&logo=vite&logoColor=white" /></a>
+<a href="https://tailwindcss.com"><img alt="Tailwind CSS 4" src="https://img.shields.io/badge/Tailwind%20CSS%204-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white" /></a>
+<a href="https://ui.shadcn.com"><img alt="shadcn/ui" src="https://img.shields.io/badge/shadcn%2Fui-000000?style=flat-square&logo=shadcnui&logoColor=white" /></a>
+<a href="https://www.electronjs.org"><img alt="Electron 33" src="https://img.shields.io/badge/Electron%2033-47848F?style=flat-square&logo=electron&logoColor=white" /></a>
+<a href="https://supabase.com"><img alt="Supabase (optional)" src="https://img.shields.io/badge/Supabase%20(optional)-3FCF8E?style=flat-square&logo=supabase&logoColor=white" /></a>
+
+**CI**<br/>
+<a href="https://github.com/features/actions"><img alt="GitHub Actions" src="https://img.shields.io/badge/GitHub%20Actions-2088FF?style=flat-square&logo=githubactions&logoColor=white" /></a>
+Backend tests on Ubuntu, Windows and macOS, plus a frontend typecheck and build, on every pull request and every push to `main`.
+
+<br/>
+
 ## <img src="docs/readme/icons/user.svg" width="24" height="24" alt="" /> Author
 
 **Alex Mieses** · [GitHub](https://github.com/Troy2727)
@@ -332,7 +357,7 @@ Before software, Alex spent about ten years in cybersecurity, and Voxwell is bui
 
 ## <img src="docs/readme/icons/git-pull-request.svg" width="24" height="24" alt="" /> Contributing
 
-Read [`CONTRIBUTING.md`](CONTRIBUTING.md) first. In short: one folder per feature, heavy imports inside functions so the app starts fast, a CLI command and MCP tool for every user-facing feature, and only permissively licensed code and models. Never copy from GPL or AGPL projects. CI runs the backend tests on Ubuntu, Windows and macOS, plus a frontend typecheck and build, on every pull request.
+Read [`CONTRIBUTING.md`](CONTRIBUTING.md) first. In short: one folder per feature, heavy imports inside functions so the app starts fast, a CLI command and MCP tool for every user-facing feature, and only permissively licensed code and models. Never copy from GPL or AGPL projects.
 
 <details>
 <summary><b>Repository layout</b></summary>
