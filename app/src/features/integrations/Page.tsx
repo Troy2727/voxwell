@@ -25,17 +25,24 @@ const OFFLINE_INFO: Info = {
   mcp: { command: 'uv', args: ['run', '--directory', '<voxwell>/backend', 'voxwell-mcp'], env: { UV_SYSTEM_CERTS: '1' } },
 };
 
-/** The nine tools, the same in the CLI and the MCP server (backend/voxwell/cli.py, mcp_server.py). */
+/** The tools, the same in the CLI and the MCP server (backend/voxwell/cli.py, mcp_server.py). */
 const TOOLS: { cli: string; mcp: string; what: string }[] = [
   { cli: 'voices', mcp: 'list_voices', what: 'List saved voices' },
+  { cli: 'collection', mcp: 'voice_collections', what: 'Organize saved voices into collections' },
   { cli: 'speak', mcp: 'speak', what: 'Turn text into speech (WAV)' },
+  { cli: 'sound', mcp: 'generate_sound', what: 'Generate a sound effect from a description' },
   { cli: 'transcribe', mcp: 'transcribe', what: 'Transcribe an audio or video file' },
+  { cli: 'align', mcp: 'align_script', what: 'Time a script against its recording (SRT or VTT)' },
+  { cli: 'edit', mcp: 'edit_transcript', what: 'Clean up a transcript with the local AI model' },
   { cli: 'isolate', mcp: 'isolate_voice', what: 'Split a recording into the voice and the background' },
   { cli: 'clone', mcp: 'clone_voice', what: 'Save a voice from a short, clean recording' },
   { cli: 'design', mcp: 'design_voice', what: 'Create a voice from a description' },
+  { cli: 'effects', mcp: 'apply_effects', what: 'Add reverb, distance, noise or pan to a recording' },
+  { cli: 'pronounce', mcp: 'manage_pronunciations', what: 'List, add or remove how a word is pronounced' },
   { cli: 'convert', mcp: 'convert_voice', what: 'Re-speak a recording in a saved voice' },
   { cli: 'dub', mcp: 'dub_video', what: 'Dub a video into another language (MP4 + SRT)' },
   { cli: 'chat', mcp: 'chat_with_agent', what: 'Send a message to a saved voice agent' },
+  { cli: 'translate', mcp: 'translate_speech', what: 'Translate text or a recording and speak it' },
 ];
 
 function Snippet({ code }: { code: string }) {
@@ -116,7 +123,7 @@ export default function Page() {
         </Alert>
       )}
 
-      <Section title="Nine tools, two ways in" description="The command line and MCP share the same nine tools.">
+      <Section title={`${TOOLS.length} tools, two ways in`} description="The command line and MCP share the same tools.">
         <div className="overflow-x-auto rounded-lg border">
           <table className="w-full text-sm">
             <thead className="bg-muted/40 text-left">
@@ -175,7 +182,7 @@ with open("recording.mp3", "rb") as f:
         title="Command line (Claude Code, Codex, scripts)"
         description={
           <>
-            The <code>voxwell</code> command speaks, transcribes, isolates voices, clones and designs voices, converts, dubs and chats with your voice agents,
+            The <code>voxwell</code> command speaks, transcribes, isolates voices, clones and designs voices, converts, dubs, translates and chats with your voice agents,
             from a terminal or an AI coding agent. Add <code>--json</code> for machine-readable output. Keep Voxwell open while
             it runs.
           </>
@@ -197,7 +204,7 @@ ${info.cli} isolate song.mp3`} />
         title="AI assistants (MCP)"
         description={
           <>
-            Gives AI apps without a terminal, such as Claude Desktop and Cursor, the same nine tools as the command line: speak, transcribe, isolate, clone, design, convert, dub, chat with an agent and list voices. Keep Voxwell open
+            Gives AI apps without a terminal, such as Claude Desktop and Cursor, the same tools as the command line, listed above. Keep Voxwell open
             while the assistant uses it. Requires <a href="https://docs.astral.sh/uv/">uv</a>.
           </>
         }

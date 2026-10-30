@@ -5,6 +5,7 @@ import { ChoiceSelect } from '@/components/choice-select';
 import { FileDrop } from '@/components/file-drop';
 import { JobProgress } from '@/components/job-progress';
 import { ErrorAlert, Field, message, Muted, Page as PageLayout, Section } from '@/components/page';
+import { appendSpeakerFields, SpeakerOptions } from '@/components/speaker-options';
 import { VoiceSelect } from '@/components/voice-select';
 import { Button } from '@/components/ui/button';
 import { LANGUAGES } from './languages';
@@ -23,6 +24,8 @@ export default function Page() {
   const [file, setFile] = useState<File | null>(null);
   const [language, setLanguage] = useState('es');
   const [voice, setVoice] = useState(ORIGINAL);
+  const [speakers, setSpeakers] = useState(false);
+  const [speakerCount, setSpeakerCount] = useState('');
   const [voices, setVoices] = useState<Voice[]>([]);
   const [job, setJob] = useState<JobStatus | null>(null);
   const [error, setError] = useState('');
@@ -60,6 +63,7 @@ export default function Page() {
     form.append('file', file);
     form.append('target_language', language);
     form.append('voice', voice);
+    appendSpeakerFields(form, speakers, speakerCount);
     try {
       const { id } = await api<{ id: string }>('/api/dubbing/jobs', { method: 'POST', body: form });
       poll(id);
@@ -89,6 +93,14 @@ export default function Page() {
             />
           </Field>
         </div>
+        <SpeakerOptions
+          enabled={speakers}
+          onEnabled={setSpeakers}
+          count={speakerCount}
+          onCount={setSpeakerCount}
+          disabled={busy}
+          hint="Each speaker keeps their own voice when cloning the original, and the subtitles say who speaks. A saved voice speaks every line."
+        />
         {voices.length === 0 && <Muted className="text-xs">No saved voices yet; create one in Voice cloning or Voice design.</Muted>}
         <div>
           <Button disabled={!file || busy} onClick={start}>

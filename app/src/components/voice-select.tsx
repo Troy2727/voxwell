@@ -1,4 +1,6 @@
-import { apiUrl, type Voice } from '@/api';
+import { useEffect, useState } from 'react';
+import { apiUrl, listVoiceCollections, type Voice, type VoiceCollection } from '@/api';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { VoicePicker, type VoiceOption } from '@/components/ui/voice-picker';
 
 /** Pick a saved voice (with a play preview of its reference clip), or the default voice. */
@@ -10,9 +12,18 @@ export function VoiceSelect({ voices, value, onChange, disabled, defaultLabel = 
   defaultLabel?: string | null;
   defaultDescription?: string;
 }) {
+  const [collections, setCollections] = useState<VoiceCollection[]>([]);
+  const [collectionId, setCollectionId] = useState('');
+  useEffect(() => {
+    listVoiceCollections().then(setCollections, () => setCollections([]));
+  }, []);
+  // Filter by collection, but never hide the voice that is currently chosen.
+  const collection = collections.find((c) => c.id === collectionId);
+  const visible = collection ? (voices ?? []).filter((v) => collection.voice_ids.includes(v.id) || v.id === value) : voices;
+
   const options: VoiceOption[] = [
     ...(defaultLabel === null ? [] : [{ id: '', name: defaultLabel, description: defaultDescription }]),
-    ...(voices ?? []).map((v) => ({
+    ...(visible ?? []).map((v) => ({
       id: v.id,
       name: v.name,
       description: v.source === 'design' ? 'Designed' : 'Uploaded',
@@ -21,6 +32,19 @@ export function VoiceSelect({ voices, value, onChange, disabled, defaultLabel = 
   ];
   return (
     <div className={disabled ? 'pointer-events-none opacity-50' : undefined} aria-disabled={disabled}>
+      {collections.length > 0 && (
+        <Select value={collection ? collectionId : 'all'} onValueChange={(v) => setCollectionId(v === 'all' ? '' : v)}>
+          <SelectTrigger size="sm" className="mb-2 w-full" aria-label="Filter voices by collection">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All voices</SelectItem>
+            {collections.map((c) => (
+              <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
       <VoicePicker
         voices={options}
         value={value}

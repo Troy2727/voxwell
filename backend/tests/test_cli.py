@@ -109,6 +109,47 @@ def test_transcribe_prints_or_saves(capsys, monkeypatch, audio, tmp_path):
     assert result["text"] == "Hello there." and Path(result["path"]).read_text().startswith("1\n00:00:00,000 --> ")
 
 
+def test_align_writes_subtitles(capsys, monkeypatch, audio, tmp_path):
+    from voxwell.features.dictation.engine import Word, WordTimings
+
+    heard = [Word(0.0, 0.4, "Hello"), Word(0.5, 0.9, "there")]
+    monkeypatch.setattr(dictation_engine, "transcribe_words", lambda path, language=None, on_progress=None: WordTimings("en", heard))
+    script = tmp_path / "script.txt"
+    script.write_text("Hello there!", encoding="utf-8")
+    code, out, _ = run(capsys, "align", str(audio), str(script), "-o", str(tmp_path / "subs"))
+    assert code == 0 and "2 of 2 words matched" in out
+    assert (tmp_path / "subs.srt").read_text(encoding="utf-8") == "1\n00:00:00,000 --> 00:00:00,900\nHello there!\n"
+    code, out, _ = run(capsys, "align", str(audio), str(script), "-f", "vtt", "-o", str(tmp_path / "v"), "--json")
+    result = json.loads(out)
+    assert code == 0 and result["matched"] == 2 and result["cues"][0]["text"] == "Hello there!"
+    assert Path(result["path"]).read_text(encoding="utf-8").startswith("WEBVTT")
+    monkeypatch.setattr("sys.stdin", io.StringIO("Something else entirely"))
+    code, out, _ = run(capsys, "align", str(audio), "-", "-o", str(tmp_path / "x"))
+    assert code == 0 and "estimates" in out
+    assert run(capsys, "align", str(audio), str(tmp_path / "missing.txt"))[0] == 1
+    script.write_text(" \n", encoding="utf-8")
+    assert "script is empty" in run(capsys, "align", str(audio), str(script))[2]
+    assert run(capsys, "align", str(audio), str(script), "--max-chars", "1")[0] == 1
+
+
+def test_edit_prints_or_saves(capsys, monkeypatch, tmp_path):
+    from voxwell.features.tools import direction
+
+    monkeypatch.setattr(direction, "complete", lambda system, user, max_new_tokens=80: "Edited.")
+    source = tmp_path / "talk.txt"
+    source.write_text("Um, hello.", encoding="utf-8")
+    code, out, _ = run(capsys, "edit", str(source), "-p", "filler")
+    assert code == 0 and out.strip() == "Edited."
+    code, out, _ = run(capsys, "edit", str(source), "-i", "make it formal", "-o", str(tmp_path / "out"), "--json")
+    result = json.loads(out)
+    assert code == 0 and Path(result["path"]).read_text(encoding="utf-8") == "Edited.\n" and Path(result["path"]).name == "out.txt"
+    monkeypatch.setattr("sys.stdin", io.StringIO("From a pipe"))
+    assert run(capsys, "edit", "-", "-p", "filler")[1].strip() == "Edited."
+    code, _, err = run(capsys, "edit", str(source))
+    assert code == 1 and "--preset or --instruction" in err
+    assert run(capsys, "edit", str(source), "-p", "nope")[0] == 1
+
+
 def test_isolate_writes_two_tracks(capsys, monkeypatch, audio, tmp_path):
     def fake_isolate(source, voice_out, background_out):
         voice_out.write_bytes(wav_bytes())
@@ -129,6 +170,23 @@ def test_clone_then_convert_by_name(capsys, monkeypatch, audio, tmp_path):
     monkeypatch.setattr(tools_engine, "convert", lambda source, target: targets.append(target.stem) or wav_bytes())
     code, out, _ = run(capsys, "convert", str(audio), "-v", "my voice", "-o", str(tmp_path / "out.wav"))
     assert code == 0 and targets == [voices.list_voices()[0].id] and (tmp_path / "out.wav").exists()
+
+
+def test_collections_organize_voices(capsys):
+    voice = voices.save_voice("Narrator", wav_bytes(), "upload")
+    assert "No collections yet" in run(capsys, "collection", "list")[1]
+    assert run(capsys, "collection", "create", "Leads")[0] == 0
+    assert run(capsys, "collection", "create", "leads")[0] == 1  # names are unique, any case
+    assert run(capsys, "collection", "add", "leads", "narrator")[0] == 0
+    code, out, _ = run(capsys, "collection", "show", "Leads", "--json")
+    assert code == 0 and [v["id"] for v in json.loads(out)["voices"]] == [voice.id]
+    assert run(capsys, "collection", "rename", "Leads", "Cast", "Members")[0] == 0
+    code, out, _ = run(capsys, "collection", "list", "--json")
+    assert [(c["name"], c["voice_ids"]) for c in json.loads(out)["collections"]] == [("Cast Members", [voice.id])]
+    assert run(capsys, "collection", "remove", "Cast Members", "Narrator")[0] == 0
+    assert run(capsys, "collection", "delete", "Cast Members")[0] == 0
+    assert run(capsys, "collection", "show", "Cast Members")[0] == 1
+    assert len(voices.list_voices()) == 1
 
 
 def test_design_saves_the_voice_and_preview(capsys, monkeypatch, tmp_path):
@@ -168,6 +226,23 @@ def test_chat_with_an_agent(capsys, monkeypatch):
     assert code == 1 and "Unknown agent 'nobody'" in err
 
 
+def test_translate_text_or_file(capsys, monkeypatch, audio, tmp_path):
+    calls = []
+    monkeypatch.setattr(translator, "translate", lambda texts, s, t: calls.append((s, t)) or [f"[{t}] {x}" for x in texts])
+    monkeypatch.setattr(cloning_engine, "synthesize", lambda *a, **k: wav_bytes())
+    monkeypatch.setattr(dictation_engine, "transcribe", lambda p, language=None: Transcript("hola", "es", []))
+    code, out, _ = run(capsys, "translate", "Hello there.", "--to", "fr", "-o", str(tmp_path / "fr"), "--json")
+    result = json.loads(out)
+    assert code == 0 and result["translation"] == "[fr] Hello there." and Path(result["path"]) == tmp_path / "fr.wav"
+    code, out, _ = run(capsys, "translate", "--file", str(audio), "--to", "en", "-o", str(tmp_path / "en.wav"))
+    assert code == 0 and out.startswith("[en] hola") and (tmp_path / "en.wav").exists()
+    assert calls == [("en", "fr"), ("es", "en")]
+    code, _, err = run(capsys, "translate", "Hi", "--to", "xx")
+    assert code == 1 and "Unsupported target language 'xx'" in err
+    code, _, err = run(capsys, "translate", "--to", "es")
+    assert code == 1 and "Give the text" in err
+
+
 def test_dub_downloads_video_and_subtitles(capsys, monkeypatch, tmp_path):
     def fake_ffmpeg(args):
         out = Path(args[-1])
@@ -184,6 +259,47 @@ def test_dub_downloads_video_and_subtitles(capsys, monkeypatch, tmp_path):
     result = json.loads(out)
     assert code == 0 and Path(result["path"]).read_bytes() == b"video"
     assert Path(result["subtitles"]).read_text(encoding="utf-8").strip().endswith("[en] hola")
+
+
+def test_transcribe_and_dub_label_speakers(capsys, monkeypatch, audio, tmp_path):
+    from voxwell.features.transcription import diarization
+
+    turns = [diarization.Turn(0.0, 1.0, 0), diarization.Turn(1.0, 2.0, 1)]
+    seen = []
+    monkeypatch.setattr(diarization, "diarize", lambda path, n=0, on_progress=None: seen.append(n) or turns)
+    transcript = Transcript("Hi. Bye.", "en", [Segment(0.0, 1.0, "Hi."), Segment(1.0, 2.0, "Bye.")])
+    monkeypatch.setattr(dictation_engine, "transcribe", lambda path, language=None, on_progress=None: transcript)
+    monkeypatch.setattr(transcription_jobs, "start", transcription_jobs._work)
+    code, out, _ = run(capsys, "transcribe", str(audio), "--speakers", "--num-speakers", "2")
+    assert code == 0 and out.strip() == "Speaker 1: Hi.\n\nSpeaker 2: Bye."
+    assert seen == [2]
+    code, out, _ = run(capsys, "transcribe", str(audio), "--speakers", "--json")
+    assert [s["speaker"] for s in json.loads(out)["segments"]] == ["Speaker 1", "Speaker 2"]
+    code, out, _ = run(capsys, "transcribe", str(audio), "--speakers", "-f", "vtt", "-o", str(tmp_path / "v"))
+    assert "<v Speaker 2>Bye." in (tmp_path / "v.vtt").read_text(encoding="utf-8")
+
+    def offline(path, n=0, on_progress=None):
+        raise diarization.DiarizationError("Could not download the speaker model: offline")
+
+    monkeypatch.setattr(diarization, "diarize", offline)
+    code, out, _ = run(capsys, "transcribe", str(audio), "--speakers")
+    assert code == 0 and out.startswith("Hi. Bye.") and out.strip().endswith("[Speaker labels failed: Could not download the speaker model: offline]")
+
+    monkeypatch.setattr(diarization, "diarize", lambda path, n=0, on_progress=None: turns)
+
+    def fake_ffmpeg(args):
+        out_file = Path(args[-1])
+        out_file.write_bytes(wav_bytes() if out_file.suffix == ".wav" else b"video")
+
+    monkeypatch.setattr(ffmpeg, "run_ffmpeg", fake_ffmpeg)
+    monkeypatch.setattr(dictation_engine, "transcribe", lambda p, language=None: transcript)
+    monkeypatch.setattr(translator, "translate", lambda texts, s, t: texts)
+    monkeypatch.setattr(cloning_engine, "synthesize", lambda *a, **k: wav_bytes())
+    monkeypatch.setattr(dubbing_jobs, "start", dubbing_jobs._work)
+    video = tmp_path / "talk.mp4"
+    video.write_bytes(b"fakevideo")
+    code, out, _ = run(capsys, "dub", str(video), "--to", "en", "--speakers", "-o", str(tmp_path / "dubbed"), "--json")
+    assert code == 0 and "Speaker 2: Bye." in Path(json.loads(out)["subtitles"]).read_text(encoding="utf-8")
 
 
 def test_errors_are_clear(capsys, tmp_path):
