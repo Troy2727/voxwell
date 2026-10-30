@@ -154,7 +154,8 @@ function Shell({ user }: { user?: User }) {
           </div>
         </SidebarFooter>
       </Sidebar>
-      <SidebarInset>
+      {/* min-w-0: a long code line must scroll in its own box, not widen the page past the sidebar. */}
+      <SidebarInset className="min-w-0">
         <header className="bg-background/80 sticky top-0 z-10 flex h-12 items-center gap-2 border-b px-4 backdrop-blur">
           <SidebarTrigger className="-ml-1 size-9 md:size-7" />
           <span className="text-muted-foreground text-sm">{feature.group}</span>
