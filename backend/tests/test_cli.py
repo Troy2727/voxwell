@@ -109,6 +109,29 @@ def test_transcribe_prints_or_saves(capsys, monkeypatch, audio, tmp_path):
     assert result["text"] == "Hello there." and Path(result["path"]).read_text().startswith("1\n00:00:00,000 --> ")
 
 
+def test_align_writes_subtitles(capsys, monkeypatch, audio, tmp_path):
+    from voxwell.features.dictation.engine import Word, WordTimings
+
+    heard = [Word(0.0, 0.4, "Hello"), Word(0.5, 0.9, "there")]
+    monkeypatch.setattr(dictation_engine, "transcribe_words", lambda path, language=None, on_progress=None: WordTimings("en", heard))
+    script = tmp_path / "script.txt"
+    script.write_text("Hello there!", encoding="utf-8")
+    code, out, _ = run(capsys, "align", str(audio), str(script), "-o", str(tmp_path / "subs"))
+    assert code == 0 and "2 of 2 words matched" in out
+    assert (tmp_path / "subs.srt").read_text(encoding="utf-8") == "1\n00:00:00,000 --> 00:00:00,900\nHello there!\n"
+    code, out, _ = run(capsys, "align", str(audio), str(script), "-f", "vtt", "-o", str(tmp_path / "v"), "--json")
+    result = json.loads(out)
+    assert code == 0 and result["matched"] == 2 and result["cues"][0]["text"] == "Hello there!"
+    assert Path(result["path"]).read_text(encoding="utf-8").startswith("WEBVTT")
+    monkeypatch.setattr("sys.stdin", io.StringIO("Something else entirely"))
+    code, out, _ = run(capsys, "align", str(audio), "-", "-o", str(tmp_path / "x"))
+    assert code == 0 and "estimates" in out
+    assert run(capsys, "align", str(audio), str(tmp_path / "missing.txt"))[0] == 1
+    script.write_text(" \n", encoding="utf-8")
+    assert "script is empty" in run(capsys, "align", str(audio), str(script))[2]
+    assert run(capsys, "align", str(audio), str(script), "--max-chars", "1")[0] == 1
+
+
 def test_edit_prints_or_saves(capsys, monkeypatch, tmp_path):
     from voxwell.features.tools import direction
 

@@ -245,6 +245,26 @@ def cmd_transcribe(client: Client, args) -> tuple[str, dict]:
     return f"Saved the transcript to {out}", result
 
 
+def cmd_align(client: Client, args) -> tuple[str, dict]:
+    audio = _existing_file(args.file)
+    if args.script_text is not None:  # given directly (the MCP tool); a CLI always passes a file
+        script = args.script_text
+    elif args.script == "-":
+        script = sys.stdin.read()
+    else:
+        script = _existing_file(args.script).read_text(encoding="utf-8", errors="replace")
+    if not script.strip():
+        raise CliError("The script is empty.")
+    fields = {"script": script, "language": args.language or "", "max_chars": args.max_chars, "max_seconds": args.max_seconds}
+    result = client.post_form("/api/transcription/align", fields, audio)
+    out = _output_path(args.output, f"{audio.stem}.{args.format}", f".{args.format}")
+    out.write_text(result[args.format], encoding="utf-8")
+    note = f" ({result['matched']} of {result['total']} words matched the audio)"
+    if result["fallback"]:
+        note = " (none of the words matched the audio, so the times are estimates; check the script and language)"
+    return f"Saved the subtitles to {out}{note}", {**{k: result[k] for k in ("language", "words", "cues", "matched", "total", "fallback")}, "path": str(out)}
+
+
 def cmd_edit(client: Client, args) -> tuple[str, dict]:
     if args.text is not None:  # given directly (the MCP tool); a CLI always passes a file
         text = args.text
@@ -396,6 +416,15 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("-o", "--output", help="save to this file instead of printing the text")
     p.set_defaults(run=cmd_transcribe)
 
+    p = sub.add_parser("align", parents=[common], help="time a script against its recording (SRT or VTT subtitles)")
+    p.add_argument("file", help="the audio or video that speaks the script")
+    p.add_argument("script", help="a text file with the words spoken; - reads it from stdin")
+    p.add_argument("-l", "--language", help="ISO 639-1 code (default: detect it)")
+    p.add_argument("-f", "--format", choices=["srt", "vtt"], default="srt", help="subtitle format (default srt)")
+    p.add_argument("-o", "--output", help="subtitle file or folder (default: <name>.<format> in the current folder)")
+    p.add_argument("--max-chars", type=int, default=42, help="longest subtitle in characters, 10 to 200 (default 42)")
+    p.add_argument("--max-seconds", type=float, default=6.0, help="longest subtitle in seconds, 1 to 30 (default 6)")
+    p.set_defaults(run=cmd_align, script_text=None)
     p = sub.add_parser("edit", parents=[common], help="clean up a transcript with the local AI model")
     p.add_argument("file", help="a text file, e.g. from `transcribe -o`; - reads it from stdin")
     p.add_argument("-p", "--preset", help="filler (remove filler words), punctuation, formal or concise")

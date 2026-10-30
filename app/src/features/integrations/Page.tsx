@@ -32,6 +32,7 @@ const TOOLS: { cli: string; mcp: string; what: string }[] = [
   { cli: 'speak', mcp: 'speak', what: 'Turn text into speech (WAV)' },
   { cli: 'sound', mcp: 'generate_sound', what: 'Generate a sound effect from a description' },
   { cli: 'transcribe', mcp: 'transcribe', what: 'Transcribe an audio or video file' },
+  { cli: 'align', mcp: 'align_script', what: 'Time a script against its recording (SRT or VTT)' },
   { cli: 'edit', mcp: 'edit_transcript', what: 'Clean up a transcript with the local AI model' },
   { cli: 'isolate', mcp: 'isolate_voice', what: 'Split a recording into the voice and the background' },
   { cli: 'clone', mcp: 'clone_voice', what: 'Save a voice from a short, clean recording' },

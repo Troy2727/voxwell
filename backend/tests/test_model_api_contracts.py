@@ -104,6 +104,12 @@ def test_faster_whisper_calls_match_installed_api(monkeypatch, tmp_path):
     transcript = engine.transcribe(tmp_path / "clip.wav", "en")
     assert (transcript.text, transcript.language) == ("hello", "en")
 
+    word = mock.Mock(start=0.0, end=0.5, word=" hello")
+    segment = mock.Mock(start=0.0, end=1.0, words=[word])
+    whisper.return_value.transcribe.return_value = (iter([segment]), mock.Mock(language="en"))
+    timings = engine.transcribe_words(tmp_path / "clip.wav", "en")
+    assert [(w.start, w.end, w.text) for w in timings.words] == [(0.0, 0.5, "hello")]
+
 
 def test_m2m100_calls_match_installed_api(monkeypatch):
     transformers = pytest.importorskip("transformers")
