@@ -181,6 +181,8 @@ def cmd_sound(client: Client, args) -> tuple[str, dict]:
     out = _output_path(args.output, f"sound-{_stamp()}.wav", ".wav")
     out.write_bytes(client.request("GET", sound["url"]))
     return f"Saved the sound to {out} (seed {sound['seed']})", {"path": str(out), "seed": sound["seed"], "duration": sound["duration"]}
+
+
 def cmd_collection(client: Client, args) -> tuple[str, dict]:
     action, name, rest = args.action, (args.name or "").strip(), args.rest
     base = "/api/voice_collections"
@@ -230,19 +232,30 @@ def cmd_speak(client: Client, args) -> tuple[str, dict]:
     return f"Saved the speech to {out}", {"path": str(out)}
 
 
+def _speaker_fields(args) -> dict:
+    """Form fields for the optional speaker labels; none at all unless they were asked for."""
+    return {"speakers": "true", "num_speakers": args.num_speakers} if args.speakers else {}
+
+
 def cmd_transcribe(client: Client, args) -> tuple[str, dict]:
     source = _existing_file(args.file)
-    job_id = client.post_form("/api/transcription/jobs", {"language": args.language or ""}, source)["id"]
+    fields = {"language": args.language or "", **_speaker_fields(args)}
+    job_id = client.post_form("/api/transcription/jobs", fields, source)["id"]
     job = _wait(client, f"/api/transcription/jobs/{job_id}", args.json, "Transcribing")
     transcript = job["transcript"]
     result = {"text": transcript["text"], "language": job.get("detected") or job.get("language"), "segments": transcript["segments"]}
-    if args.format == "txt" and not args.output:
+    note = transcript.get("speakers_error")  # the transcript is fine, but the labels could not be added
+    if note:
+        result["speakers_error"] = note
+    if args.format == "txt" and not args.output and not args.speakers:
         return transcript["text"], result
     rendered = client.request("GET", f"/api/transcription/jobs/{job_id}/export/{args.format}")
+    if args.format == "txt" and not args.output:  # printed with its "Speaker 1:" labels
+        return rendered.decode("utf-8").strip() + (f"\n\n[{note}]" if note else ""), result
     out = _output_path(args.output, f"{source.stem}.{args.format}", f".{args.format}")
     out.write_bytes(rendered)
     result["path"] = str(out)
-    return f"Saved the transcript to {out}", result
+    return f"Saved the transcript to {out}" + (f"\n{note}" if note else ""), result
 
 
 def cmd_align(client: Client, args) -> tuple[str, dict]:
@@ -327,13 +340,18 @@ def cmd_convert(client: Client, args) -> tuple[str, dict]:
 def cmd_dub(client: Client, args) -> tuple[str, dict]:
     source = _existing_file(args.file)
     voice = "original" if args.voice == "original" else _voice_id(client, args.voice)
-    job_id = client.post_form("/api/dubbing/jobs", {"target_language": args.to, "voice": voice}, source)["id"]
+    job_id = client.post_form("/api/dubbing/jobs", {"target_language": args.to, "voice": voice, **_speaker_fields(args)}, source)["id"]
     _wait(client, f"/api/dubbing/jobs/{job_id}", args.json, "Dubbing")
     out = _output_path(args.output, f"{source.stem}.{args.to}.mp4", ".mp4")
     out.write_bytes(client.request("GET", f"/api/dubbing/jobs/{job_id}/video"))
     subtitles = out.with_suffix(".srt")
     subtitles.write_bytes(client.request("GET", f"/api/dubbing/jobs/{job_id}/subtitles"))
     return f"Saved the dubbed video to {out}\nSaved the subtitles to {subtitles}", {"path": str(out), "subtitles": str(subtitles)}
+
+
+def _add_speaker_options(p: argparse.ArgumentParser, speakers_help: str) -> None:
+    p.add_argument("--speakers", action="store_true", help=speakers_help)
+    p.add_argument("--num-speakers", type=int, default=0, metavar="N", help="with --speakers: how many people speak, 1 to 20 (default: find out)")
 
 
 def cmd_effects(client: Client, args) -> tuple[str, dict]:
@@ -343,6 +361,8 @@ def cmd_effects(client: Client, args) -> tuple[str, dict]:
     out = _output_path(args.output, f"{source.stem}.effects.wav", ".wav")
     out.write_bytes(client.request("GET", result["url"]))
     return f"Saved the processed recording to {out}", {"path": str(out)}
+
+
 def cmd_pronounce(client: Client, args) -> tuple[str, dict]:
     language = urllib.parse.quote(args.language)
     entries = client.get_json(f"/api/pronunciation/entries?language={language}")
@@ -414,6 +434,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("-l", "--language", help="ISO 639-1 code (default: detect it)")
     p.add_argument("-f", "--format", choices=["txt", "srt", "vtt"], default="txt", help="output format (default txt)")
     p.add_argument("-o", "--output", help="save to this file instead of printing the text")
+    _add_speaker_options(p, "label who speaks: a 'Speaker 1:' prefix in TXT and SRT, <v Speaker 1> in VTT")
     p.set_defaults(run=cmd_transcribe)
 
     p = sub.add_parser("align", parents=[common], help="time a script against its recording (SRT or VTT subtitles)")
@@ -478,6 +499,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("-t", "--to", required=True, help="target language, ISO 639-1 code")
     p.add_argument("-v", "--voice", default="original", help="saved voice name or id, or original (default: clone the speaker)")
     p.add_argument("-o", "--output", help="MP4 file or folder (default: <name>.<lang>.mp4 in the current folder)")
+    _add_speaker_options(p, "keep each speaker's own voice (with the original voice) and label them in the subtitles")
     p.set_defaults(run=cmd_dub)
     return parser
 

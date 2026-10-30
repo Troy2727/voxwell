@@ -12,7 +12,7 @@ from pydantic import BaseModel
 
 from voxwell.features.dictation import engine
 from voxwell.features.dubbing.fitting import build_srt, srt_time
-from voxwell.features.transcription import alignment, editing, jobs
+from voxwell.features.transcription import alignment, diarization, editing, jobs
 from voxwell.paths import attachment, data_dir, download_name
 
 router = APIRouter(tags=["transcription"])
@@ -42,14 +42,16 @@ def status():
 
 
 @router.post("/jobs")
-def create_job(file: UploadFile = File(...), language: str = Form("")):
+def create_job(file: UploadFile = File(...), language: str = Form(""), speakers: bool = Form(False), num_speakers: int = Form(0)):
     language = language.strip().lower()
     if language and not _LANGUAGE.match(language):
         raise HTTPException(422, f"Unsupported language '{language}'.")
+    if not 0 <= num_speakers <= diarization.MAX_SPEAKERS:
+        raise HTTPException(422, f"The number of speakers must be 0 (detect) or 1 to {diarization.MAX_SPEAKERS}.")
     name = Path(file.filename or "")
     ext = name.suffix.lower() if _EXT.match(name.suffix.lower()) else ""  # PyAV sniffs the format
     title = name.stem.strip()[:100] or "Transcript"  # display only, never a path
-    job = jobs.create(ext, title, language)
+    job = jobs.create(ext, title, language, speakers=speakers, num_speakers=num_speakers if speakers else 0)
     with (job.dir / job.source).open("wb") as out:
         shutil.copyfileobj(file.file, out)
     if (job.dir / job.source).stat().st_size == 0:
@@ -74,13 +76,35 @@ def get_job(job_id: str):
 
 
 def _vtt(segments: list[dict]) -> str:
-    cues = [f"{srt_time(s['start']).replace(',', '.')} --> {srt_time(s['end']).replace(',', '.')}\n{s['text']}\n" for s in segments]
+    def text(s: dict) -> str:  # WebVTT's voice span names the speaker
+        return f"<v {s['speaker']}>{s['text']}" if s.get("speaker") else s["text"]
+
+    cues = [f"{srt_time(s['start']).replace(',', '.')} --> {srt_time(s['end']).replace(',', '.')}\n{text(s)}\n" for s in segments]
     return "WEBVTT\n\n" + "\n".join(cues)
 
 
+def _txt(transcript: dict) -> str:
+    """The plain text; with speaker labels, one paragraph per turn: "Speaker 1: ..."."""
+    segments = transcript["segments"]
+    if not any(s.get("speaker") for s in segments):
+        return transcript["text"] + "\n"
+    turns: list[list[str]] = []  # [speaker, text]
+    for s in segments:
+        speaker = s.get("speaker") or ""
+        if turns and turns[-1][0] == speaker:
+            turns[-1][1] += " " + s["text"]
+        else:
+            turns.append([speaker, s["text"]])
+    return "\n\n".join(f"{speaker}: {text}" if speaker else text for speaker, text in turns) + "\n"
+
+
+def _srt_text(s: dict) -> str:
+    return f"{s['speaker']}: {s['text']}" if s.get("speaker") else s["text"]
+
+
 EXPORTS = {
-    "txt": ("text/plain; charset=utf-8", lambda t: t["text"] + "\n"),
-    "srt": ("application/x-subrip; charset=utf-8", lambda t: build_srt([(s["start"], s["end"], s["text"]) for s in t["segments"]])),
+    "txt": ("text/plain; charset=utf-8", _txt),
+    "srt": ("application/x-subrip; charset=utf-8", lambda t: build_srt([(s["start"], s["end"], _srt_text(s)) for s in t["segments"]])),
     "vtt": ("text/vtt; charset=utf-8", lambda t: _vtt(t["segments"])),
 }
 

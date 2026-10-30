@@ -125,6 +125,41 @@ def test_m2m100_calls_match_installed_api(monkeypatch):
     assert translate.translate(["hello"], "en", "es") == ["hola"]
 
 
+def test_sherpa_onnx_diarization_calls_match_installed_api(monkeypatch, tmp_path):
+    sherpa = pytest.importorskip("sherpa_onnx")
+    import numpy as np
+    from faster_whisper import audio as fw_audio
+
+    from voxwell.features.transcription import diarization
+
+    (tmp_path / "seg.onnx").write_bytes(b"x")
+    (tmp_path / "emb.onnx").write_bytes(b"x")
+    monkeypatch.setattr(diarization, "model_paths", lambda: (tmp_path / "seg.onnx", tmp_path / "emb.onnx"))
+    monkeypatch.setattr(fw_audio, "decode_audio", lambda path, sampling_rate: np.zeros(16000, dtype="float32"))
+
+    segment = mock.Mock(start=0.0, end=1.0, speaker=3)
+    diarizer = mock.Mock(sample_rate=16000)
+    diarizer.process.return_value.sort_by_start_time.return_value = [segment]
+    configs = []
+
+    def make(config):  # the config is the real class, so a wrong keyword fails here, as it would at runtime
+        assert config.validate()
+        configs.append(config)
+        return diarizer
+
+    real = sherpa.OfflineSpeakerDiarization
+    monkeypatch.setattr(sherpa, "OfflineSpeakerDiarization", make)
+    turns = diarization.diarize(tmp_path / "clip.wav", num_speakers=2)
+    assert turns == [diarization.Turn(0.0, 1.0, 3)] and configs[0].clustering.num_clusters == 2
+    callback = diarizer.process.call_args.kwargs["callback"]
+    assert callback(1, 4) == 0  # sherpa-onnx keeps going when the callback returns 0
+    diarization.diarize(tmp_path / "clip.wav")
+    assert configs[1].clustering.num_clusters == -1  # detect the number of speakers
+    # The Python wrapper exposes the calls we make: process(samples, callback=...) and the result's sorting.
+    assert "callback" in real.process.__doc__ and "samples" in real.process.__doc__
+    assert hasattr(sherpa.OfflineSpeakerDiarizationResult, "sort_by_start_time")
+
+
 def test_chatterbox_diffusers_imports_still_exist():
     """chatterbox-tts 0.1.6 pins diffusers==0.29.0 but runs on the newer one we override it with
     (for Stable Audio; see pyproject.toml). Newer diffusers releases removed some of these names,

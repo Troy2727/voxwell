@@ -257,6 +257,23 @@ def test_mcp_transcribe_and_list_voices(mcp, fake_stt, tmp_path):
     assert "No saved voices" in tool(mcp, "list_voices")["content"][0]["text"]
 
 
+def test_mcp_transcribe_can_label_speakers(mcp, monkeypatch, tmp_path):
+    from voxwell.features.transcription import diarization
+
+    t = Transcript("Hi. Bye.", "en", [Segment(0.0, 1.0, "Hi."), Segment(1.0, 2.0, "Bye.")])
+    monkeypatch.setattr(stt, "transcribe", lambda p, language=None, on_progress=None: t)
+    seen = []
+    monkeypatch.setattr(diarization, "diarize", lambda path, n=0, on_progress=None: seen.append(n) or [diarization.Turn(0.0, 1.0, 0), diarization.Turn(1.0, 2.0, 1)])
+    f = tmp_path / "talk.mp3"
+    f.write_bytes(b"audio")
+    plain = tool(mcp, "transcribe", file_path=str(f))["content"][0]["text"]
+    assert plain == "Hi. Bye." and seen == []  # off by default
+    labelled = tool(mcp, "transcribe", file_path=str(f), label_speakers=True, num_speakers=2)["content"][0]["text"]
+    assert labelled.startswith("Speaker 1: Hi.") and "Speaker 2: Bye." in labelled and seen == [2]
+    schema = next(x for x in mcp("tools/list")["result"]["tools"] if x["name"] == "dub_video")["inputSchema"]["properties"]
+    assert "label_speakers" in schema and "num_speakers" in schema
+
+
 def test_mcp_align_script(mcp, monkeypatch, tmp_path, isolated_data_dir):
     from voxwell.features.dictation.engine import Word, WordTimings
 

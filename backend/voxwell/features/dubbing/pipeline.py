@@ -10,6 +10,7 @@ from voxwell import voices
 from voxwell.features.dictation import engine as dictation_engine
 from voxwell.features.dubbing import ffmpeg, fitting
 from voxwell.features.dubbing import translate as translator
+from voxwell.features.transcription import diarization
 from voxwell.features.voice_cloning import engine as cloning_engine
 
 RATE = 24000
@@ -45,8 +46,21 @@ def _normalize(src: Path, dst: Path, tempo: float = 1.0) -> list[int]:
     return _read_wav(dst)
 
 
-def run(job_dir: Path, video: Path, target: str, voice: str, progress: Progress) -> dict:
-    """Run the full pipeline; returns {"video": Path, "subtitles": Path}."""
+def _original_reference(job_dir: Path, audio: Path, spans: list[tuple[float, float]], name: str) -> Path:
+    """A clean clip of the original speech to clone, cut from the longest of `spans`."""
+    start, dur = fitting.reference_window(spans)
+    reference = job_dir / name
+    ffmpeg.run_ffmpeg(["-ss", f"{start:.3f}", "-t", f"{dur:.3f}", "-i", str(audio), str(reference)])
+    return reference
+
+
+def run(job_dir: Path, video: Path, target: str, voice: str, progress: Progress, *, speakers: bool = False, num_speakers: int = 0) -> dict:
+    """Run the full pipeline; returns {"video": Path, "subtitles": Path}.
+
+    With `speakers`, each segment is labelled with who says it ("Speaker 1", ...). Cloning the original
+    voice then uses a reference clip of each speaker's own voice, and the subtitles name the speaker.
+    A saved voice speaks every line, whoever said it.
+    """
     progress("Extracting audio", 2)
     audio = job_dir / "source.wav"
     ffmpeg.run_ffmpeg(["-i", str(video), "-vn", "-ac", "1", "-ar", str(RATE), "-c:a", "pcm_s16le", str(audio)])
@@ -57,21 +71,32 @@ def run(job_dir: Path, video: Path, target: str, voice: str, progress: Progress)
     if not segments:
         raise ffmpeg.DubbingError("No speech was found in the video.")
 
+    labels: list[str | None] = [None] * len(segments)
+    if speakers:
+        progress("Identifying speakers", 20)
+        try:
+            turns = diarization.diarize(audio, num_speakers)
+        except diarization.DiarizationError as exc:
+            raise ffmpeg.DubbingError(str(exc))
+        labels = diarization.assign_speakers([(s.start, s.end) for s in segments], turns)
+
     progress("Translating", 30)
     texts = translator.translate([s.text.strip() for s in segments], transcript.language, target)
 
     progress("Preparing voice", 42)
-    if voice == "original":
-        start, dur = fitting.reference_window([(s.start, s.end) for s in segments])
-        reference = job_dir / "reference.wav"
-        ffmpeg.run_ffmpeg(["-ss", f"{start:.3f}", "-t", f"{dur:.3f}", "-i", str(audio), str(reference)])
+    references: dict[str | None, Path] = {}  # speaker label (None: no labels) -> voice to clone
+    if voice != "original":
+        references[None] = voices.voice_audio_path(voice)
     else:
-        reference = voices.voice_audio_path(voice)
+        for n, label in enumerate(dict.fromkeys(labels)):  # in order of first appearance
+            spans = [(s.start, s.end) for s, who in zip(segments, labels) if who == label]
+            references[label] = _original_reference(job_dir, audio, spans, f"reference{n or ''}.wav")
 
     track: list[int] = []
     for i, (seg, text) in enumerate(zip(segments, texts)):
         progress(f"Synthesizing speech ({i + 1}/{len(segments)})", 45 + int(45 * i / len(segments)))
         raw = job_dir / f"clip{i}.raw.wav"
+        reference = references.get(labels[i], references.get(None))
         raw.write_bytes(cloning_engine.synthesize(text, target, reference))
         norm = job_dir / f"clip{i}.wav"
         samples = _normalize(raw, norm)
@@ -90,7 +115,7 @@ def run(job_dir: Path, video: Path, target: str, voice: str, progress: Progress)
     track_path = job_dir / "dubbed.wav"
     _write_wav(track_path, track)
     srt_path = job_dir / "subtitles.srt"
-    srt = fitting.build_srt([(s.start, s.end, t) for s, t in zip(segments, texts)])
+    srt = fitting.build_srt([(s.start, s.end, f"{who}: {t}" if who else t) for s, t, who in zip(segments, texts, labels)])
     srt_path.write_bytes(srt.encode("utf-8"))  # bytes: no CRLF translation on Windows
     out = job_dir / "dubbed.mp4"
     mux(video, track_path, out)

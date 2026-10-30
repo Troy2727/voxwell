@@ -64,7 +64,12 @@ TOOLS = [
     {
         "name": "transcribe",
         "description": "Transcribe an audio or video file on this computer to text.",
-        "inputSchema": _schema({"file_path": _FILE, "language": {**_LANGUAGE, "description": "ISO 639-1 code; omit to detect it."}}, ["file_path"]),
+        "inputSchema": _schema({
+            "file_path": _FILE,
+            "language": {**_LANGUAGE, "description": "ISO 639-1 code; omit to detect it."},
+            "label_speakers": {"type": "boolean", "description": "Label who is speaking ('Speaker 1: ...'). Default false."},
+            "num_speakers": {"type": "integer", "description": "With label_speakers: how many people speak (1 to 20). Omit to detect it."},
+        }, ["file_path"]),
     },
     {
         "name": "align_script",
@@ -156,6 +161,8 @@ TOOLS = [
             "file_path": _FILE,
             "target_language": _LANGUAGE,
             "voice": {**_VOICE, "description": "A saved voice name or id. Omit to clone the original speaker."},
+            "label_speakers": {"type": "boolean", "description": "Keep each speaker's own voice (when cloning the original) and label them in the SRT. Default false."},
+            "num_speakers": {"type": "integer", "description": "With label_speakers: how many people speak (1 to 20). Omit to detect it."},
             "output_path": {"type": "string", "description": "Where to save the MP4. Default: the Voxwell MCP folder."},
         }, ["file_path", "target_language"]),
     },
@@ -189,6 +196,10 @@ def _required(args: dict, key: str) -> str:
     return value
 
 
+def _speaker_args(args: dict) -> dict:
+    return {"speakers": bool(args.get("label_speakers")), "num_speakers": int(args.get("num_speakers") or 0)}
+
+
 def list_voices(args: dict) -> str:
     return _run(cli.cmd_voices)
 
@@ -218,7 +229,8 @@ def generate_sound(args: dict) -> str:
 
 
 def transcribe(args: dict) -> str:
-    text = _run(cli.cmd_transcribe, file=_required(args, "file_path"), language=args.get("language"), format="txt", output=None)
+    text = _run(cli.cmd_transcribe, file=_required(args, "file_path"), language=args.get("language"), format="txt", output=None,
+                **_speaker_args(args))
     return text or "(no speech found)"
 
 
@@ -265,7 +277,7 @@ def convert_voice(args: dict) -> str:
 
 def dub_video(args: dict) -> str:
     return _run(cli.cmd_dub, file=_required(args, "file_path"), to=_required(args, "target_language").lower(),
-                voice=args.get("voice") or "original", output=args.get("output_path") or _default_folder())
+                voice=args.get("voice") or "original", output=args.get("output_path") or _default_folder(), **_speaker_args(args))
 
 
 def apply_effects(args: dict) -> str:
@@ -275,6 +287,8 @@ def apply_effects(args: dict) -> str:
         raise ToolError("reverb, distance, noise and pan must be numbers.")
     return _run(cli.cmd_effects, file=_required(args, "file_path"), noise_color=args.get("noise_color") or "pink",
                 output=args.get("output_path") or _default_folder(), **levels)
+
+
 def manage_pronunciations(args: dict) -> str:
     action = _required(args, "action")
     if action not in ("list", "add", "remove"):
