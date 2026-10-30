@@ -2,7 +2,7 @@
 
 ## Layout
 
-- `backend/voxwell/features/<feature>/`: one folder per feature (`voice_cloning`, `voice_design`, `voices`, `voice_collections`, `gallery`, `stories`, `audiobook`, `dubbing`, `batch`, `dictation`, `transcription`, `tools`, `integrations`, `projects`) with its FastAPI `router.py`, mounted at `/api/<feature>/`. `projects` owns no files: it lists, renames and deletes through each feature's own store (`voice_cloning/history.py`, `stories/jobs.py`, `audiobook/books.py`, `dubbing/jobs.py`, `transcription/jobs.py`). A feature can run a background task while the server is up via `Feature.background` (the watch folder uses it).
+- `backend/voxwell/features/<feature>/`: one folder per feature (`voice_cloning`, `voice_design`, `sound`, `voices`, `voice_collections`, `gallery`, `stories`, `audiobook`, `dubbing`, `batch`, `dictation`, `transcription`, `tools`, `integrations`, `projects`) with its FastAPI `router.py`, mounted at `/api/<feature>/`. `projects` owns no files: it lists, renames and deletes through each feature's own store (`voice_cloning/history.py`, `stories/jobs.py`, `audiobook/books.py`, `dubbing/jobs.py`, `transcription/jobs.py`). A feature can run a background task while the server is up via `Feature.background` (the watch folder uses it).
 - `app/src/features/<feature>/Page.tsx`: the matching React page.
 - `app/src/components/`: Voxwell's shared page pieces (`Page`, `Section`, `Field`, `FileDrop`, `AudioResult`, `VoiceSelect`, `JobProgress`, `ConfirmButton`).
 - `app/src/components/ui/`: UI components copied from shadcn/ui and ElevenLabs UI (both MIT); see its `LICENSES.md`.
@@ -14,7 +14,7 @@
 
 Voxwell is MIT. Only add code you wrote yourself or code under a permissive license (MIT, Apache-2.0, BSD). Never copy from GPL/AGPL projects.
 
-Models must allow commercial use for both **code and weights** (MIT, Apache-2.0, BSD, CC-BY-4.0). No CC-BY-NC, "non-commercial" or "research only" licenses. Record each model in its feature's `LICENSES.md`. `backend/tests/test_dependency_licenses.py` fails if a GPL/AGPL or non-commercial package gets installed.
+Models must allow commercial use for both **code and weights** (MIT, Apache-2.0, BSD, CC-BY-4.0). No CC-BY-NC, "non-commercial" or "research only" licenses. The single owner-approved exception is Stable Audio Open (Stability AI Community License, free below US$1M annual revenue) for the `sound` feature; see `backend/voxwell/features/sound/LICENSES.md`. Record each model in its feature's `LICENSES.md`. `backend/tests/test_dependency_licenses.py` fails if a GPL/AGPL or non-commercial package gets installed.
 
 ## Backend
 
