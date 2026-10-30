@@ -20,6 +20,7 @@ import {
   SidebarMenuItem,
   SidebarProvider,
   SidebarTrigger,
+  useSidebar,
 } from '@/components/ui/sidebar';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -58,6 +59,35 @@ function Account({ user }: { user: User }) {
   );
 }
 
+function FeatureMenu({ active, onSelect }: { active: string; onSelect: (id: string) => void }) {
+  // On phones the sidebar is a slide-over panel; picking a page must also close it.
+  const { setOpenMobile } = useSidebar();
+  return GROUPS.map((group) => (
+    <SidebarGroup key={group}>
+      <SidebarGroupLabel>{group}</SidebarGroupLabel>
+      <SidebarGroupContent>
+        <SidebarMenu>
+          {FEATURES.filter((f) => f.group === group).map((f) => (
+            <SidebarMenuItem key={f.id}>
+              <SidebarMenuButton
+                isActive={f.id === active}
+                tooltip={f.title}
+                onClick={() => {
+                  onSelect(f.id);
+                  setOpenMobile(false);
+                }}
+              >
+                <f.icon />
+                <span>{f.title}</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          ))}
+        </SidebarMenu>
+      </SidebarGroupContent>
+    </SidebarGroup>
+  ));
+}
+
 function Shell({ user }: { user?: User }) {
   const [active, setActive] = useState(FEATURES[0].id);
   const [online, setOnline] = useState<boolean | null>(null);
@@ -78,23 +108,7 @@ function Shell({ user }: { user?: User }) {
           </div>
         </SidebarHeader>
         <SidebarContent>
-          {GROUPS.map((group) => (
-            <SidebarGroup key={group}>
-              <SidebarGroupLabel>{group}</SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  {FEATURES.filter((f) => f.group === group).map((f) => (
-                    <SidebarMenuItem key={f.id}>
-                      <SidebarMenuButton isActive={f.id === active} tooltip={f.title} onClick={() => setActive(f.id)}>
-                        <f.icon />
-                        <span>{f.title}</span>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          ))}
+          <FeatureMenu active={active} onSelect={setActive} />
         </SidebarContent>
         <SidebarFooter>
           {user && <Account user={user} />}
