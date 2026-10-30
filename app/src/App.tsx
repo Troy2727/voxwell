@@ -64,7 +64,7 @@ function Account({ user }: { user: User }) {
 
 function BackendOffline() {
   return (
-    <Alert className="mx-auto mb-6 max-w-3xl">
+    <Alert className="mx-auto mb-6 max-w-4xl">
       <PlugZap />
       <AlertTitle>Voxwell isn't running on this computer</AlertTitle>
       <AlertDescription>

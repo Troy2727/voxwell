@@ -99,7 +99,7 @@ export default function Page() {
   }, []);
 
   return (
-    <PageLayout title="Projects" description="Everything you made, newest first.">
+    <PageLayout title="Projects" description="Everything you made, newest first." wide>
       <ErrorAlert message={error} />
       {items === null && <Skeleton className="h-32 w-full" />}
       {items?.length === 0 && !error && (
@@ -107,9 +107,13 @@ export default function Page() {
           Speech, stories and audiobooks you make, videos you dub and files you transcribe appear here.
         </EmptyState>
       )}
-      {items?.map((item) => (
-        <ProjectCard key={`${item.kind}-${item.id}`} item={item} onChanged={refresh} onError={(e) => setError(message(e))} />
-      ))}
+      {!!items?.length && (
+        <div className="grid items-start gap-4 @4xl:grid-cols-2">
+          {items.map((item) => (
+            <ProjectCard key={`${item.kind}-${item.id}`} item={item} onChanged={refresh} onError={(e) => setError(message(e))} />
+          ))}
+        </div>
+      )}
     </PageLayout>
   );
 }
