@@ -30,6 +30,10 @@ cd backend && uv run voxwell --help        # the CLI; its commands need the back
 
 Requirements: [uv](https://docs.astral.sh/uv/) (it installs Python 3.11 for you), Node.js, and [ffmpeg](https://ffmpeg.org/) on your PATH for dubbing and some tools. Behind a proxy or antivirus that inspects HTTPS, set `UV_SYSTEM_CERTS=1` for the `uv` commands above (the desktop app sets it for you; the backend itself always trusts the OS certificate store). Windows and Linux get CUDA builds of PyTorch, which run on CPU when there is no NVIDIA GPU; macOS uses Apple's GPU (MPS) when available. Model weights download on first use of each feature.
 
+## The website
+
+[voxwell.vercel.app](https://voxwell.vercel.app) is the same UI, hosted. It does no work itself: it talks to the Voxwell backend on your own computer (`http://127.0.0.1:8765`), so start Voxwell first (the desktop app, or `uv run voxwell` in `backend`). Until it is running, the site says so. Chrome asks once whether the site may connect to apps on your device; choose Allow.
+
 ## Accounts (optional)
 
 Sign-in is off unless the app is built with a [Supabase](https://supabase.com) project; without one, the app opens straight to the dashboard. To turn it on, set the project's URL and publishable key when you run or build the UI:

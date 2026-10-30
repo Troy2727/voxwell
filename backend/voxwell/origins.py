@@ -1,7 +1,8 @@
 """Which web pages may talk to the backend."""
 
-# The renderer runs on the Vite dev server or from file:// (origin "null").
-APP_ORIGINS = ("http://localhost:5173", "null")
+# The renderer runs on the Vite dev server or from file:// (origin "null"); the hosted web build
+# at voxwell.vercel.app talks to the backend on the visitor's own computer.
+APP_ORIGINS = ("http://localhost:5173", "null", "https://voxwell.vercel.app")
 
 
 def websocket_origin_allowed(origin: str | None) -> bool:

@@ -152,7 +152,7 @@ def test_cancel_drops_queued_turns(monkeypatch):
     assert calls == [0] and sent == []
 
 
-@pytest.mark.parametrize("origin", [None, "http://localhost:5173", "null", "file://"])
+@pytest.mark.parametrize("origin", [None, "http://localhost:5173", "null", "file://", "https://voxwell.vercel.app"])
 def test_app_origins_allowed(origin):
     assert websocket_origin_allowed(origin)
 
