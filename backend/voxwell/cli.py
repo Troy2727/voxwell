@@ -128,6 +128,16 @@ def _voice_id(client: Client, voice: str) -> str:
     raise CliError(f"Unknown voice '{voice}'. Saved voices: {names}.")
 
 
+def _collection_id(client: Client, collection: str) -> str:
+    """A voice collection's id from its id or (case-insensitive) name."""
+    saved = client.get_json("/api/voice_collections")
+    for c in saved:
+        if collection in (c["id"], c["name"]) or collection.lower() == c["name"].lower():
+            return c["id"]
+    names = ", ".join(c["name"] for c in saved) or "none yet"
+    raise CliError(f"Unknown collection '{collection}'. Collections: {names}.")
+
+
 def _wait(client: Client, path: str, quiet: bool, label: str) -> dict:
     """Poll a background job until it is done; progress goes to stderr when it is a terminal."""
     quiet = quiet or not sys.stderr.isatty()
@@ -161,6 +171,55 @@ def cmd_voices(client: Client, args) -> tuple[str, dict]:
     return "\n".join(lines), {"voices": saved}
 
 
+def cmd_sound(client: Client, args) -> tuple[str, dict]:
+    if not args.prompt.strip():
+        raise CliError("Describe the sound to make.")
+    body = {"prompt": args.prompt.strip(), "duration": args.duration, "steps": args.steps}
+    if args.seed is not None:
+        body["seed"] = args.seed
+    sound = json.loads(client.post_json("/api/sound/generate", body))
+    out = _output_path(args.output, f"sound-{_stamp()}.wav", ".wav")
+    out.write_bytes(client.request("GET", sound["url"]))
+    return f"Saved the sound to {out} (seed {sound['seed']})", {"path": str(out), "seed": sound["seed"], "duration": sound["duration"]}
+
+
+def cmd_collection(client: Client, args) -> tuple[str, dict]:
+    action, name, rest = args.action, (args.name or "").strip(), args.rest
+    base = "/api/voice_collections"
+    if action == "list":
+        collections = client.get_json(base)
+        if not collections:
+            return "No collections yet. Make one with `voxwell collection create NAME`.", {"collections": []}
+        return "\n".join(f"{c['name']}  ({len(c['voice_ids'])} voices, id {c['id']})" for c in collections), {"collections": collections}
+    if not name:
+        raise CliError(f"Give the collection name: voxwell collection {action} NAME.")
+    if action == "create":
+        made = json.loads(client.post_json(base, {"name": name}))
+        return f"Created the collection '{made['name']}' (id {made['id']}).", made
+    collection_id = _collection_id(client, name)
+    if action == "show":
+        voices = json.loads(client.request("GET", f"{base}/{collection_id}/voices"))
+        if not voices:
+            return f"'{name}' has no voices yet.", {"voices": []}
+        return "\n".join(f"{v['name']}  (id {v['id']}, {v['source']})" for v in voices), {"voices": voices}
+    if action == "rename":
+        if not rest:
+            raise CliError("Give the new name: voxwell collection rename NAME NEW_NAME.")
+        body = json.dumps({"name": " ".join(rest)}).encode()
+        renamed = json.loads(client.request("PATCH", f"{base}/{collection_id}", body, {"Content-Type": "application/json"}))
+        return f"Renamed the collection to '{renamed['name']}'.", renamed
+    if action == "delete":
+        client.request("DELETE", f"{base}/{collection_id}")
+        return f"Deleted the collection '{name}'. Its voices are still saved.", {"deleted": collection_id}
+    if not rest:
+        raise CliError(f"Give the voices to {action}: voxwell collection {action} NAME VOICE...")
+    result = None
+    for voice in rest:
+        result = json.loads(client.request("PUT" if action == "add" else "DELETE", f"{base}/{collection_id}/voices/{_voice_id(client, voice)}"))
+    verb = "Added to" if action == "add" else "Removed from"
+    return f"{verb} '{name}': {', '.join(rest)}.", result
+
+
 def cmd_speak(client: Client, args) -> tuple[str, dict]:
     text = sys.stdin.read() if args.text == "-" else args.text
     if not text.strip():
@@ -173,19 +232,68 @@ def cmd_speak(client: Client, args) -> tuple[str, dict]:
     return f"Saved the speech to {out}", {"path": str(out)}
 
 
+def _speaker_fields(args) -> dict:
+    """Form fields for the optional speaker labels; none at all unless they were asked for."""
+    return {"speakers": "true", "num_speakers": args.num_speakers} if args.speakers else {}
+
+
 def cmd_transcribe(client: Client, args) -> tuple[str, dict]:
     source = _existing_file(args.file)
-    job_id = client.post_form("/api/transcription/jobs", {"language": args.language or ""}, source)["id"]
+    fields = {"language": args.language or "", **_speaker_fields(args)}
+    job_id = client.post_form("/api/transcription/jobs", fields, source)["id"]
     job = _wait(client, f"/api/transcription/jobs/{job_id}", args.json, "Transcribing")
     transcript = job["transcript"]
     result = {"text": transcript["text"], "language": job.get("detected") or job.get("language"), "segments": transcript["segments"]}
-    if args.format == "txt" and not args.output:
+    note = transcript.get("speakers_error")  # the transcript is fine, but the labels could not be added
+    if note:
+        result["speakers_error"] = note
+    if args.format == "txt" and not args.output and not args.speakers:
         return transcript["text"], result
     rendered = client.request("GET", f"/api/transcription/jobs/{job_id}/export/{args.format}")
+    if args.format == "txt" and not args.output:  # printed with its "Speaker 1:" labels
+        return rendered.decode("utf-8").strip() + (f"\n\n[{note}]" if note else ""), result
     out = _output_path(args.output, f"{source.stem}.{args.format}", f".{args.format}")
     out.write_bytes(rendered)
     result["path"] = str(out)
-    return f"Saved the transcript to {out}", result
+    return f"Saved the transcript to {out}" + (f"\n{note}" if note else ""), result
+
+
+def cmd_align(client: Client, args) -> tuple[str, dict]:
+    audio = _existing_file(args.file)
+    if args.script_text is not None:  # given directly (the MCP tool); a CLI always passes a file
+        script = args.script_text
+    elif args.script == "-":
+        script = sys.stdin.read()
+    else:
+        script = _existing_file(args.script).read_text(encoding="utf-8", errors="replace")
+    if not script.strip():
+        raise CliError("The script is empty.")
+    fields = {"script": script, "language": args.language or "", "max_chars": args.max_chars, "max_seconds": args.max_seconds}
+    result = client.post_form("/api/transcription/align", fields, audio)
+    out = _output_path(args.output, f"{audio.stem}.{args.format}", f".{args.format}")
+    out.write_text(result[args.format], encoding="utf-8")
+    note = f" ({result['matched']} of {result['total']} words matched the audio)"
+    if result["fallback"]:
+        note = " (none of the words matched the audio, so the times are estimates; check the script and language)"
+    return f"Saved the subtitles to {out}{note}", {**{k: result[k] for k in ("language", "words", "cues", "matched", "total", "fallback")}, "path": str(out)}
+
+
+def cmd_edit(client: Client, args) -> tuple[str, dict]:
+    if args.text is not None:  # given directly (the MCP tool); a CLI always passes a file
+        text = args.text
+    elif args.file == "-":
+        text = sys.stdin.read()
+    else:
+        text = _existing_file(args.file).read_text(encoding="utf-8", errors="replace")
+    body = {"text": text, **({"preset": args.preset} if args.preset else {"instruction": args.instruction})}
+    if not args.preset and not (args.instruction or "").strip():
+        raise CliError("Give --preset or --instruction.")
+    result = json.loads(client.post_json("/api/transcription/edit", body))
+    if not args.output:
+        return result["text"], result
+    out = _output_path(args.output, f"{Path(args.file).stem}.edited.txt", ".txt")
+    out.write_text(result["text"] + "\n", encoding="utf-8")
+    return f"Saved the edited text to {out}", {**result, "path": str(out)}
 
 
 def cmd_isolate(client: Client, args) -> tuple[str, dict]:
@@ -232,7 +340,7 @@ def cmd_convert(client: Client, args) -> tuple[str, dict]:
 def cmd_dub(client: Client, args) -> tuple[str, dict]:
     source = _existing_file(args.file)
     voice = "original" if args.voice == "original" else _voice_id(client, args.voice)
-    job_id = client.post_form("/api/dubbing/jobs", {"target_language": args.to, "voice": voice}, source)["id"]
+    job_id = client.post_form("/api/dubbing/jobs", {"target_language": args.to, "voice": voice, **_speaker_fields(args)}, source)["id"]
     _wait(client, f"/api/dubbing/jobs/{job_id}", args.json, "Dubbing")
     out = _output_path(args.output, f"{source.stem}.{args.to}.mp4", ".mp4")
     out.write_bytes(client.request("GET", f"/api/dubbing/jobs/{job_id}/video"))
@@ -260,6 +368,47 @@ def cmd_translate(client: Client, args) -> tuple[str, dict]:
     return f"{result['translation']}\nSaved the speech to {out}", data
 
 
+def _add_speaker_options(p: argparse.ArgumentParser, speakers_help: str) -> None:
+    p.add_argument("--speakers", action="store_true", help=speakers_help)
+    p.add_argument("--num-speakers", type=int, default=0, metavar="N", help="with --speakers: how many people speak, 1 to 20 (default: find out)")
+
+
+def cmd_effects(client: Client, args) -> tuple[str, dict]:
+    source = _existing_file(args.file)
+    fields = {"reverb": args.reverb, "distance": args.distance, "noise": args.noise, "noise_color": args.noise_color, "pan": args.pan}
+    result = client.post_form("/api/audio_effects/apply", fields, source)
+    out = _output_path(args.output, f"{source.stem}.effects.wav", ".wav")
+    out.write_bytes(client.request("GET", result["url"]))
+    return f"Saved the processed recording to {out}", {"path": str(out)}
+
+
+def cmd_pronounce(client: Client, args) -> tuple[str, dict]:
+    language = urllib.parse.quote(args.language)
+    entries = client.get_json(f"/api/pronunciation/entries?language={language}")
+    if args.action == "list":
+        if not entries:
+            return f"No pronunciations for '{args.language}' yet. Add one with `voxwell pronounce add WORD RESPELLING`.", {"entries": []}
+        return "\n".join(f"{e['word']} -> {e['respelling']}" for e in entries), {"entries": entries}
+    if not args.word:
+        raise CliError("Give the word.")
+    existing = next((e for e in entries if e["word"].lower() == args.word.strip().lower()), None)
+    if args.action == "remove":
+        if existing is None:
+            raise CliError(f"'{args.word}' has no pronunciation for '{args.language}'.")
+        client.request("DELETE", f"/api/pronunciation/entries/{existing['id']}?language={language}")
+        return f"Removed the pronunciation of '{existing['word']}'.", {"removed": existing}
+    if not args.respelling:
+        raise CliError("Give the respelling, e.g. `voxwell pronounce add Nguyen win`.")
+    body = {"language": args.language, "word": args.word, "respelling": args.respelling,
+            "case_sensitive": args.case_sensitive, "whole_word": not args.partial}
+    if existing is None:
+        entry = json.loads(client.post_json("/api/pronunciation/entries", body))
+    else:
+        entry = json.loads(client.request("PUT", f"/api/pronunciation/entries/{existing['id']}", json.dumps(body).encode(),
+                                          {"Content-Type": "application/json"}))
+    return f"'{entry['word']}' will be spoken as '{entry['respelling']}'.", entry
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="voxwell",
@@ -277,6 +426,20 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("voices", parents=[common], help="list saved voices")
     p.set_defaults(run=cmd_voices)
 
+    p = sub.add_parser("sound", parents=[common], help="generate a sound effect from a description (WAV)")
+    p.add_argument("prompt", help='e.g. "rain on a tin roof, distant thunder"')
+    p.add_argument("-d", "--duration", type=float, default=10, help="seconds, 1 to 30 (default 10)")
+    p.add_argument("--seed", type=int, help="repeat a previous result by reusing its seed")
+    p.add_argument("--steps", type=int, default=100, help="quality steps, 10 to 250 (default 100; fewer is faster)")
+    p.add_argument("-o", "--output", help="WAV file or folder (default: ./sound-<time>.wav)")
+    p.set_defaults(run=cmd_sound)
+    p = sub.add_parser("collection", parents=[common], help="organize saved voices into collections (folders)")
+    p.add_argument("action", choices=["list", "show", "create", "rename", "delete", "add", "remove"],
+                   help="list collections; show a collection's voices; create/rename/delete one; add/remove voices")
+    p.add_argument("name", nargs="?", help="collection name or id")
+    p.add_argument("rest", nargs="*", help="rename: the new name; add/remove: saved voice names or ids")
+    p.set_defaults(run=cmd_collection)
+
     p = sub.add_parser("speak", parents=[common], help="turn text into speech (WAV)")
     p.add_argument("text", help="what to say, up to 4096 characters; - reads it from stdin")
     p.add_argument("-v", "--voice", help="saved voice name or id (default: the built-in voice)")
@@ -290,7 +453,24 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("-l", "--language", help="ISO 639-1 code (default: detect it)")
     p.add_argument("-f", "--format", choices=["txt", "srt", "vtt"], default="txt", help="output format (default txt)")
     p.add_argument("-o", "--output", help="save to this file instead of printing the text")
+    _add_speaker_options(p, "label who speaks: a 'Speaker 1:' prefix in TXT and SRT, <v Speaker 1> in VTT")
     p.set_defaults(run=cmd_transcribe)
+
+    p = sub.add_parser("align", parents=[common], help="time a script against its recording (SRT or VTT subtitles)")
+    p.add_argument("file", help="the audio or video that speaks the script")
+    p.add_argument("script", help="a text file with the words spoken; - reads it from stdin")
+    p.add_argument("-l", "--language", help="ISO 639-1 code (default: detect it)")
+    p.add_argument("-f", "--format", choices=["srt", "vtt"], default="srt", help="subtitle format (default srt)")
+    p.add_argument("-o", "--output", help="subtitle file or folder (default: <name>.<format> in the current folder)")
+    p.add_argument("--max-chars", type=int, default=42, help="longest subtitle in characters, 10 to 200 (default 42)")
+    p.add_argument("--max-seconds", type=float, default=6.0, help="longest subtitle in seconds, 1 to 30 (default 6)")
+    p.set_defaults(run=cmd_align, script_text=None)
+    p = sub.add_parser("edit", parents=[common], help="clean up a transcript with the local AI model")
+    p.add_argument("file", help="a text file, e.g. from `transcribe -o`; - reads it from stdin")
+    p.add_argument("-p", "--preset", help="filler (remove filler words), punctuation, formal or concise")
+    p.add_argument("-i", "--instruction", help='your own instruction, e.g. "remove filler words"')
+    p.add_argument("-o", "--output", help="save to this .txt file or folder instead of printing the text")
+    p.set_defaults(run=cmd_edit, text=None)
 
     p = sub.add_parser("isolate", parents=[common], help="split a recording into the voice and the background")
     p.add_argument("file", help="WAV, MP3, FLAC or OGG, up to 10 minutes")
@@ -309,6 +489,24 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--preview", metavar="FILE", help="also save the preview WAV here")
     p.set_defaults(run=cmd_design)
 
+    p = sub.add_parser("effects", parents=[common], help="add reverb, distance, background noise or stereo pan to a recording")
+    p.add_argument("file", help="WAV, MP3, FLAC or OGG")
+    p.add_argument("--reverb", type=float, default=0.0, help="0 to 1 (default 0)")
+    p.add_argument("--distance", type=float, default=0.0, help="0 (close) to 1 (far away): duller, quieter, more reverberant")
+    p.add_argument("--noise", type=float, default=0.0, help="background noise level, 0 to 1 (default 0)")
+    p.add_argument("--noise-color", choices=["pink", "brown"], default="pink", help="kind of noise (default pink)")
+    p.add_argument("--pan", type=float, default=0.0, help="-1 (left) to 1 (right); any other value makes the output stereo")
+    p.add_argument("-o", "--output", help="WAV file or folder (default: <name>.effects.wav in the current folder)")
+    p.set_defaults(run=cmd_effects)
+    p = sub.add_parser("pronounce", parents=[common], help="list, add or remove how a word is pronounced")
+    p.add_argument("action", choices=["list", "add", "remove"], help="add also updates an existing word")
+    p.add_argument("word", nargs="?", help="the word as written")
+    p.add_argument("respelling", nargs="?", help="how to write it so it is spoken right, e.g. win for Nguyen")
+    p.add_argument("-l", "--language", default="en", help="ISO 639-1 code (default en)")
+    p.add_argument("--case-sensitive", action="store_true", help="match only this exact capitalization")
+    p.add_argument("--partial", action="store_true", help="also match inside longer words")
+    p.set_defaults(run=cmd_pronounce)
+
     p = sub.add_parser("convert", parents=[common], help="re-speak a recording in a saved voice")
     p.add_argument("file")
     p.add_argument("-v", "--voice", required=True, help="saved voice name or id")
@@ -320,6 +518,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("-t", "--to", required=True, help="target language, ISO 639-1 code")
     p.add_argument("-v", "--voice", default="original", help="saved voice name or id, or original (default: clone the speaker)")
     p.add_argument("-o", "--output", help="MP4 file or folder (default: <name>.<lang>.mp4 in the current folder)")
+    _add_speaker_options(p, "keep each speaker's own voice (with the original voice) and label them in the subtitles")
     p.set_defaults(run=cmd_dub)
 
     p = sub.add_parser("translate", parents=[common], help="translate text or a recording and speak it in another language (WAV)")

@@ -35,6 +35,8 @@ class Job:
     outputs: dict[str, Path] = field(default_factory=dict)
     title: str = "Dub"  # display name only, never used as a path
     created: float = 0.0
+    speakers: bool = False  # keep each speaker's own voice and label them (off by default)
+    num_speakers: int = 0  # how many speakers there are, 0 to detect it
 
 
 _jobs: dict[str, Job] = {}
@@ -48,6 +50,7 @@ def _save(job: Job) -> None:
         "state": job.state, "step": job.step, "percent": job.percent, "error": job.error,
         "outputs": {key: path.name for key, path in job.outputs.items()},
         "title": job.title, "created": job.created,
+        "speakers": job.speakers, "num_speakers": job.num_speakers,
     }
     (job.dir / STATE_FILE).write_text(json.dumps(state), encoding="utf-8")
 
@@ -62,6 +65,7 @@ def _load(folder: Path) -> Job | None:
         s["percent"], s["error"], {key: folder / name for key, name in s["outputs"].items()},
         # Jobs saved before titles existed fall back to a generic title and the file's age.
         s.get("title", "Dub"), s.get("created", path.stat().st_mtime),
+        s.get("speakers", False), s.get("num_speakers", 0),
     )
     if job.state in ("queued", "running"):  # not in memory, so the app closed mid-job
         job.state, job.error = "error", INTERRUPTED
@@ -77,11 +81,11 @@ def _cleanup(job: Job) -> None:
             shutil.rmtree(path) if path.is_dir() else path.unlink()
 
 
-def create(dir_root: Path, ext: str, target: str, voice: str, title: str = "Dub") -> Job:
+def create(dir_root: Path, ext: str, target: str, voice: str, title: str = "Dub", *, speakers: bool = False, num_speakers: int = 0) -> Job:
     job_id = uuid.uuid4().hex[:12]
     folder = dir_root / job_id
     folder.mkdir(parents=True)
-    job = Job(job_id, folder, folder / f"input{ext}", target, voice, title=title, created=time.time())
+    job = Job(job_id, folder, folder / f"input{ext}", target, voice, title=title, created=time.time(), speakers=speakers, num_speakers=num_speakers)
     with _lock:
         _jobs[job_id] = job
     return job
@@ -130,7 +134,8 @@ def _work(job: Job) -> None:
         job.state = "running"
         _save(job)
         try:
-            job.outputs = pipeline.run(job.dir, job.video, job.target, job.voice, lambda s, p: _update(job, s, p))
+            extra = {"speakers": True, "num_speakers": job.num_speakers} if job.speakers else {}
+            job.outputs = pipeline.run(job.dir, job.video, job.target, job.voice, lambda s, p: _update(job, s, p), **extra)
             job.state, job.step, job.percent = "done", "Done", 100
         except DubbingError as exc:
             job.state, job.error = "error", str(exc)

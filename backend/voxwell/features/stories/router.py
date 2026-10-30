@@ -6,6 +6,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from voxwell import voices
+from voxwell.features.audio_effects.dsp import Effects
 from voxwell.features.stories import jobs
 from voxwell.features.stories.script import ScriptError, parse, speakers
 from voxwell.features.voice_cloning.engine import LANGUAGES
@@ -26,6 +27,7 @@ class StoryRequest(BaseModel):
     language: str = "en"
     script: str
     cast: dict[str, str] = {}  # speaker -> voice id; missing speakers use the default voice
+    effects: Effects | None = None
 
 
 def summary(job: jobs.Job) -> dict:
@@ -75,7 +77,7 @@ def create_job(req: StoryRequest):
                 raise HTTPException(422, f"Unknown voice for {speaker}.")
         cast[speaker] = voice
     title = req.title.strip()[:MAX_TITLE] or lines[0].text[:60]
-    job = jobs.create(title, req.language, req.script, cast)
+    job = jobs.create(title, req.language, req.script, cast, req.effects.model_dump() if req.effects else None)
     jobs.start(job)
     return {"id": job.id}
 

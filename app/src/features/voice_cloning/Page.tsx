@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import { api, apiUrl, listVoices, Voice } from '../../api';
 import { AudioResult } from '@/components/audio-result';
 import { ChoiceSelect } from '@/components/choice-select';
+import { EffectsControls, EffectsSettings, isNeutral, NO_EFFECTS } from '@/components/effects-controls';
 import { FileDrop } from '@/components/file-drop';
 import { ErrorAlert, Field, message, Page as PageLayout, Section } from '@/components/page';
 import { VoiceSelect } from '@/components/voice-select';
@@ -19,6 +20,7 @@ export default function Page() {
   const [uploading, setUploading] = useState(false);
   const [text, setText] = useState('');
   const [language, setLanguage] = useState('en');
+  const [fx, setFx] = useState<EffectsSettings>(NO_EFFECTS);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [audioUrl, setAudioUrl] = useState('');
@@ -61,7 +63,7 @@ export default function Page() {
       const res = await api<{ id: string; url: string }>('/api/voice_cloning/synthesize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, language, voice_id: voiceId || null }),
+        body: JSON.stringify({ text, language, voice_id: voiceId || null, effects: isNeutral(fx) ? null : fx }),
       });
       setAudioUrl(apiUrl(res.url));
     } catch (e) {
@@ -99,6 +101,7 @@ export default function Page() {
         <Field label="Text" htmlFor="clone-text" hint={`${text.length} / 2000`}>
           <Textarea id="clone-text" rows={5} maxLength={2000} value={text} onChange={(e) => setText(e.target.value)} placeholder="Type what the voice should say…" />
         </Field>
+        <EffectsControls value={fx} onChange={setFx} disabled={busy} />
         <div>
           <Button disabled={busy || !text.trim()} onClick={generate}>
             {busy ? 'Generating…' : 'Generate'}
