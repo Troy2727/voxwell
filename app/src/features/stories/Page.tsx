@@ -3,6 +3,7 @@ import { Play } from 'lucide-react';
 import { api, apiUrl, listVoices, sendJson, type Voice } from '../../api';
 import { AudioResult } from '@/components/audio-result';
 import { ChoiceSelect } from '@/components/choice-select';
+import { EffectsControls, EffectsSettings, isNeutral, NO_EFFECTS } from '@/components/effects-controls';
 import { JobProgress } from '@/components/job-progress';
 import { ErrorAlert, Field, message, Muted, Page as PageLayout, Section } from '@/components/page';
 import { VoiceSelect } from '@/components/voice-select';
@@ -38,6 +39,7 @@ export default function Page() {
   const [scriptError, setScriptError] = useState('');
   const [cast, setCast] = useState<Record<string, string>>({});
   const [story, setStory] = useState<Story | null>(null);
+  const [fx, setFx] = useState<EffectsSettings>(NO_EFFECTS);
   const [error, setError] = useState('');
   const timer = useRef<number | undefined>(undefined);
   const parseTimer = useRef<number | undefined>(undefined);
@@ -84,7 +86,7 @@ export default function Page() {
     setStory(null);
     const chosen = Object.fromEntries(speakers.map((s) => [s, cast[s] ?? DEFAULT_VOICE]));
     try {
-      const { id } = await sendJson<{ id: string }>('/api/stories/jobs', 'POST', { title, language, script, cast: chosen });
+      const { id } = await sendJson<{ id: string }>('/api/stories/jobs', 'POST', { title, language, script, cast: chosen, effects: isNeutral(fx) ? null : fx });
       await poll(id);
     } catch (e) {
       setError(message(e));
@@ -128,6 +130,7 @@ export default function Page() {
             </div>
           ))}
           {voices.length === 0 && <Muted className="text-xs">No saved voices yet; everyone uses the default voice.</Muted>}
+          <EffectsControls value={fx} onChange={setFx} disabled={working} />
           <div>
             <Button disabled={working} onClick={generate}>
               <Play /> {working ? 'Generating…' : 'Generate story'}

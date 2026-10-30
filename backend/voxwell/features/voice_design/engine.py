@@ -3,6 +3,8 @@
 import io
 import threading
 
+from voxwell.features.pronunciation import store as pronunciation
+
 MODEL_ID = "parler-tts/parler-tts-mini-v1"
 
 _lock = threading.Lock()
@@ -36,6 +38,8 @@ def design(description: str, sample_text: str) -> bytes:
     """Synthesize sample_text in a voice matching description; returns WAV bytes."""
     import soundfile as sf
 
+    # Parler-TTS Mini speaks English, so the English pronunciation dictionary applies.
+    sample_text = pronunciation.apply(sample_text, "en")
     c = _load()
     device, model, tok = c["device"], c["model"], c["tokenizer"]
     input_ids = tok(description, return_tensors="pt").input_ids.to(device)

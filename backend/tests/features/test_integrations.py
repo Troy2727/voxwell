@@ -224,7 +224,7 @@ def test_mcp_handshake_and_tool_list(mcp):
     assert init["result"]["protocolVersion"] == "2025-03-26" and "tools" in init["result"]["capabilities"]
     assert mcp_server.handle({"jsonrpc": "2.0", "method": "notifications/initialized"}) is None
     names = {t["name"] for t in mcp("tools/list")["result"]["tools"]}
-    assert names == {"list_voices", "voice_collections", "speak", "transcribe", "isolate_voice", "clone_voice", "design_voice", "convert_voice", "dub_video"}
+    assert names == {"list_voices", "voice_collections", "speak", "generate_sound", "transcribe", "edit_transcript", "align_script", "isolate_voice", "clone_voice", "design_voice", "convert_voice", "dub_video", "manage_pronunciations", "apply_effects"}
     assert names == set(mcp_server.HANDLERS)
     assert mcp("ping")["result"] == {}
     assert mcp("resources/list")["error"]["code"] == -32601
@@ -272,6 +272,35 @@ def test_mcp_transcribe_can_label_speakers(mcp, monkeypatch, tmp_path):
     assert labelled.startswith("Speaker 1: Hi.") and "Speaker 2: Bye." in labelled and seen == [2]
     schema = next(x for x in mcp("tools/list")["result"]["tools"] if x["name"] == "dub_video")["inputSchema"]["properties"]
     assert "label_speakers" in schema and "num_speakers" in schema
+
+
+def test_mcp_align_script(mcp, monkeypatch, tmp_path, isolated_data_dir):
+    from voxwell.features.dictation.engine import Word, WordTimings
+
+    monkeypatch.setattr(stt, "transcribe_words", lambda p, language=None, on_progress=None: WordTimings("en", [Word(0.0, 1.0, "Hi")]), raising=False)
+    audio = tmp_path / "talk.mp3"
+    audio.write_bytes(b"audio")
+    result = tool(mcp, "align_script", file_path=str(audio), script="Hi")
+    assert result["isError"] is False and (isolated_data_dir / "mcp" / "talk.srt").read_text(encoding="utf-8").startswith("1\n")
+    script = tmp_path / "s.txt"
+    script.write_text("Hi", encoding="utf-8")
+    out = tmp_path / "talk.vtt"
+    assert tool(mcp, "align_script", file_path=str(audio), script_path=str(script), format="vtt", output_path=str(out))["isError"] is False
+    assert out.read_text(encoding="utf-8").startswith("WEBVTT")
+    for args in ({}, {"script": "a", "script_path": "b"}, {"script": "  "}, {"script": "a", "format": "ass"}):
+        assert tool(mcp, "align_script", file_path=str(audio), **args)["isError"] is True
+
+
+def test_mcp_edit_transcript(mcp, monkeypatch, tmp_path):
+    from voxwell.features.tools import direction
+
+    monkeypatch.setattr(direction, "complete", lambda system, user, max_new_tokens=80: "Clean text.")
+    assert tool(mcp, "edit_transcript", text="um text", preset="filler")["content"][0]["text"] == "Clean text."
+    f = tmp_path / "t.txt"
+    f.write_text("um text", encoding="utf-8")
+    assert tool(mcp, "edit_transcript", file_path=str(f), instruction="clean it")["content"][0]["text"] == "Clean text."
+    for args in ({}, {"text": "a", "file_path": "b"}, {"text": "  "}, {"text": "a"}):
+        assert tool(mcp, "edit_transcript", **args)["isError"] is True
 
 
 def test_mcp_isolate_clone_convert_design(mcp, monkeypatch, tmp_path, isolated_data_dir):

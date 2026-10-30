@@ -18,6 +18,8 @@ import {
   TranscriptViewerWords,
 } from '@/components/ui/transcript-viewer';
 import { cn } from '@/lib/utils';
+import { AlignPanel } from './AlignPanel';
+import { EditPanel } from './EditPanel';
 
 interface Summary {
   id: string;
@@ -151,6 +153,8 @@ export default function Page() {
       </Section>
       <ErrorAlert message={error} />
 
+      <AlignPanel />
+
       {current && (
         <Viewer
           key={current.id + current.state}
@@ -224,6 +228,7 @@ function Viewer({ summary, media, onMedia }: { summary: Summary; media?: File; o
   const base = `/api/transcription/jobs/${summary.id}/export`;
 
   return (
+    <>
     <Section
       title={summary.title}
       action={
@@ -272,6 +277,8 @@ function Viewer({ summary, media, onMedia }: { summary: Summary; media?: File; o
         </>
       )}
     </Section>
+    <EditPanel jobId={summary.id} title={summary.title} text={text} />
+    </>
   );
 }
 

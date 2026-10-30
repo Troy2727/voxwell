@@ -71,3 +71,38 @@ def transcribe(
         raise
     text = " ".join(p.text for p in parts if p.text).strip()
     return Transcript(text=text, language=info.language, segments=parts)
+
+
+@dataclass
+class Word:
+    start: float  # seconds
+    end: float
+    text: str
+
+
+@dataclass
+class WordTimings:
+    language: str  # ISO 639-1 code
+    words: list[Word]
+
+
+def transcribe_words(
+    audio_path: Path, language: str | None = None, on_progress: Callable[[float], None] | None = None
+) -> WordTimings:
+    """Recognize an audio file with a timestamp for every word (used to align a known script).
+
+    A sibling of transcribe() that asks faster-whisper for word timestamps; `on_progress` works as there.
+    """
+    model = _load_model()
+    try:
+        segments, info = model.transcribe(str(audio_path), language=language or None, word_timestamps=True)
+        words = []
+        for s in segments:
+            words.extend(Word(w.start, w.end, w.word.strip()) for w in s.words or [] if w.word.strip())
+            if on_progress and info.duration:
+                on_progress(min(s.end / info.duration, 1.0))
+    except Exception as exc:
+        if type(exc).__module__.split(".")[0] == "av":
+            raise AudioError("Could not decode the audio.") from exc
+        raise
+    return WordTimings(language=info.language, words=words)

@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from voxwell import voices
 from voxwell.features import FEATURES
 from voxwell.features.integrations import openai_api
+from voxwell.origins import APP_ORIGINS
 
 # Model downloads must work behind TLS-inspecting proxies and antivirus, whose certificates
 # live in the OS store, not in Python's bundled one. huggingface_hub does not fall back to the
@@ -27,10 +28,9 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(title="Voxwell", lifespan=lifespan)
-# The renderer runs on the Vite dev server or from file:// (origin "null").
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "null"],
+    allow_origins=list(APP_ORIGINS),
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -70,7 +70,11 @@ def _stop_when_stdin_closes(server) -> None:
 def run():
     import uvicorn
 
-    server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=int(os.environ.get("VOXWELL_PORT", "8765"))))
+    from voxwell.live_audio import MAX_FRAME_BYTES
+
+    port = int(os.environ.get("VOXWELL_PORT", "8765"))
+    # Live audio messages are small; the WebSocket layer refuses bigger ones before buffering them.
+    server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, ws_max_size=MAX_FRAME_BYTES))
     # Only when started by the app: a terminal's stdin must not stop a server started by hand.
     if os.environ.get("VOXWELL_EXIT_WITH_PARENT") == "1":
         _stop_when_stdin_closes(server)

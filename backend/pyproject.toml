@@ -7,6 +7,7 @@ requires-python = ">=3.11,<3.12"  # chatterbox-tts 0.1.6 pins numpy<1.26 (no 3.1
 dependencies = [
     "fastapi>=0.115",
     "uvicorn>=0.30",
+    "websockets>=12",  # uvicorn serves WebSockets (live audio) only with this installed
     "python-multipart>=0.0.9",
     "platformdirs>=4",
     "truststore>=0.10",  # trust the OS certificate store (corporate proxies, antivirus TLS inspection)
@@ -20,12 +21,18 @@ dependencies = [
     "torchaudio",  # listed directly so the CUDA index source below applies to it
     "sentencepiece",
     "soundfile",
+    "diffusers==0.36.0",  # Stable Audio (sound effects); newest release chatterbox-tts still imports against
+    "torchsde>=0.2.6",
+    "scipy",
 ]
 
 [tool.uv]
 # parler-tts pins transformers==4.46.1; chatterbox-tts 0.1.6 needs 4.46.3 (patch-level bump).
 override-dependencies = [
     "transformers==4.46.3",
+    # chatterbox-tts 0.1.6 pins diffusers==0.29.0, which has no StableAudioPipeline (added in 0.30). 0.36.0 is the
+    # newest release where every diffusers name chatterbox imports still exists (tests/test_model_api_contracts.py).
+    "diffusers==0.36.0",
     # pykakasi is GPL-3.0 (chatterbox-tts uses it only for Japanese); never install it.
     "pykakasi; sys_platform == 'never'",
 ]
