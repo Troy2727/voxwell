@@ -25,14 +25,19 @@ const OFFLINE_INFO: Info = {
   mcp: { command: 'uv', args: ['run', '--directory', '<voxwell>/backend', 'voxwell-mcp'], env: { UV_SYSTEM_CERTS: '1' } },
 };
 
-/** The eight tools, the same in the CLI and the MCP server (backend/voxwell/cli.py, mcp_server.py). */
+/** The tools, the same in the CLI and the MCP server (backend/voxwell/cli.py, mcp_server.py). */
 const TOOLS: { cli: string; mcp: string; what: string }[] = [
   { cli: 'voices', mcp: 'list_voices', what: 'List saved voices' },
+  { cli: 'collection', mcp: 'voice_collections', what: 'Organize saved voices into collections' },
   { cli: 'speak', mcp: 'speak', what: 'Turn text into speech (WAV)' },
+  { cli: 'sound', mcp: 'generate_sound', what: 'Generate a sound effect from a description' },
   { cli: 'transcribe', mcp: 'transcribe', what: 'Transcribe an audio or video file' },
+  { cli: 'edit', mcp: 'edit_transcript', what: 'Clean up a transcript with the local AI model' },
   { cli: 'isolate', mcp: 'isolate_voice', what: 'Split a recording into the voice and the background' },
   { cli: 'clone', mcp: 'clone_voice', what: 'Save a voice from a short, clean recording' },
   { cli: 'design', mcp: 'design_voice', what: 'Create a voice from a description' },
+  { cli: 'effects', mcp: 'apply_effects', what: 'Add reverb, distance, noise or pan to a recording' },
+  { cli: 'pronounce', mcp: 'manage_pronunciations', what: 'List, add or remove how a word is pronounced' },
   { cli: 'convert', mcp: 'convert_voice', what: 'Re-speak a recording in a saved voice' },
   { cli: 'dub', mcp: 'dub_video', what: 'Dub a video into another language (MP4 + SRT)' },
 ];
@@ -115,7 +120,7 @@ export default function Page() {
         </Alert>
       )}
 
-      <Section title="Eight tools, two ways in" description="The command line and MCP share the same eight tools.">
+      <Section title={`${TOOLS.length} tools, two ways in`} description="The command line and MCP share the same tools.">
         <div className="overflow-x-auto rounded-lg border">
           <table className="w-full text-sm">
             <thead className="bg-muted/40 text-left">
@@ -196,7 +201,7 @@ ${info.cli} isolate song.mp3`} />
         title="AI assistants (MCP)"
         description={
           <>
-            Gives AI apps without a terminal, such as Claude Desktop and Cursor, the same eight tools as the command line: speak, transcribe, isolate, clone, design, convert, dub and list voices. Keep Voxwell open
+            Gives AI apps without a terminal, such as Claude Desktop and Cursor, the same tools as the command line, listed above. Keep Voxwell open
             while the assistant uses it. Requires <a href="https://docs.astral.sh/uv/">uv</a>.
           </>
         }

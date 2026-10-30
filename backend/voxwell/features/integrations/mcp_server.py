@@ -30,6 +30,17 @@ TOOLS = [
         "inputSchema": _schema({}, []),
     },
     {
+        "name": "voice_collections",
+        "description": "Organize saved voices into collections (folders). Deleting a collection never deletes its voices.",
+        "inputSchema": _schema({
+            "action": {"type": "string", "enum": ["list", "show", "create", "rename", "delete", "add", "remove"],
+                       "description": "list collections; show a collection's voices; create, rename or delete one; add or remove voices."},
+            "name": {"type": "string", "description": "Collection name or id (not needed for list)."},
+            "new_name": {"type": "string", "description": "The new name, for rename."},
+            "voices": {"type": "array", "items": {"type": "string"}, "description": "Saved voice names or ids, for add and remove."},
+        }, ["action"]),
+    },
+    {
         "name": "speak",
         "description": "Turn text into speech with a Voxwell voice and save it as a WAV file. Returns the file path.",
         "inputSchema": _schema({
@@ -40,9 +51,31 @@ TOOLS = [
         }, ["text"]),
     },
     {
+        "name": "generate_sound",
+        "description": "Generate a sound effect or ambience from a text description (Stable Audio Open; needs a Hugging Face "
+        "token and accepted model terms, see the Sound page). Takes a while on CPU. Saves a WAV and returns its path and seed.",
+        "inputSchema": _schema({
+            "prompt": {"type": "string", "description": "What the sound is, e.g. 'rain on a tin roof, distant thunder'."},
+            "duration": {"type": "number", "description": "Seconds, 1 to 30. Default 10."},
+            "seed": {"type": "integer", "description": "Reuse a previous seed to repeat a result."},
+            "output_path": {"type": "string", "description": "Where to save the WAV. Default: the Voxwell MCP folder."},
+        }, ["prompt"]),
+    },
+    {
         "name": "transcribe",
         "description": "Transcribe an audio or video file on this computer to text.",
         "inputSchema": _schema({"file_path": _FILE, "language": {**_LANGUAGE, "description": "ISO 639-1 code; omit to detect it."}}, ["file_path"]),
+    },
+    {
+        "name": "edit_transcript",
+        "description": "Clean up a transcript with Voxwell's local AI model, following a short instruction. Give the "
+        "text or a text file, and a preset or your own instruction. Returns the edited text.",
+        "inputSchema": _schema({
+            "text": {"type": "string", "description": "The transcript text. Alternative to file_path."},
+            "file_path": {**_FILE, "description": "Path to a text file with the transcript. Alternative to text."},
+            "preset": {"type": "string", "description": "filler (remove filler words), punctuation, formal or concise."},
+            "instruction": {"type": "string", "description": "Your own instruction, e.g. 'remove filler words'. Alternative to preset."},
+        }, []),
     },
     {
         "name": "isolate_voice",
@@ -75,6 +108,33 @@ TOOLS = [
             "voice": _VOICE,
             "output_path": {"type": "string", "description": "Where to save the WAV. Default: the Voxwell MCP folder."},
         }, ["file_path", "voice"]),
+    },
+    {
+        "name": "apply_effects",
+        "description": "Add reverb, distance, background noise or stereo pan to a recording. Saves a WAV (stereo when pan is "
+        "not 0; reverb adds a short tail) and returns its path. Leave an effect out to leave it off.",
+        "inputSchema": _schema({
+            "file_path": _FILE,
+            "reverb": {"type": "number", "description": "0 to 1."},
+            "distance": {"type": "number", "description": "0 (close) to 1 (far away): duller, quieter, more reverberant."},
+            "noise": {"type": "number", "description": "Background noise level, 0 to 1."},
+            "noise_color": {"type": "string", "enum": ["pink", "brown"], "description": "Default pink."},
+            "pan": {"type": "number", "description": "-1 (left) to 1 (right)."},
+            "output_path": {"type": "string", "description": "Where to save the WAV. Default: the Voxwell MCP folder."},
+        }, ["file_path"]),
+    },
+    {
+        "name": "manage_pronunciations",
+        "description": "List, add or remove how a word is pronounced. Every voice then says the word as respelled "
+        "(e.g. Nguyen -> win). Adding a word that already has an entry replaces it.",
+        "inputSchema": _schema({
+            "action": {"type": "string", "enum": ["list", "add", "remove"]},
+            "word": {"type": "string", "description": "The word as written (add, remove)."},
+            "respelling": {"type": "string", "description": "How to write it so it is spoken right (add)."},
+            "language": {**_LANGUAGE, "description": "ISO 639-1 code. Default en."},
+            "case_sensitive": {"type": "boolean", "description": "Match only this capitalization (add). Default false."},
+            "whole_word": {"type": "boolean", "description": "Match whole words only (add). Default true."},
+        }, ["action"]),
     },
     {
         "name": "dub_video",
@@ -120,6 +180,17 @@ def list_voices(args: dict) -> str:
     return _run(cli.cmd_voices)
 
 
+def voice_collections(args: dict) -> str:
+    action = _required(args, "action")
+    if action == "rename":
+        rest = [_required(args, "new_name")]
+    elif action in ("add", "remove"):
+        rest = [str(v) for v in args.get("voices") or []]
+    else:
+        rest = []
+    return _run(cli.cmd_collection, action=action, name=args.get("name"), rest=rest)
+
+
 def speak(args: dict) -> str:
     text = _required(args, "text")
     if text == "-":  # the CLI reads "-" from stdin, which is this server's protocol stream
@@ -128,9 +199,23 @@ def speak(args: dict) -> str:
                 output=args.get("output_path") or _default_folder())
 
 
+def generate_sound(args: dict) -> str:
+    return _run(cli.cmd_sound, prompt=_required(args, "prompt"), duration=float(args.get("duration") or 10),
+                seed=args.get("seed"), steps=100, output=args.get("output_path") or _default_folder())
+
+
 def transcribe(args: dict) -> str:
     text = _run(cli.cmd_transcribe, file=_required(args, "file_path"), language=args.get("language"), format="txt", output=None)
     return text or "(no speech found)"
+
+
+def edit_transcript(args: dict) -> str:
+    text, path = args.get("text"), str(args.get("file_path") or "").strip()
+    if (text is None) == (not path):
+        raise ToolError("Give either text or file_path.")
+    if text is not None and not str(text).strip():
+        raise ToolError("text is required.")
+    return _run(cli.cmd_edit, file=path or "text", text=text, preset=args.get("preset"), instruction=args.get("instruction"), output=None)
 
 
 def isolate_voice(args: dict) -> str:
@@ -156,9 +241,27 @@ def dub_video(args: dict) -> str:
                 voice=args.get("voice") or "original", output=args.get("output_path") or _default_folder())
 
 
+def apply_effects(args: dict) -> str:
+    try:
+        levels = {k: float(args.get(k) or 0) for k in ("reverb", "distance", "noise", "pan")}
+    except (TypeError, ValueError):
+        raise ToolError("reverb, distance, noise and pan must be numbers.")
+    return _run(cli.cmd_effects, file=_required(args, "file_path"), noise_color=args.get("noise_color") or "pink",
+                output=args.get("output_path") or _default_folder(), **levels)
+def manage_pronunciations(args: dict) -> str:
+    action = _required(args, "action")
+    if action not in ("list", "add", "remove"):
+        raise ToolError("action must be list, add or remove.")
+    return _run(cli.cmd_pronounce, action=action, word=args.get("word"), respelling=args.get("respelling"),
+                language=args.get("language") or "en", case_sensitive=bool(args.get("case_sensitive")),
+                partial=args.get("whole_word") is False)
+
+
 HANDLERS = {
-    "list_voices": list_voices, "speak": speak, "transcribe": transcribe, "isolate_voice": isolate_voice,
+    "list_voices": list_voices, "voice_collections": voice_collections, "speak": speak, "generate_sound": generate_sound, "transcribe": transcribe, "edit_transcript": edit_transcript, "isolate_voice": isolate_voice,
     "clone_voice": clone_voice, "design_voice": design_voice, "convert_voice": convert_voice, "dub_video": dub_video,
+    "apply_effects": apply_effects,
+    "manage_pronunciations": manage_pronunciations,
 }
 
 

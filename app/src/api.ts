@@ -45,3 +45,11 @@ export interface Voice {
 }
 
 export const listVoices = () => api<Voice[]>('/api/voices');
+
+export interface VoiceCollection {
+  id: string;
+  name: string;
+  voice_ids: string[];
+}
+
+export const listVoiceCollections = () => api<VoiceCollection[]>('/api/voice_collections');

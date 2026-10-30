@@ -6,9 +6,10 @@ from typing import Literal
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
+from pydantic import BaseModel
 
 from voxwell.features.dubbing.fitting import build_srt, srt_time
-from voxwell.features.transcription import jobs
+from voxwell.features.transcription import editing, jobs
 from voxwell.paths import attachment, download_name
 
 router = APIRouter(tags=["transcription"])
@@ -92,3 +93,50 @@ def export(job_id: str, fmt: Literal["txt", "srt", "vtt"]):
         media_type=media_type,
         headers=attachment(download_name(job.title, f".{fmt}", "Transcript")),
     )
+
+
+MAX_EDIT_CHARS = 200_000
+
+
+class EditRequest(BaseModel):
+    text: str | None = None  # the text to edit, or...
+    job_id: str | None = None  # ...a finished transcription whose text is edited
+    preset: str | None = None  # one of GET /edit/presets, or...
+    instruction: str | None = None  # ...your own wording
+
+
+@router.get("/edit/presets")
+def edit_presets():
+    return [{"id": k, "label": label, "instruction": text} for k, (label, text) in editing.PRESETS.items()]
+
+
+@router.post("/edit")
+def edit(req: EditRequest):
+    if (req.text is None) == (req.job_id is None):
+        raise HTTPException(422, "Give either text or job_id.")
+    if (req.preset is None) == (req.instruction is None):
+        raise HTTPException(422, "Give either preset or instruction.")
+    if req.preset is not None:
+        if req.preset not in editing.PRESETS:
+            raise HTTPException(422, f"Unknown preset '{req.preset}'. Presets: {', '.join(editing.PRESETS)}.")
+        instruction = editing.PRESETS[req.preset][1]
+    else:
+        instruction = " ".join(req.instruction.split())
+        if not instruction or len(instruction) > editing.MAX_INSTRUCTION:
+            raise HTTPException(422, f"Write an instruction of 1 to {editing.MAX_INSTRUCTION} characters.")
+    if req.job_id is not None:
+        job = _job(req.job_id)
+        if job.state != "done":
+            raise HTTPException(409, "The transcription is not finished yet.")
+        text = jobs.result(job)["text"]
+    else:
+        text = req.text
+    if not text.strip():
+        raise HTTPException(422, "There is no text to edit.")
+    if len(text) > MAX_EDIT_CHARS:
+        raise HTTPException(422, f"The text is too long to edit (limit {MAX_EDIT_CHARS:,} characters).")
+    try:
+        edited = editing.edit_text(text, instruction)
+    except Exception as exc:  # the model could not load or run: say so without a traceback
+        raise HTTPException(500, f"The AI editor failed: {exc}")
+    return {"text": edited.text, "chunks": edited.chunks, "kept": edited.kept}
