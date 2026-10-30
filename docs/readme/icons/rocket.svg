@@ -5,12 +5,22 @@
   height="24"
   viewBox="0 0 24 24"
   fill="none"
-  stroke="#B45309"
+  stroke="url(#vx)"
   stroke-width="2"
   stroke-linecap="round"
   stroke-linejoin="round"
 >
-  <style>@media (prefers-color-scheme: dark) { svg { stroke: #FFA800; } }</style>
+  <defs>
+    <linearGradient id="vx" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+      <stop class="a" offset="0" />
+      <stop class="b" offset=".5" />
+      <stop class="c" offset="1" />
+    </linearGradient>
+  </defs>
+  <style>
+    .a { stop-color: #EA580C; } .b { stop-color: #D97706; } .c { stop-color: #CA8A04; }
+    @media (prefers-color-scheme: dark) { .a { stop-color: #FF7A00; } .b { stop-color: #FFA800; } .c { stop-color: #FFC800; } }
+  </style>
   <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" />
   <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09" />
   <path d="M9 12a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.4 22.4 0 0 1-4 2z" />
