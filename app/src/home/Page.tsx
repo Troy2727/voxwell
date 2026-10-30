@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ArrowRight, FolderOpen } from 'lucide-react';
+import { ArrowRight, FolderOpen, Languages, LayoutGrid } from 'lucide-react';
 import { api } from '../api';
 import { WaveStage } from '../auth/wave-stage';
 import { FEATURES } from '../features';
@@ -58,6 +58,7 @@ export function HomePage({ name, online, onOpen }: { name?: string; online: bool
               <ArrowRight />
             </Button>
             <Button size="lg" variant="outline" className="max-w-full" onClick={() => onOpen('dubbing')}>
+              <Languages />
               Dub a video
             </Button>
           </div>
@@ -110,6 +111,7 @@ export function HomePage({ name, online, onOpen }: { name?: string; online: bool
           action={
             <Button variant="ghost" size="sm" onClick={() => onOpen('projects')}>
               See all
+              <ArrowRight />
             </Button>
           }
         >
@@ -137,14 +139,21 @@ export function HomePage({ name, online, onOpen }: { name?: string; online: bool
             {[
               { label: 'Saved voices', value: voices, id: 'voices' },
               { label: 'Projects', value: projects?.length ?? null, id: 'projects' },
-            ].map((s) => (
-              <button key={s.id} type="button" onClick={() => onOpen(s.id)} className="bg-secondary hover:bg-accent flex flex-col gap-1 rounded-xl border p-4 text-left transition-colors">
-                <span className="text-muted-foreground text-xs">{s.label}</span>
-                <span className="text-2xl font-bold">{online && s.value !== null ? s.value : '–'}</span>
-              </button>
-            ))}
+            ].map((s) => {
+              const Icon = feature(s.id).icon;
+              return (
+                <button key={s.id} type="button" onClick={() => onOpen(s.id)} className="bg-secondary hover:bg-accent flex flex-col gap-1 rounded-xl border p-4 text-left transition-colors">
+                  <span className="text-muted-foreground flex items-center gap-1.5 text-xs">
+                    <Icon className="size-3.5" />
+                    {s.label}
+                  </span>
+                  <span className="text-2xl font-bold">{online && s.value !== null ? s.value : '–'}</span>
+                </button>
+              );
+            })}
           </div>
           <Button variant="outline" className="max-w-full" onClick={() => onOpen('gallery')}>
+            <LayoutGrid />
             Browse ready-made voices
           </Button>
         </Section>

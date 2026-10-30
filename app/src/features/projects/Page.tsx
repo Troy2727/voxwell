@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Download, FolderOpen, Pencil } from 'lucide-react';
+import { Download, FolderOpen, Pencil, Save, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, apiUrl, sendJson } from '../../api';
 import { AudioResult } from '@/components/audio-result';
@@ -147,7 +147,7 @@ function ProjectCard({ item, onChanged, onError }: { item: Item; onChanged: () =
         {editing ? (
           <div className="flex items-center gap-2">
             <Input value={title} maxLength={100} onChange={(e) => setTitle(e.target.value)} className="flex-1" autoFocus />
-            <Button disabled={busy || !title.trim()} onClick={rename}>Save</Button>
+            <Button disabled={busy || !title.trim()} onClick={rename}><Save /> Save</Button>
             <Button variant="outline" disabled={busy} onClick={() => setEditing(false)}>Cancel</Button>
           </div>
         ) : (
@@ -157,7 +157,7 @@ function ProjectCard({ item, onChanged, onError }: { item: Item; onChanged: () =
               <Pencil /> Rename
             </Button>
             <ConfirmButton title={`Delete "${item.title}"?`} disabled={busy || working(item)} onConfirm={remove}>
-              Delete
+              <Trash2 /> Delete
             </ConfirmButton>
           </div>
         )}

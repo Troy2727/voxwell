@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
-import { ArrowRight, Eye, EyeOff, Loader2, Lock, MailCheck, Mic, SlidersHorizontal, Type, Video } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Eye, EyeOff, Loader2, Lock, MailCheck, Mic, SlidersHorizontal, Type, Video } from 'lucide-react';
 import { toast } from 'sonner';
 import { LogoMark } from '@/components/logo';
 import { ErrorAlert, Field, message } from '@/components/page';
@@ -138,7 +138,7 @@ function AccountForm() {
       {mode === 'sent' ? (
         <div className="flex flex-col items-center gap-6">
           <MailCheck className="text-primary size-10" />
-          <Button variant="outline" onClick={() => go('signin')}>Back to sign in</Button>
+          <Button variant="outline" onClick={() => go('signin')}><ArrowLeft /> Back to sign in</Button>
         </div>
       ) : (
         <>

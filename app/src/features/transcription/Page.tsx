@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Copy, Download, FileAudio, FileText } from 'lucide-react';
+import { Copy, Download, FileAudio, FileText, Play } from 'lucide-react';
 import { api, apiUrl } from '../../api';
 import { ChoiceSelect } from '@/components/choice-select';
 import { FileDrop } from '@/components/file-drop';
@@ -290,7 +290,7 @@ function PlayAlong({ onMedia }: { onMedia: (f: File) => void }) {
       <FileAudio className="text-muted-foreground size-4" />
       <span className="text-muted-foreground flex-1">Open the original file to play it with the words highlighted. It stays on this computer.</span>
       <Button variant="outline" size="sm" onClick={() => input.current?.click()}>
-        Play along…
+        <Play /> Play along…
       </Button>
       <input ref={input} type="file" accept="audio/*,video/*,.mkv" hidden onChange={(e) => e.target.files?.[0] && onMedia(e.target.files[0])} />
     </div>

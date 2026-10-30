@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Check, Copy, Download, Sparkles } from 'lucide-react';
+import { Check, Copy, Download, RotateCcw, Sparkles, X } from 'lucide-react';
 import { api, sendJson } from '../../api';
 import { ChoiceSelect } from '@/components/choice-select';
 import { ErrorAlert, Field, message, Section } from '@/components/page';
@@ -161,7 +161,7 @@ export function EditPanel({ jobId, title, text }: { jobId: string; title: string
               <Download /> Download TXT
             </Button>
             <Button size="sm" variant="ghost" onClick={() => setResult(null)}>
-              Discard
+              <X /> Discard
             </Button>
           </div>
         </>
@@ -176,7 +176,7 @@ export function EditPanel({ jobId, title, text }: { jobId: string; title: string
             <Download /> Download TXT
           </Button>
           <Button size="sm" variant="ghost" onClick={() => setBase(text)}>
-            Start over from the original
+            <RotateCcw /> Start over from the original
           </Button>
         </div>
       )}

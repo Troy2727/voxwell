@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ArrowRightLeft, AudioLines, Plus, Sparkles, Timer, Trash2, Volume2 } from 'lucide-react';
+import { ArrowRightLeft, AudioLines, Headphones, Plus, Sparkles, Timer, Trash2, Volume2 } from 'lucide-react';
 import { api, apiUrl, listVoices, sendJson, type Voice } from '../../api';
 import { AudioResult } from '@/components/audio-result';
 import { ChoiceSelect } from '@/components/choice-select';
@@ -318,7 +318,7 @@ function Compare({ voices }: { voices: Voice[] }) {
           </Button>
         )}
         <Button disabled={busy !== null || !text.trim()} onClick={run}>
-          {busy !== null ? 'Comparing…' : 'Compare'}
+          <Headphones /> {busy !== null ? 'Comparing…' : 'Compare'}
         </Button>
       </div>
       <ErrorAlert message={error} />

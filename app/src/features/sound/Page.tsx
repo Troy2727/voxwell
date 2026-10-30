@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { KeyRound, Volume2 } from 'lucide-react';
+import { KeyRound, Save, Sparkles, Trash2, Volume2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, apiUrl, sendJson } from '../../api';
 import { AudioResult } from '@/components/audio-result';
@@ -111,7 +111,7 @@ function TokenSection({ status, onChanged, onError }: { status: Status; onChange
             disabled={busy}
             onConfirm={() => run(() => sendJson('/api/sound/token', 'DELETE'), 'Token removed')}
           >
-            Remove token
+            <Trash2 /> Remove token
           </ConfirmButton>
         </div>
       </Section>
@@ -144,7 +144,7 @@ function TokenSection({ status, onChanged, onError }: { status: Status; onChange
             className="flex-1"
           />
           <Button disabled={busy || !token.trim()} onClick={() => run(() => sendJson('/api/sound/token', 'PUT', { token }), 'Token saved')}>
-            Save token
+            <Save /> Save token
           </Button>
         </div>
       </Field>
@@ -208,7 +208,7 @@ function GenerateSection({ status, onDone }: { status: Status | null; onDone: (s
       </div>
       <div className="flex items-center gap-3">
         <Button disabled={busy || !ready || status?.token_set === false} onClick={generate}>
-          {busy ? 'Generating…' : 'Generate'}
+          <Sparkles /> {busy ? 'Generating…' : 'Generate'}
         </Button>
         {busy && <Muted>This can take several minutes without a GPU. Keep this page open.</Muted>}
         {status?.token_set === false && <Muted>Save a Hugging Face token above first.</Muted>}
@@ -239,7 +239,7 @@ function HistoryItem({ sound, onDeleted, onError }: { sound: Sound; onDeleted: (
           </Muted>
         </div>
         <ConfirmButton title="Delete this sound?" onConfirm={remove}>
-          Delete
+          <Trash2 /> Delete
         </ConfirmButton>
       </div>
       <AudioResult src={apiUrl(sound.url)} download={`voxwell-sound-${sound.seed}.wav`} lazy />
