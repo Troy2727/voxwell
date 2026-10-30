@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { FolderPlus, Library, Pencil } from 'lucide-react';
+import { FolderPlus, Library, Pencil, Save, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiUrl, listVoiceCollections, listVoices, sendJson, type Voice, type VoiceCollection } from '../../api';
 import { AudioResult } from '@/components/audio-result';
@@ -104,7 +104,7 @@ function VoiceCard({ voice, collections, onChanged, onError }: {
         {editing ? (
           <div className="flex items-center gap-2">
             <Input value={name} onChange={(e) => setName(e.target.value)} className="flex-1" autoFocus />
-            <Button disabled={busy || !name.trim()} onClick={rename}>Save</Button>
+            <Button disabled={busy || !name.trim()} onClick={rename}><Save /> Save</Button>
             <Button variant="outline" disabled={busy} onClick={() => setEditing(false)}>Cancel</Button>
           </div>
         ) : (
@@ -137,7 +137,7 @@ function VoiceCard({ voice, collections, onChanged, onError }: {
               <Pencil /> Rename
             </Button>
             <ConfirmButton title={`Delete "${voice.name}"?`} disabled={busy} onConfirm={remove}>
-              Delete
+              <Trash2 /> Delete
             </ConfirmButton>
           </div>
         )}

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Pencil, Plus, Save, Trash2, Volume2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, apiUrl, listVoices, sendJson, Voice } from '../../api';
 import { AudioResult } from '@/components/audio-result';
@@ -151,7 +152,7 @@ export default function Page() {
         </div>
         <div className="flex gap-2">
           <Button disabled={saving || !word.trim() || !respelling.trim()} onClick={save}>
-            {saving ? 'Saving…' : editing ? 'Save changes' : 'Add word'}
+            {editing ? <Save /> : <Plus />} {saving ? 'Saving…' : editing ? 'Save changes' : 'Add word'}
           </Button>
           {editing && (
             <Button variant="outline" onClick={reset}>
@@ -180,10 +181,10 @@ export default function Page() {
                   </span>
                 </div>
                 <Button variant="outline" size="sm" onClick={() => edit(e)}>
-                  Edit
+                  <Pencil /> Edit
                 </Button>
                 <ConfirmButton title={`Delete "${e.word}"?`} onConfirm={() => remove(e)}>
-                  Delete
+                  <Trash2 /> Delete
                 </ConfirmButton>
               </li>
             ))}
@@ -200,7 +201,7 @@ export default function Page() {
         </Field>
         <div>
           <Button disabled={hearing || !sample.trim()} onClick={hear}>
-            {hearing ? 'Generating…' : 'Hear it'}
+            <Volume2 /> {hearing ? 'Generating…' : 'Hear it'}
           </Button>
         </div>
         <ErrorAlert message={hearError} />

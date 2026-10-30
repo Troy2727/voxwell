@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Upload, Volume2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, apiUrl, listVoices, Voice } from '../../api';
 import { AudioResult } from '@/components/audio-result';
@@ -84,7 +85,7 @@ export default function Page() {
         </Field>
         <div>
           <Button disabled={uploading || !file || !name.trim()} onClick={upload}>
-            {uploading ? 'Uploading…' : 'Upload voice'}
+            <Upload /> {uploading ? 'Uploading…' : 'Upload voice'}
           </Button>
         </div>
       </Section>
@@ -104,7 +105,7 @@ export default function Page() {
         <EffectsControls value={fx} onChange={setFx} disabled={busy} />
         <div>
           <Button disabled={busy || !text.trim()} onClick={generate}>
-            {busy ? 'Generating…' : 'Generate'}
+            <Volume2 /> {busy ? 'Generating…' : 'Generate'}
           </Button>
         </div>
         <ErrorAlert message={error} />

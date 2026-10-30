@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Sparkles } from 'lucide-react';
+import { Save, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, apiUrl, type Voice } from '../../api';
 import { AudioResult } from '@/components/audio-result';
@@ -88,7 +88,7 @@ export default function Page() {
               <Input id="design-name" value={name} onChange={(e) => setName(e.target.value)} />
             </Field>
             <Button onClick={save} disabled={saving || !name.trim()}>
-              {saving ? 'Saving…' : 'Save to voices'}
+              <Save /> {saving ? 'Saving…' : 'Save to voices'}
             </Button>
           </div>
         </Section>

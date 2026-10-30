@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { RotateCcw, Sparkles } from 'lucide-react';
 import { api, apiUrl } from '../../api';
 import { AudioResult } from '@/components/audio-result';
 import { EffectsControls, EffectsSettings, isNeutral, NO_EFFECTS } from '@/components/effects-controls';
@@ -40,10 +41,10 @@ export default function Page() {
         <EffectsControls value={fx} onChange={setFx} disabled={busy} />
         <div className="flex gap-2">
           <Button disabled={busy || !file} onClick={apply}>
-            {busy ? 'Processing…' : 'Apply effects'}
+            <Sparkles /> {busy ? 'Processing…' : 'Apply effects'}
           </Button>
           <Button variant="outline" disabled={busy || isNeutral(fx)} onClick={() => setFx(NO_EFFECTS)}>
-            Reset
+            <RotateCcw /> Reset
           </Button>
         </div>
         <ErrorAlert message={error} />

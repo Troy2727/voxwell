@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FolderPlus, Pencil } from 'lucide-react';
+import { FolderPlus, Pencil, Save, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { sendJson, type VoiceCollection } from '../../api';
 import { ConfirmButton } from '@/components/confirm-button';
@@ -80,7 +80,7 @@ export function CollectionBar({ collections, voiceCount, selected, onSelect, onC
             className="flex-1"
             autoFocus
           />
-          <Button type="submit" disabled={busy || !name.trim()}>{mode === 'create' ? 'Create' : 'Save'}</Button>
+          <Button type="submit" disabled={busy || !name.trim()}>{mode === 'create' ? <><FolderPlus /> Create</> : <><Save /> Save</>}</Button>
           <Button type="button" variant="outline" disabled={busy} onClick={() => setMode(null)}>Cancel</Button>
         </form>
       ) : (
@@ -95,7 +95,7 @@ export function CollectionBar({ collections, voiceCount, selected, onSelect, onC
               disabled={busy}
               onConfirm={remove}
             >
-              Delete collection
+              <Trash2 /> Delete collection
             </ConfirmButton>
           </div>
         )
