@@ -6,7 +6,7 @@
   <img src="docs/readme/voxwell-lockup-light.svg" alt="Voxwell Voice Studio" width="440" />
 </picture>
 
-<img src="docs/readme/voxwell-banner.jpg" alt="Voxwell Voice Studio: a complete voice studio that runs on your machine. Clone and design voices, dub videos, transcribe and talk to voice agents. Every model runs locally. 100% local, MIT licensed, CLI + MCP, OpenAI-compatible API." width="100%" />
+<img src="docs/readme/voxwell-banner.gif" alt="Voxwell Voice Studio: a complete voice studio that runs on your machine. Clone and design voices, dub videos, transcribe and talk to voice agents. Every model runs locally. 100% local, MIT licensed, CLI + MCP, OpenAI-compatible API." width="100%" />
 
 <p>
   <a href="https://voxwell.vercel.app"><img alt="Web UI: voxwell.vercel.app" src="docs/readme/badges/web-ui-voxwell-vercel-app.svg" /></a>
