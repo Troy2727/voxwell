@@ -34,7 +34,7 @@ export default function Page() {
   const shown = inCollection ? voices?.filter((v) => inCollection.voice_ids.includes(v.id)) : voices;
 
   return (
-    <PageLayout title="Saved voices" description="Every voice you uploaded or designed. Rename, listen, delete or sort them into collections.">
+    <PageLayout title="Saved voices" description="Every voice you uploaded or designed. Rename, listen, delete or sort them into collections." wide>
       <ErrorAlert message={error} />
       {voices !== null && (
         <CollectionBar
@@ -57,9 +57,13 @@ export default function Page() {
           Use the Collections button on a voice to add it here.
         </EmptyState>
       )}
-      {shown?.map((v) => (
-        <VoiceCard key={v.id} voice={v} collections={collections} onChanged={refresh} onError={(e) => setError(message(e))} />
-      ))}
+      {!!shown?.length && (
+        <div className="grid items-start gap-4 @4xl:grid-cols-2">
+          {shown.map((v) => (
+            <VoiceCard key={v.id} voice={v} collections={collections} onChanged={refresh} onError={(e) => setError(message(e))} />
+          ))}
+        </div>
+      )}
     </PageLayout>
   );
 }

@@ -5,10 +5,13 @@ import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle }
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 
-/** The top of every feature page: title, one-line description, optional actions on the right. */
-export function Page({ title, description, actions, children }: { title: string; description?: ReactNode; actions?: ReactNode; children: ReactNode }) {
+/**
+ * The top of every feature page: title, one-line description, optional actions on the right.
+ * `wide` is for pages that show a grid of cards; their grids size columns by this container (`@2xl:` etc.).
+ */
+export function Page({ title, description, actions, wide, children }: { title: string; description?: ReactNode; actions?: ReactNode; wide?: boolean; children: ReactNode }) {
   return (
-    <section className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+    <section className={cn('@container mx-auto flex w-full flex-col gap-6', wide ? 'max-w-7xl' : 'max-w-4xl')}>
       <header className="flex items-start gap-4">
         <div className="flex flex-1 flex-col gap-1">
           <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>

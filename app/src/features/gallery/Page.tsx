@@ -35,13 +35,14 @@ export default function Page() {
     <PageLayout
       title="Gallery"
       description="Ready-made voices, created on your computer from a description. Listen to one, then add it to Saved voices to use it anywhere. The first listen takes a little while."
+      wide
     >
       <ErrorAlert message={error} />
       {presets === null && <Skeleton className="h-40 w-full" />}
       {categories.map((category) => (
         <div key={category} className="flex flex-col gap-3">
           <h2 className="text-muted-foreground text-sm font-medium tracking-wide uppercase">{category}</h2>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 @2xl:grid-cols-2 @5xl:grid-cols-3 @7xl:grid-cols-4">
             {presets?.filter((p) => p.category === category).map((p) => (
               <PresetCard key={p.id} preset={p} onUpdated={replace} />
             ))}
