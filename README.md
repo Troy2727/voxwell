@@ -349,9 +349,9 @@ Backend tests on Ubuntu, Windows and macOS, plus a frontend typecheck and build,
 
 **Alex Mieses** · [GitHub](https://github.com/Troy2727)
 
-Alex builds Voxwell end to end: the choice of voice models, the FastAPI backend, the React and Electron app, and the integrations that let AI assistants use it. Voxwell exists so that a complete voice studio can run on your own machine, with no cloud service, no per-minute billing and no uploads.
+Alex founded Voxwell and builds it end to end, from the choice of open voice models to the FastAPI backend, the React and Electron app and the hosted site at voxwell.vercel.app. Cloning a voice, dubbing a video or transcribing an interview usually means uploading your recordings to someone else's cloud and paying by the minute. Voxwell gives you the whole studio on your own machine.
 
-Before software, Alex spent about ten years in cybersecurity, and Voxwell is built that way. The server only listens on your own computer. The optional phone gateway is the only part that can ever be exposed, and it rejects any request without a valid Twilio signature. A test fails the build if a dependency's license ever stops allowing commercial use.
+Before software, Alex spent about ten years in cybersecurity, and Voxwell is built that way. The server listens only on your own computer and answers only the app's own pages, the phone gateway rejects any call without a valid Twilio signature, and nothing merges until the tests pass on Windows, macOS and Linux.
 
 <br/>
 
