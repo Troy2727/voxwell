@@ -62,7 +62,11 @@ export function HomePage({ name, online, onOpen }: { name?: string; online: bool
             </Button>
           </div>
           <p className="text-muted-foreground flex items-center gap-2 text-sm">
-            <span className={cn('size-2 shrink-0 rounded-full', online === null ? 'bg-muted-foreground' : online ? 'bg-success' : 'bg-destructive')} />
+            <span className="relative flex size-2 shrink-0">
+              {/* A soft "live" ripple while connected; still when offline or with reduced motion. */}
+              {online && <span className="bg-success absolute inset-0 animate-ping rounded-full opacity-60 [animation-duration:2s] motion-reduce:hidden" />}
+              <span className={cn('relative size-2 rounded-full', online === null ? 'bg-muted-foreground' : online ? 'bg-success' : 'bg-destructive')} />
+            </span>
             {online === null ? 'Connecting…' : online ? 'Running on this computer' : "Voxwell isn't running on this computer"}
           </p>
         </div>
