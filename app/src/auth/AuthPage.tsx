@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
-import { ArrowLeft, ArrowRight, Eye, EyeOff, Loader2, Lock, MailCheck, Mic, SlidersHorizontal, Type, Video } from 'lucide-react';
+import { ArrowRight, Eye, EyeOff, Loader2, Lock, Mic, SlidersHorizontal, Type, Video } from 'lucide-react';
 import { toast } from 'sonner';
 import { LogoMark } from '@/components/logo';
 import { ErrorAlert, Field, message } from '@/components/page';
@@ -7,15 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { googleEnabled, redirectTo, supabase } from '@/lib/auth';
 import { WaveStage } from './wave-stage';
-
-type Mode = 'signin' | 'signup' | 'forgot' | 'sent';
-
-const COPY: Record<Mode, { title: string; sub: string; button?: string }> = {
-  signin: { title: 'Welcome back', sub: 'Sign in to your studio', button: 'Sign in' },
-  signup: { title: 'Join the studio', sub: 'Create your account and start creating voices', button: 'Create account' },
-  forgot: { title: 'Reset your password', sub: "We'll email you a link to set a new one", button: 'Send reset link' },
-  sent: { title: 'Check your email', sub: '' },
-};
 
 const TOOLS = [
   { icon: Mic, label: 'Clone' },
@@ -58,48 +49,28 @@ function SubmitButton({ busy, children }: { busy: boolean; children: ReactNode }
   );
 }
 
-/** Sign in, create an account, or reset a forgotten password. Signing in opens the dashboard. */
+/**
+ * Sign in only: accounts are created by the owner in Supabase, which also has sign-up turned off.
+ * Google sign-in stays for accounts that already exist. Signing in opens the dashboard.
+ */
 function AccountForm() {
-  const [mode, setMode] = useState<Mode>('signin');
-  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [sentTo, setSentTo] = useState('');
   const [google, setGoogle] = useState(false);
 
   useEffect(() => {
     googleEnabled().then(setGoogle, () => setGoogle(false));
   }, []);
 
-  const go = (next: Mode) => {
-    setMode(next);
-    setError('');
-  };
-
   async function submit(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError('');
     try {
-      if (mode === 'signin') {
-        const { error } = await supabase!.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-      } else if (mode === 'signup') {
-        const { data, error } = await supabase!.auth.signUp({ email, password, options: { data: { full_name: name.trim() }, emailRedirectTo: redirectTo() } });
-        if (error) throw error;
-        // With email confirmation on, there is no session until the link in the email is opened.
-        if (!data.session) {
-          setSentTo(`We sent a confirmation link to ${email}. Open it to finish creating your account.`);
-          go('sent');
-        }
-      } else {
-        const { error } = await supabase!.auth.resetPasswordForEmail(email, { redirectTo: redirectTo() });
-        if (error) throw error;
-        setSentTo(`If ${email} has an account, a link to reset its password is on its way.`);
-        go('sent');
-      }
+      const { error } = await supabase!.auth.signInWithPassword({ email, password });
+      if (error) throw error;
     } catch (e) {
       setError(message(e));
     } finally {
@@ -125,62 +96,35 @@ function AccountForm() {
     }
   }
 
-  const copy = COPY[mode];
   return (
     <div className="w-full max-w-sm">
       <div className="mb-10 flex items-center justify-center gap-3">
         <LogoMark className="size-14" />
         <span className="text-3xl font-bold tracking-tight">Voxwell</span>
       </div>
-      <h1 className="text-center text-3xl font-bold tracking-tight">{copy.title}</h1>
-      <p className="text-muted-foreground mt-2 mb-8 text-center">{mode === 'sent' ? sentTo : copy.sub}</p>
+      <h1 className="text-center text-3xl font-bold tracking-tight">Welcome back</h1>
+      <p className="text-muted-foreground mt-2 mb-8 text-center">Sign in with the login you were given</p>
 
-      {mode === 'sent' ? (
-        <div className="flex flex-col items-center gap-6">
-          <MailCheck className="text-primary size-10" />
-          <Button variant="outline" onClick={() => go('signin')}><ArrowLeft /> Back to sign in</Button>
-        </div>
-      ) : (
+      {google && (
         <>
-          {google && mode !== 'forgot' && (
-            <>
-              <Button type="button" variant="outline" size="lg" className="h-11 w-full font-semibold" disabled={busy} onClick={signInWithGoogle}>
-                <GoogleIcon />
-                Continue with Google
-              </Button>
-              <div className="text-muted-foreground my-6 flex items-center gap-4 text-sm before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border">or</div>
-            </>
-          )}
-          <form className="flex flex-col gap-5" onSubmit={submit}>
-            {mode === 'signup' && (
-              <Field label="Name" htmlFor="name">
-                <Input id="name" autoComplete="name" placeholder="Enter your name" className="h-11" value={name} onChange={(e) => setName(e.target.value)} />
-              </Field>
-            )}
-            <Field label="Email address" htmlFor="email">
-              <Input id="email" type="email" autoComplete="email" required placeholder="Enter your email" className="h-11" value={email} onChange={(e) => setEmail(e.target.value)} />
-            </Field>
-            {mode !== 'forgot' && (
-              <Field label="Password" htmlFor="password" hint={mode === 'signup' ? 'At least 6 characters.' : undefined}>
-                <PasswordInput id="password" autoComplete={mode === 'signup' ? 'new-password' : 'current-password'} value={password} onChange={setPassword} />
-              </Field>
-            )}
-            {mode === 'signin' && (
-              <button type="button" className="text-muted-foreground hover:text-foreground -mt-2 self-end text-sm" onClick={() => go('forgot')}>
-                Forgot password?
-              </button>
-            )}
-            <ErrorAlert message={error} />
-            <SubmitButton busy={busy}>{copy.button}</SubmitButton>
-          </form>
-          <p className="text-muted-foreground mt-6 text-center text-sm">
-            {mode === 'signin' ? 'New to Voxwell?' : mode === 'signup' ? 'Already have an account?' : 'Remembered it?'}{' '}
-            <button type="button" className="text-primary font-semibold underline-offset-4 hover:underline" onClick={() => go(mode === 'signin' ? 'signup' : 'signin')}>
-              {mode === 'signin' ? 'Create an account' : 'Sign in'}
-            </button>
-          </p>
+          <Button type="button" variant="outline" size="lg" className="h-11 w-full font-semibold" disabled={busy} onClick={signInWithGoogle}>
+            <GoogleIcon />
+            Continue with Google
+          </Button>
+          <div className="text-muted-foreground my-6 flex items-center gap-4 text-sm before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border">or</div>
         </>
       )}
+      <form className="flex flex-col gap-5" onSubmit={submit}>
+        <Field label="Email address" htmlFor="email">
+          <Input id="email" type="email" autoComplete="email" required placeholder="Enter your email" className="h-11" value={email} onChange={(e) => setEmail(e.target.value)} />
+        </Field>
+        <Field label="Password" htmlFor="password">
+          <PasswordInput id="password" autoComplete="current-password" value={password} onChange={setPassword} />
+        </Field>
+        <ErrorAlert message={error} />
+        <SubmitButton busy={busy}>Sign in</SubmitButton>
+      </form>
+      <p className="text-muted-foreground mt-6 text-center text-sm">Accounts are by invitation only.</p>
       <p className="text-muted-foreground mt-8 flex items-center justify-center gap-2 text-xs">
         <Lock className="size-3.5" />
         Your voices stay on your device.
