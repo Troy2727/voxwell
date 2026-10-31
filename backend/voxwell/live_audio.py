@@ -36,6 +36,7 @@ from pathlib import Path
 
 from fastapi import WebSocket
 
+from voxwell.errors import user_message
 from voxwell.origins import websocket_origin_allowed
 from voxwell.paths import data_dir
 
@@ -161,11 +162,10 @@ TURN_FAILED = "This turn could not be processed; see the Voxwell log."
 
 
 def turn_error_message(exc: Exception) -> str:
-    """What the client sees for a failed turn. Voxwell's own errors (AudioError, TranslationError,
-    AgentError, ...) carry a message written for the user; anything from Python or a library may
-    hold paths or internals, so it is logged and replaced by a fixed message."""
-    if type(exc).__module__.startswith("voxwell.") and str(exc):
-        return str(exc)
+    """What the client sees for a failed turn: a message Voxwell wrote (errors.user_message), or a
+    fixed one, with the details in the log."""
+    if (message := user_message(exc)) is not None:
+        return message
     log.error("A live turn could not be processed", exc_info=exc)
     return TURN_FAILED
 

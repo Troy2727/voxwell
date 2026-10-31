@@ -17,6 +17,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from voxwell import voices
+from voxwell.errors import user_message
 from voxwell.features.audiobook.chunking import chapter_chunks
 from voxwell.features.audiobook.importer import Chapter
 from voxwell.features.voice_cloning import engine
@@ -211,11 +212,11 @@ def _work(book: Book) -> None:
                 ch.status = "done"
                 save(book)  # resume point
             book.state, book.step, book.percent, book.error = "done", "Done", 100, None
-        except ValueError as exc:
-            book.state, book.error = "error", str(exc)
-        except Exception:  # an unexpected failure: the details go to the log, not to the user
-            log.exception("Audiobook failed at %s", book.step)
-            book.state, book.error = "error", f"{book.step} failed; see the Voxwell log."
+        except Exception as exc:
+            if (message := user_message(exc)) is None:  # not Voxwell's own message: log it instead
+                log.exception("Audiobook failed at %s", book.step)
+                message = f"{book.step} failed; see the Voxwell log."
+            book.state, book.error = "error", message
         save(book)
 
 

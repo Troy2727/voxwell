@@ -159,7 +159,8 @@ def _download_source() -> None:
             shutil.copyfileobj(response, out)
     except OSError as exc:
         archive.unlink(missing_ok=True)
-        raise EngineError(f"Could not download ACE-Step: {exc}")
+        log.exception("Downloading ACE-Step failed")
+        raise EngineError("Could not download ACE-Step. Check the internet connection and try again.") from exc
     # Extract beside the final folder and rename it into place only when complete, so an
     # interrupted extraction never leaves a source_dir() that later installs would trust.
     target = source_dir()
@@ -217,7 +218,8 @@ def _sync_packages() -> None:
             tail = (tail + [line])[-20:]
             _set(detail=line[:200])
     if proc.wait() != 0:
-        raise EngineError("Installing the music engine's packages failed:\n" + "\n".join(tail[-8:]))
+        log.error("uv sync failed:\n%s", "\n".join(tail))
+        raise EngineError("Installing the music engine's packages failed; see the Voxwell log.")
 
 
 def _dir_bytes(path: Path) -> int:
@@ -253,7 +255,8 @@ def _download_weights() -> None:
     try:
         snapshot_download(WEIGHTS_REPO, revision=WEIGHTS_REVISION, local_dir=checkpoints, allow_patterns=WEIGHTS)
     except Exception as exc:
-        raise EngineError(f"Could not download the music model: {exc}")
+        log.exception("Downloading the music model failed")
+        raise EngineError("Could not download the music model. Check the internet connection and try again.") from exc
     finally:
         done.set()
 
@@ -300,10 +303,12 @@ def ensure_running() -> tuple[str, str]:
         deadline = time.monotonic() + START_TIMEOUT_SECONDS
         while not _healthy(server["base"]):
             if server["proc"].poll() is not None:
-                raise EngineError("The music engine stopped while starting:\n" + log_tail())
+                log.error("The music engine stopped while starting:\n%s", log_tail())
+                raise EngineError("The music engine stopped while starting; see the Voxwell log.")
             if time.monotonic() > deadline:
                 stop()
-                raise EngineError("The music engine took too long to start.\n" + log_tail())
+                log.error("The music engine took too long to start:\n%s", log_tail())
+                raise EngineError("The music engine took too long to start; see the Voxwell log.")
             time.sleep(1.0)
         server["ready"] = True
         return server["base"], server["key"]

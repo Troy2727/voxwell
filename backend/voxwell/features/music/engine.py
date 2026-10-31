@@ -6,6 +6,7 @@ its progress, and GET /v1/audio returns the finished file.
 """
 
 import json
+import logging
 import time
 import urllib.error
 import urllib.parse
@@ -15,6 +16,8 @@ from collections.abc import Callable
 from pathlib import Path
 
 from voxwell.features.music import runtime
+
+log = logging.getLogger(__name__)
 
 POLL_SECONDS = 1.5
 TASK_TIMEOUT_SECONDS = 2 * 60 * 60  # a long song on a slow CPU
@@ -45,9 +48,11 @@ def _request(base: str, key: str, path: str, *, data: bytes | None = None, conte
             detail = body.get("error") or body.get("detail") or detail
         except ValueError:
             pass
-        raise GenerationError(f"The music engine refused the request: {detail}") from exc
+        log.error("The music engine refused %s: %s", path, detail[:2000])
+        raise GenerationError("The music engine refused the request; see the Voxwell log.") from exc
     except urllib.error.URLError as exc:
-        raise GenerationError(f"Lost contact with the music engine: {exc.reason}") from exc
+        log.error("Lost contact with the music engine: %s", exc.reason)
+        raise GenerationError("Lost contact with the music engine; see the Voxwell log.") from exc
 
 
 def _multipart(fields: dict, files: dict[str, Path]) -> tuple[bytes, str]:
@@ -128,4 +133,5 @@ def _failure_message(item: dict) -> str:
             detail = (json.loads(results) or [{}])[0].get("error", "")
         except (ValueError, AttributeError, IndexError):
             pass
-    return f"Music generation failed: {detail}" if detail else "Music generation failed."
+    log.error("The music engine failed a task: %s", detail[:2000] or "(no detail)")
+    return "Music generation failed; see the Voxwell log."

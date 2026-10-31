@@ -11,6 +11,7 @@ from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 
 from voxwell import voices
+from voxwell.errors import user_message
 from voxwell.features.audiobook import books
 from voxwell.features.audiobook.importer import ImportError_, import_book
 from voxwell.features.voice_cloning.engine import LANGUAGES
@@ -149,9 +150,9 @@ def preview(book_id: str, req: PreviewRequest):
     index = _chapter(book, req.chapter)
     try:
         wav = books.preview(book, index)
-    except ValueError as exc:
-        raise HTTPException(422, str(exc))
     except Exception as exc:
+        if (message := user_message(exc)) is not None:  # Voxwell's own message (e.g. a deleted voice)
+            raise HTTPException(422, message) from exc
         log.exception("Preview failed")
         raise HTTPException(500, "Preview failed; see the Voxwell log.") from exc
     folder = data_dir("audiobooks_previews")

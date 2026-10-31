@@ -126,6 +126,18 @@ def test_a_failed_generation_is_reported_on_the_track(monkeypatch, installed):
     assert track["status"] == "failed" and "out of memory" in track["error"] and "url" not in track
 
 
+def test_an_unexpected_generation_crash_is_logged_not_shown(monkeypatch, installed, caplog):
+    def crash(fields, files, on_progress):
+        raise RuntimeError("secret detail C:/internal/path")
+
+    monkeypatch.setattr(engine, "generate", crash)
+    monkeypatch.setattr(jobs, "submit", lambda *args: jobs._run(*args))
+    track_id = client.post("/api/music/generate", data=form()).json()["id"]
+    track = client.get(f"/api/music/tracks/{track_id}").json()
+    assert track["error"] == "Music generation failed; see the Voxwell log."
+    assert "secret detail" in caplog.text
+
+
 def test_a_track_left_unfinished_by_an_earlier_run_shows_as_failed():
     track = history.create(history.Track(id="a" * 32, title="t", prompt="p", lyrics="", instrumental=True, language="en",
                                          duration=30, bpm=None, key="", seed=1, steps=8, created=0, status="generating"))

@@ -188,6 +188,10 @@ def test_failing_step_becomes_job_error(mocked, monkeypatch, target):
     job = client.get(f"/api/dubbing/jobs/{post().json()['id']}").json()
     assert job["state"] == "error" and job["error"]
     assert "Traceback" not in job["error"]
+    if target == "ffmpeg":  # Voxwell's own DubbingError: its message is shown
+        assert job["error"] == "install ffmpeg"
+    else:  # a library failure: logged, never shown
+        assert "boom" not in job["error"] and job["error"].endswith("failed; see the Voxwell log.")
 
 
 def test_no_speech_is_an_error(mocked, monkeypatch):

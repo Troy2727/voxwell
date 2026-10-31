@@ -16,6 +16,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from voxwell import voices
+from voxwell.errors import user_message
 from voxwell.features.audio_effects.dsp import Effects, apply_to_wav
 from voxwell.features.stories.script import parse
 from voxwell.features.voice_cloning import engine
@@ -154,11 +155,11 @@ def _work(job: Job) -> None:
                 story = apply_to_wav(story, Effects(**job.effects))
             audio_path(job).write_bytes(story)
             job.state, job.step, job.percent = "done", "Done", 100
-        except ValueError as exc:
-            job.state, job.error = "error", str(exc)
-        except Exception:  # an unexpected failure: the details go to the log, not to the user
-            log.exception("Story failed at %s", job.step)
-            job.state, job.error = "error", f"{job.step} failed; see the Voxwell log."
+        except Exception as exc:
+            if (message := user_message(exc)) is None:  # not Voxwell's own message: log it instead
+                log.exception("Story failed at %s", job.step)
+                message = f"{job.step} failed; see the Voxwell log."
+            job.state, job.error = "error", message
         _save(job)
 
 
