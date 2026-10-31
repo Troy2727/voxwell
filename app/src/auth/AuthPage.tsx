@@ -50,12 +50,10 @@ function SubmitButton({ busy, children }: { busy: boolean; children: ReactNode }
 }
 
 /**
- * Sign in only: accounts are created by the owner in Supabase, which also has sign-up turned off.
- * Google sign-in stays for accounts that already exist. Signing in opens the dashboard.
+ * Google sign-in only, for accounts that already exist: Supabase has sign-up and email logins turned off.
+ * Signing in opens the dashboard.
  */
 function AccountForm() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [google, setGoogle] = useState(false);
@@ -72,20 +70,6 @@ function AccountForm() {
     setError(failure);
     window.history.replaceState(null, '', pathname);
   }, []);
-
-  async function submit(e: FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setError('');
-    try {
-      const { error } = await supabase!.auth.signInWithPassword({ email, password });
-      if (error) throw error;
-    } catch (e) {
-      setError(message(e));
-    } finally {
-      setBusy(false);
-    }
-  }
 
   async function signInWithGoogle() {
     setBusy(true);
@@ -112,27 +96,17 @@ function AccountForm() {
         <span className="text-3xl font-bold tracking-tight">Voxwell</span>
       </div>
       <h1 className="text-center text-3xl font-bold tracking-tight">Welcome back</h1>
-      <p className="text-muted-foreground mt-2 mb-8 text-center">Sign in with the login you were given</p>
+      <p className="text-muted-foreground mt-2 mb-8 text-center">Sign in with Google</p>
 
-      {google && (
-        <>
+      <div className="flex flex-col gap-5">
+        {google && (
           <Button type="button" variant="outline" size="lg" className="h-11 w-full font-semibold" disabled={busy} onClick={signInWithGoogle}>
             <GoogleIcon />
             Continue with Google
           </Button>
-          <div className="text-muted-foreground my-6 flex items-center gap-4 text-sm before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border">or</div>
-        </>
-      )}
-      <form className="flex flex-col gap-5" onSubmit={submit}>
-        <Field label="Email address" htmlFor="email">
-          <Input id="email" type="email" autoComplete="email" required placeholder="Enter your email" className="h-11" value={email} onChange={(e) => setEmail(e.target.value)} />
-        </Field>
-        <Field label="Password" htmlFor="password">
-          <PasswordInput id="password" autoComplete="current-password" value={password} onChange={setPassword} />
-        </Field>
+        )}
         <ErrorAlert message={error} />
-        <SubmitButton busy={busy}>Sign in</SubmitButton>
-      </form>
+      </div>
       <p className="text-muted-foreground mt-6 text-center text-sm">Accounts are by invitation only.</p>
       <p className="text-muted-foreground mt-8 flex items-center justify-center gap-2 text-xs">
         <Lock className="size-3.5" />
