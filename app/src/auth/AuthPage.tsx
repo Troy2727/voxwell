@@ -5,7 +5,7 @@ import { LogoMark } from '@/components/logo';
 import { ErrorAlert, Field, message } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { googleEnabled, redirectTo, supabase } from '@/lib/auth';
+import { googleEnabled, redirectFailure, redirectTo, supabase } from '@/lib/auth';
 import { WaveStage } from './wave-stage';
 
 const TOOLS = [
@@ -62,6 +62,15 @@ function AccountForm() {
 
   useEffect(() => {
     googleEnabled().then(setGoogle, () => setGoogle(false));
+  }, []);
+
+  // A refused Google sign-in returns here with the reason in the address: show it, then tidy the address.
+  useEffect(() => {
+    const { pathname, search, hash } = window.location;
+    const failure = redirectFailure(new URLSearchParams([...new URLSearchParams(search), ...new URLSearchParams(hash.slice(1))]));
+    if (!failure) return;
+    setError(failure);
+    window.history.replaceState(null, '', pathname);
   }, []);
 
   async function submit(e: FormEvent) {
