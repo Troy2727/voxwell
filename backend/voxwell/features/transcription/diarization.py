@@ -15,7 +15,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from voxwell.paths import data_dir
+from voxwell.paths import data_dir, replace_file
 
 _RELEASES = "https://github.com/k2-fsa/sherpa-onnx/releases/download"
 SEGMENTATION_URL = f"{_RELEASES}/speaker-segmentation-models/sherpa-onnx-pyannote-segmentation-3-0.tar.bz2"
@@ -63,7 +63,7 @@ def _download(url: str, sha256: str, dest: Path) -> None:
     if _sha256(part) != sha256:
         part.unlink(missing_ok=True)
         raise DiarizationError("The downloaded speaker model is corrupted. Try again.")
-    part.replace(dest)
+    replace_file(part, dest)
 
 
 def model_paths() -> tuple[Path, Path]:
@@ -81,7 +81,7 @@ def model_paths() -> tuple[Path, Path]:
                     part = segmentation.with_name(segmentation.name + ".part")
                     with part.open("wb") as out:
                         shutil.copyfileobj(src, out)
-                part.replace(segmentation)
+                replace_file(part, segmentation)
             except (tarfile.TarError, KeyError, OSError) as exc:
                 raise DiarizationError(f"The speaker model archive could not be read: {exc}")
             finally:

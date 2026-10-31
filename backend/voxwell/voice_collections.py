@@ -6,12 +6,11 @@ voice removes it from every collection (see voices.delete_voice).
 """
 
 import json
-import os
 import threading
 import uuid
 from dataclasses import asdict, dataclass, field
 
-from voxwell.paths import data_dir
+from voxwell.paths import data_dir, replace_file
 
 _LOCK = threading.RLock()
 
@@ -42,7 +41,7 @@ def _save(collections: list[Collection]) -> None:
     path = _path()
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps([asdict(c) for c in collections]), encoding="utf-8")
-    os.replace(tmp, path)
+    replace_file(tmp, path)
 
 
 def _clean_name(name: str, others: list[Collection]) -> str:
