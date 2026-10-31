@@ -38,7 +38,7 @@ class AppClient(cli.Client):
 
     def __init__(self):
         super().__init__("http://testserver")
-        self.http = TestClient(app)
+        self.http = TestClient(app, base_url="http://127.0.0.1")
 
     def request(self, method, path, body=None, headers=None):
         if body is not None and not isinstance(body, bytes):
@@ -65,6 +65,22 @@ def audio(tmp_path) -> Path:
     path = tmp_path / "clip.wav"
     path.write_bytes(wav_bytes())
     return path
+
+
+@pytest.mark.parametrize("path", ["//server/share/clip.wav", "\\\\server\\share\\clip.wav", "\\\\?\\UNC\\server\\share\\clip.wav"])
+def test_network_paths_are_refused(path):
+    """Opening \\\\server\\share signs in to that server as the user (Windows sends NTLM), so the
+    CLI and MCP tools only read and write files on this computer."""
+    with pytest.raises(cli.CliError, match="this computer"):
+        cli._existing_file(path)
+    with pytest.raises(cli.CliError, match="this computer"):
+        cli._output_path(path, "out.wav", ".wav")
+
+
+def test_isolate_refuses_a_network_output_folder(capsys, monkeypatch, audio):
+    monkeypatch.setattr(isolation, "isolate", lambda *a, **k: pytest.fail("must refuse before isolating"))
+    code, _, err = run(capsys, "isolate", str(audio), "-o", "//server/share")
+    assert code != 0 and "this computer" in err
 
 
 def test_no_arguments_start_the_server(monkeypatch):
@@ -208,7 +224,7 @@ def test_jobs_are_titled_after_the_file(capsys, monkeypatch, audio, tmp_path, na
     named = tmp_path / name
     named.write_bytes(audio.read_bytes())
     assert run(capsys, "transcribe", str(named))[0] == 0
-    items = TestClient(app).get("/api/projects/items").json()
+    items = TestClient(app, base_url="http://127.0.0.1").get("/api/projects/items").json()
     assert title in [item["title"] for item in items if item["kind"] == "transcript"]
 
 

@@ -18,7 +18,7 @@ from voxwell.features.transcription.diarization import DiarizationError, Turn, a
 from voxwell.features.voice_cloning import engine as cloning_engine
 from voxwell.main import app
 
-client = TestClient(app)
+client = TestClient(app, base_url="http://127.0.0.1")
 
 SEGMENTS = [Segment(0.0, 1.5, "Hello there."), Segment(2.0, 3.25, "Welcome to Voxwell."), Segment(4.0, 5.0, "Thanks.")]
 TURNS = [Turn(0.0, 1.8, 7), Turn(1.8, 3.4, 3), Turn(3.9, 5.0, 7)]  # sherpa's own speaker numbers
@@ -118,7 +118,7 @@ def test_labelled_transcript_and_exports(fake):
     assert job["state"] == "done" and job["percent"] == 100
     assert [s["speaker"] for s in job["transcript"]["segments"]] == ["Speaker 1", "Speaker 2", "Speaker 1"]
     assert job["transcript"]["text"] == "Hello there. Welcome to Voxwell. Thanks."
-    assert fake["diarize"] == [(".mp3", 0)]  # the upload, with the speaker count left to detect
+    assert fake["diarize"] == [(".audio", 0)]  # the upload, with the speaker count left to detect
     assert export(job, "txt") == "Speaker 1: Hello there.\n\nSpeaker 2: Welcome to Voxwell.\n\nSpeaker 1: Thanks.\n"
     assert "1\n00:00:00,000 --> 00:00:01,500\nSpeaker 1: Hello there.\n" in export(job, "srt")
     vtt = export(job, "vtt")
@@ -133,7 +133,7 @@ def test_consecutive_segments_of_one_speaker_share_a_text_paragraph(fake, monkey
 
 def test_num_speakers_is_passed_on_and_only_used_when_labelling(fake):
     done(speakers=True, num_speakers=2)
-    assert fake["diarize"] == [(".mp3", 2)]
+    assert fake["diarize"] == [(".audio", 2)]
     assert jobs.get(client.get("/api/transcription/jobs").json()[0]["id"]).num_speakers == 2
     done(speakers=False, num_speakers=2)
     assert len(fake["diarize"]) == 1

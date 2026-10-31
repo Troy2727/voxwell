@@ -11,7 +11,7 @@ from voxwell.features.dictation import engine
 from voxwell.main import app
 from voxwell.paths import data_dir
 
-client = TestClient(app)
+client = TestClient(app, base_url="http://127.0.0.1")
 
 
 def _fake(calls):
@@ -141,7 +141,7 @@ def _until_done(ws):
 
 
 def _live(**headers):
-    return client.websocket_connect("/api/dictation/live", headers=headers)
+    return client.websocket_connect("ws://127.0.0.1/api/dictation/live", headers=headers)
 
 
 def test_live_turn_by_turn(monkeypatch):
@@ -202,7 +202,7 @@ def test_live_failed_turn_is_reported_and_the_session_continues(monkeypatch):
     assert messages[-1] == {"type": "done"}
 
 
-@pytest.mark.parametrize("origin", ["https://evil.example", "http://localhost:3000"])
+@pytest.mark.parametrize("origin", ["https://evil.example", "http://localhost:3000", "null", "file://"])
 def test_live_refuses_other_web_pages(origin):
     with pytest.raises(WebSocketDisconnect) as exc:
         with _live(origin=origin):
@@ -210,7 +210,7 @@ def test_live_refuses_other_web_pages(origin):
     assert exc.value.code == 1008
 
 
-@pytest.mark.parametrize("origin", ["http://localhost:5173", "file://", "null"])
+@pytest.mark.parametrize("origin", ["http://localhost:5173", "app://voxwell"])
 def test_live_accepts_the_app(origin):
     with _live(origin=origin) as ws:
         ws.send_json({"type": "start", "config": {}})

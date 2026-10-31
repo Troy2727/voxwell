@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 from voxwell.features.sound import engine, history, token
 from voxwell.main import app
 
-client = TestClient(app)
+client = TestClient(app, base_url="http://127.0.0.1")
 SECRET = "hf_super_secret_value_123"
 
 

@@ -13,7 +13,7 @@ from voxwell.features.pronunciation.store import Entry
 from voxwell.features.voice_cloning import engine
 from voxwell.main import app
 
-client = TestClient(app)
+client = TestClient(app, base_url="http://127.0.0.1")
 
 
 def entry(word, respelling, case_sensitive=False, whole_word=True):
@@ -216,7 +216,7 @@ def test_the_openai_compatible_api_applies_the_dictionary(monkeypatch):
 class AppClient(cli.Client):
     def __init__(self):
         super().__init__("http://testserver")
-        self.http = TestClient(app)
+        self.http = TestClient(app, base_url="http://127.0.0.1")
 
     def request(self, method, path, body=None, headers=None):
         res = self.http.request(method, path, content=body, headers=headers)

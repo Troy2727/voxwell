@@ -15,7 +15,7 @@ from voxwell.features.dubbing import translate as translator
 from voxwell.features.voice_cloning import engine as cloning_engine
 from voxwell.main import app
 
-client = TestClient(app)
+client = TestClient(app, base_url="http://127.0.0.1")
 
 
 def wav_bytes(seconds: float = 1.0, rate: int = 24000) -> bytes:
@@ -204,6 +204,6 @@ def test_server_start_launches_the_watcher(monkeypatch):
 
     patched = [f if f.id != "batch" else features.Feature("batch", f.router, watch.start) for f in FEATURES]
     monkeypatch.setattr("voxwell.main.FEATURES", patched)
-    with TestClient(app):
+    with TestClient(app, base_url="http://127.0.0.1"):
         pass
     assert started == [True]

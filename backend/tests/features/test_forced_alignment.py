@@ -10,7 +10,7 @@ from voxwell.features.transcription import alignment
 from voxwell.features.transcription.alignment import AlignedWord, align, build_cues, normalize, script_words
 from voxwell.main import app
 
-client = TestClient(app)
+client = TestClient(app, base_url="http://127.0.0.1")
 
 HEARD = [(0.0, 0.4, "Hello"), (0.5, 0.9, "there"), (1.0, 1.5, "and"), (1.6, 2.2, "welcome")]
 
@@ -164,7 +164,7 @@ def test_align_returns_words_cues_and_subtitles(fake):
     r = post(language=" EN ")
     assert r.status_code == 200
     body = r.json()
-    assert fake == [(b"audio", ".mp3", "en")]
+    assert fake == [(b"audio", ".audio", "en")]  # the upload's name never picks the decoder
     assert (body["matched"], body["total"], body["fallback"], body["language"]) == (4, 4, False, "en")
     assert body["words"][1] == {"text": "there,", "start": 0.5, "end": 0.9, "matched": True}
     assert body["cues"] == [{"start": 0.0, "end": 2.2, "text": "Hello there, and welcome!"}]

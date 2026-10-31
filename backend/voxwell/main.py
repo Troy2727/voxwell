@@ -7,11 +7,12 @@ from dataclasses import asdict
 import truststore
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
 from voxwell import voices
 from voxwell.features import FEATURES
 from voxwell.features.integrations import openai_api
-from voxwell.origins import APP_ORIGINS
+from voxwell.origins import APP_HOSTS, APP_ORIGINS
 
 # Model downloads must work behind TLS-inspecting proxies and antivirus, whose certificates
 # live in the OS store, not in Python's bundled one. huggingface_hub does not fall back to the
@@ -36,6 +37,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=list(APP_HOSTS))
 
 
 @app.get("/api/health")

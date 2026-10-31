@@ -12,7 +12,7 @@ from voxwell.features.tools.router import exaggeration_for
 from voxwell.features.voice_cloning import engine as cloning_engine
 from voxwell.main import app
 
-client = TestClient(app)
+client = TestClient(app, base_url="http://127.0.0.1")
 needs_ffmpeg = pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg is not installed")
 
 

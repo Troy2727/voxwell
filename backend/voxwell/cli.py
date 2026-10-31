@@ -17,7 +17,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 POLL_SECONDS = 2
 
@@ -97,15 +97,26 @@ def _error_message(body: bytes, fallback: str) -> str:
     return fallback
 
 
+def _on_this_computer(value: str) -> str:
+    """Refuse network paths (\\\\server\\share, //server/share) before anything touches them.
+
+    Opening one signs in to that server as the user (Windows sends NTLM), and the MCP tools take
+    their paths from an AI assistant, which a document or web page can steer.
+    """
+    if PureWindowsPath(value).drive.startswith("\\\\"):
+        raise CliError(f"Use a file on this computer, not a network path: {value}")
+    return value
+
+
 def _existing_file(value: str) -> Path:
-    path = Path(value).expanduser()
+    path = Path(_on_this_computer(value)).expanduser()
     if not path.is_file():
         raise CliError(f"File not found: {path}")
     return path
 
 
 def _output_path(given: str | None, default_name: str, suffix: str) -> Path:
-    path = (Path(given).expanduser() if given else Path.cwd() / default_name).resolve()
+    path = (Path(_on_this_computer(given)).expanduser() if given else Path.cwd() / default_name).resolve()
     if path.is_dir():
         path = path / default_name
     if path.suffix.lower() != suffix:
@@ -298,8 +309,8 @@ def cmd_edit(client: Client, args) -> tuple[str, dict]:
 
 def cmd_isolate(client: Client, args) -> tuple[str, dict]:
     source = _existing_file(args.file)
+    folder = (Path(_on_this_computer(args.output)).expanduser() if args.output else source.parent).resolve()
     result = client.post_form("/api/tools/isolate", {}, source)
-    folder = (Path(args.output).expanduser() if args.output else source.parent).resolve()
     folder.mkdir(parents=True, exist_ok=True)
     paths = {}
     for part in ("voice", "background"):

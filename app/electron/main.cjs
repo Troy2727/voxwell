@@ -1,5 +1,6 @@
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, net, protocol, shell } = require('electron');
 const path = require('node:path');
+const { pathToFileURL } = require('node:url');
 const { spawn } = require('node:child_process');
 const dictation = require('./dictation.cjs');
 
@@ -9,6 +10,20 @@ const BACKEND_PORT = process.env.VOXWELL_PORT || '8765';
 const UV_TLS = { UV_SYSTEM_CERTS: '1' };
 let backend;
 let win;
+
+// The built UI loads from app://voxwell, an origin of its own that the backend allows. From file://
+// its origin would be "null", which sandboxed iframes on any website share.
+const APP_SCHEME = 'app';
+const DIST = path.join(__dirname, '..', 'dist');
+protocol.registerSchemesAsPrivileged([
+  { scheme: APP_SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true } },
+]);
+
+function serveDist(request) {
+  const file = path.join(DIST, decodeURIComponent(new URL(request.url).pathname));
+  if (path.relative(DIST, file).startsWith('..')) return new Response('Not found', { status: 404 });
+  return net.fetch(pathToFileURL(file).toString());
+}
 
 // Account emails and Google sign-in return to voxwell://auth/callback; the OS hands those links to
 // this app (a second instance on Windows/Linux, 'open-url' on macOS) and the window finishes sign-in.
@@ -71,13 +86,14 @@ function createWindow() {
     webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true },
   });
   if (process.env.VOXWELL_DEV) win.loadURL('http://localhost:5173');
-  else win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
+  else win.loadURL(`${APP_SCHEME}://voxwell/index.html`);
   win.webContents.on('did-start-loading', () => { authReady = false; });
   return win;
 }
 
 app.whenReady().then(() => {
   if (!primary) return;
+  protocol.handle(APP_SCHEME, serveDist);
   startBackend();
   dictation.register(createWindow());
   const url = authUrlIn(process.argv);

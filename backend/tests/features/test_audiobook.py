@@ -12,7 +12,7 @@ from voxwell.features.audiobook.importer import ImportError_, import_book
 from voxwell.features.voice_cloning import engine
 from voxwell.main import app
 
-client = TestClient(app)
+client = TestClient(app, base_url="http://127.0.0.1")
 RATE = 24000
 
 
