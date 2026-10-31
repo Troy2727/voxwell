@@ -18,7 +18,7 @@ from voxwell.features.integrations import router as integrations_router
 from voxwell.features.voice_cloning import engine as tts
 from voxwell.main import app
 
-client = TestClient(app)
+client = TestClient(app, base_url="http://127.0.0.1")
 needs_ffmpeg = pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg is not installed")
 RATE = 24000
 

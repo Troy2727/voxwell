@@ -17,7 +17,7 @@ from voxwell.features.voice_cloning import engine as tts
 from voxwell.main import app
 from voxwell.paths import data_dir
 
-client = TestClient(app)
+client = TestClient(app, base_url="http://127.0.0.1")
 
 
 def wav_bytes(seconds: float = 0.5, rate: int = 24000) -> bytes:
@@ -224,7 +224,7 @@ def test_live_turns_remember_the_conversation(llm, monkeypatch):
     languages = []
     monkeypatch.setattr(stt, "transcribe", lambda path, language=None: languages.append(language) or stt.Transcript(next(heard), "fr", []))
     llm.replies = ["Salut !", "Très bien."]
-    with client.websocket_connect(f"/api/agents/agents/{agent['id']}/live") as ws:
+    with client.websocket_connect(f"ws://127.0.0.1/api/agents/agents/{agent['id']}/live") as ws:
         ws.send_json({"type": "start", "config": {"silence_ms": 400, "history": [{"role": "assistant", "content": "Allô"}]}})
         assert ws.receive_json()["type"] == "ready"
         for _ in range(2):
@@ -241,7 +241,7 @@ def test_live_turns_remember_the_conversation(llm, monkeypatch):
 
 
 def test_live_unknown_agent():
-    with client.websocket_connect("/api/agents/agents/0123456789ab/live") as ws:
+    with client.websocket_connect("ws://127.0.0.1/api/agents/agents/0123456789ab/live") as ws:
         ws.send_json({"type": "start", "config": {}})
         m = ws.receive_json()
         assert m == {"type": "error", "message": "Unknown agent."}

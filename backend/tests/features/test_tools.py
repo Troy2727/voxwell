@@ -16,7 +16,7 @@ from voxwell.features.tools.router import MAX_ISOLATE_SECONDS
 from voxwell.features.voice_cloning import engine as cloning_engine
 from voxwell.main import app
 
-client = TestClient(app)
+client = TestClient(app, base_url="http://127.0.0.1")
 needs_ffmpeg = pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg is not installed")
 
 
@@ -100,7 +100,8 @@ def test_probe_never_uses_the_client_file_name(monkeypatch):
     monkeypatch.setattr(engine, "probe", lambda path: seen.append(path.name) or {})
     client.post("/api/tools/probe", files={"file": ("../../evil name.mp4", b"x")})
     client.post("/api/tools/probe", files={"file": ("weird.<>|", b"x")})
-    assert seen == ["input.mp4", "input"]
+    client.post("/api/tools/probe", files={"file": ("list.m3u8", b"x")})  # a playlist name would pick the HLS demuxer
+    assert seen == ["input", "input", "input"]
 
 
 # --- voice conversion ----------------------------------------------------------------------

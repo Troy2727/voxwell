@@ -15,7 +15,7 @@ from voxwell.features.dubbing import translate as translator
 from voxwell.features.voice_cloning import engine as cloning_engine
 from voxwell.main import app
 
-client = TestClient(app)
+client = TestClient(app, base_url="http://127.0.0.1")
 
 
 def wav_bytes(seconds: float, rate: int = 24000) -> bytes:

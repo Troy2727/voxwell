@@ -16,7 +16,7 @@ from voxwell.features.stories import jobs
 from voxwell.features.voice_cloning import engine
 from voxwell.main import app
 
-client = TestClient(app)
+client = TestClient(app, base_url="http://127.0.0.1")
 RATE = 16000
 
 
@@ -255,7 +255,7 @@ def test_upload_errors():
 class AppClient(cli.Client):
     def __init__(self):
         super().__init__("http://testserver")
-        self.http = TestClient(app)
+        self.http = TestClient(app, base_url="http://127.0.0.1")
 
     def request(self, method, path, body=None, headers=None):
         if body is not None and not isinstance(body, bytes):

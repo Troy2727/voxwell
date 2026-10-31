@@ -3,8 +3,9 @@ from fastapi.testclient import TestClient
 
 from voxwell import voices
 from voxwell.main import app
+from voxwell.paths import download_name
 
-client = TestClient(app)
+client = TestClient(app, base_url="http://127.0.0.1")
 
 FEATURE_IDS = [
     "voice_cloning", "voice_design", "voices", "voice_collections", "gallery", "sound", "stories", "audiobook", "dubbing", "batch", "dictation",
@@ -38,10 +39,33 @@ def test_the_website_may_use_the_local_backend():
     assert r.headers["access-control-allow-private-network"] == "true"
 
 
-@pytest.mark.parametrize("origin", ["https://evil.example", "https://voxwell.vercel.app.evil.example", "http://voxwell.vercel.app"])
+def test_the_desktop_app_may_use_the_backend():
+    """The packaged desktop UI loads from app://voxwell (app/electron/main.cjs)."""
+    r = _preflight("app://voxwell")
+    assert r.status_code == 200 and r.headers["access-control-allow-origin"] == "app://voxwell"
+
+
+# "null" is the origin of file:// pages, but also of sandboxed iframes and data: URLs on any website.
+@pytest.mark.parametrize("origin", ["https://evil.example", "https://voxwell.vercel.app.evil.example", "http://voxwell.vercel.app", "null"])
 def test_other_web_pages_still_may_not(origin):
     r = _preflight(origin)
     assert r.status_code == 400 and "access-control-allow-origin" not in r.headers
+
+
+@pytest.mark.parametrize("host", ["127.0.0.1:8765", "localhost:8765"])
+def test_requests_to_this_computer_are_served(host):
+    assert client.get("/api/health", headers={"Host": host}).status_code == 200
+
+
+def test_requests_for_other_host_names_are_refused():
+    """A website whose name was re-pointed at 127.0.0.1 (DNS rebinding) must not reach the API."""
+    assert client.get("/api/voices", headers={"Host": "attacker.example:8765"}).status_code == 400
+
+
+@pytest.mark.parametrize("title", ["..\\..\\escape", "../../escape", "a\\b/c"])
+def test_download_names_have_no_path_separators(title):
+    name = download_name(title, ".wav", "Chapter")
+    assert "/" not in name and "\\" not in name
 
 
 @pytest.mark.parametrize("feature", FEATURE_IDS)

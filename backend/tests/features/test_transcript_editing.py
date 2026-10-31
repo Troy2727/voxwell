@@ -7,7 +7,7 @@ from voxwell.features.tools import direction
 from voxwell.features.transcription import editing, jobs
 from voxwell.main import app
 
-client = TestClient(app)
+client = TestClient(app, base_url="http://127.0.0.1")
 
 
 def fake_model(monkeypatch, reply=lambda chunk: chunk.upper()):

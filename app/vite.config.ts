@@ -3,7 +3,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
-// Relative base so the built index.html loads from file:// inside Electron.
+// Relative base so the built index.html loads from app://voxwell inside Electron.
 export default defineConfig({
   base: './',
   plugins: [react(), tailwindcss()],

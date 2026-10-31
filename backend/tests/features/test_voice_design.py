@@ -5,7 +5,7 @@ from voxwell import voices
 from voxwell.features.voice_design import engine
 from voxwell.main import app
 
-client = TestClient(app)
+client = TestClient(app, base_url="http://127.0.0.1")
 WAV = b"RIFFfakewav"
 
 

@@ -8,7 +8,7 @@ from voxwell.features.dictation.engine import AudioError, Segment, Transcript
 from voxwell.features.transcription import jobs
 from voxwell.main import app
 
-client = TestClient(app)
+client = TestClient(app, base_url="http://127.0.0.1")
 
 SEGMENTS = [Segment(0.0, 1.5, "Hello there."), Segment(2.0, 3.25, "Welcome to Voxwell.")]
 
@@ -49,6 +49,14 @@ def test_happy_path(fake):
     assert job["transcript"]["text"] == "Hello there. Welcome to Voxwell."
     assert job["transcript"]["segments"][1] == {"start": 2.0, "end": 3.25, "text": "Welcome to Voxwell."}
     assert fake == [(b"fake audio", None)]  # auto-detect
+
+
+def test_the_upload_name_never_picks_the_decoder(fake, monkeypatch):
+    """Named .m3u8, an upload would be decoded as a playlist that can point at other local files."""
+    seen = []
+    monkeypatch.setattr(engine, "transcribe", lambda audio_path, language=None, on_progress=None: seen.append(audio_path.name) or Transcript("", "en", []))
+    done_job(name="list.m3u8")
+    assert seen == ["input.audio"]
 
 
 def test_video_files_and_language(fake):

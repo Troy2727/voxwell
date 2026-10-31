@@ -17,7 +17,7 @@ def data_dir(*parts: str) -> Path:
     return path
 
 
-_UNSAFE_NAME = re.compile(r'[\/:*?"<>|\x00-\x1f]')
+_UNSAFE_NAME = re.compile(r'[\\/:*?"<>|\x00-\x1f]')
 
 
 def download_name(title: str, suffix: str, fallback: str) -> str:

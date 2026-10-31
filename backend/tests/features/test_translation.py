@@ -15,7 +15,7 @@ from voxwell.features.voice_cloning import engine as tts
 from voxwell.main import app
 from voxwell.paths import data_dir
 
-client = TestClient(app)
+client = TestClient(app, base_url="http://127.0.0.1")
 
 
 def wav_bytes(seconds: float = 0.5, rate: int = 24000) -> bytes:
@@ -62,7 +62,7 @@ def models(monkeypatch):
 
 
 def live_session(config, turns_ms):
-    with client.websocket_connect("/api/translation/live") as ws:
+    with client.websocket_connect("ws://127.0.0.1/api/translation/live") as ws:
         ws.send_json({"type": "start", "config": {"silence_ms": 400, **config}})
         first = ws.receive_json()
         if first["type"] == "error":

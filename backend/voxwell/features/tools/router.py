@@ -28,7 +28,6 @@ MAX_COMPARE_TEXT = 300
 MAX_ISOLATE_SECONDS = 10 * 60  # about 1 GB of working memory; longer files take a while on CPU
 OUTPUT_TTL_SECONDS = 24 * 60 * 60  # results are scratch files; download what you want to keep
 _OUTPUT_ID = re.compile(r"^[0-9a-f]{32}$")
-_EXT = re.compile(r"\.[a-z0-9]{1,6}")
 
 
 def _ffmpeg_ready() -> bool:
@@ -233,12 +232,10 @@ async def fit(file: UploadFile = File(...), target_seconds: float = Form(...)):
 
 @router.post("/probe")
 def probe(file: UploadFile = File(...)):
-    # Videos can be large, so stream to a temp file; only the extension of the name is kept.
-    suffix = Path(file.filename or "").suffix.lower()
-    if not _EXT.fullmatch(suffix):
-        suffix = ""  # ffprobe sniffs the format anyway
+    # Videos can be large, so stream to a temp file. ffprobe sniffs the format, so the upload's name
+    # is not used at all: a name like .m3u8 would make it read the upload as a playlist of other files.
     with tempfile.TemporaryDirectory(dir=data_dir("tools")) as tmp:
-        path = Path(tmp) / f"input{suffix}"
+        path = Path(tmp) / "input"
         with path.open("wb") as out:
             shutil.copyfileobj(file.file, out)
         try:

@@ -19,7 +19,6 @@ router = APIRouter(tags=["transcription"])
 
 _JOB_ID = re.compile(r"^[0-9a-f]{12}$")
 _LANGUAGE = re.compile(r"^[a-z]{2,3}$")
-_EXT = re.compile(r"^\.[a-z0-9]{1,5}$")
 
 
 def summary(job: jobs.Job) -> dict:
@@ -48,10 +47,10 @@ def create_job(file: UploadFile = File(...), language: str = Form(""), speakers:
         raise HTTPException(422, f"Unsupported language '{language}'.")
     if not 0 <= num_speakers <= diarization.MAX_SPEAKERS:
         raise HTTPException(422, f"The number of speakers must be 0 (detect) or 1 to {diarization.MAX_SPEAKERS}.")
-    name = Path(file.filename or "")
-    ext = name.suffix.lower() if _EXT.match(name.suffix.lower()) else ""  # PyAV sniffs the format
-    title = name.stem.strip()[:100] or "Transcript"  # display only, never a path
-    job = jobs.create(ext, title, language, speakers=speakers, num_speakers=num_speakers if speakers else 0)
+    title = Path(file.filename or "").stem.strip()[:100] or "Transcript"  # display only, never a path
+    # A fixed suffix: PyAV sniffs the format, and a name like .m3u8 would make it read the upload
+    # as a playlist of other files on this computer.
+    job = jobs.create(".audio", title, language, speakers=speakers, num_speakers=num_speakers if speakers else 0)
     with (job.dir / job.source).open("wb") as out:
         shutil.copyfileobj(file.file, out)
     if (job.dir / job.source).stat().st_size == 0:
@@ -143,8 +142,7 @@ def align_script(
         raise HTTPException(422, f"The script is too long (limit {MAX_SCRIPT_CHARS:,} characters).")
     if not 10 <= max_chars <= 200 or not 1 <= max_seconds <= 30:
         raise HTTPException(422, "Use 10 to 200 characters and 1 to 30 seconds per subtitle.")
-    ext = Path(file.filename or "").suffix.lower()
-    fd, name = tempfile.mkstemp(suffix=ext if _EXT.match(ext) else "", dir=data_dir("alignment"))  # the name is never used as a path
+    fd, name = tempfile.mkstemp(suffix=".audio", dir=data_dir("alignment"))  # the upload's name is never used, as in create_job
     path = Path(name)
     try:
         with os.fdopen(fd, "wb") as out:

@@ -13,7 +13,7 @@ from voxwell.features.integrations import phone
 from voxwell.features.voice_cloning import engine as cloning_engine
 from voxwell.main import app
 
-client = TestClient(app)
+client = TestClient(app, base_url="http://127.0.0.1")
 PUBLIC = "https://calls.example.trycloudflare.com"
 TOKEN = "twilio-auth-token"
 CALL = {"CallSid": "CA123", "From": "+15551234567", "To": "+15005550006", "CallStatus": "ringing"}

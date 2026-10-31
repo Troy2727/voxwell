@@ -10,7 +10,7 @@ from voxwell.features.stories.script import NARRATOR, Line, ScriptError, parse, 
 from voxwell.features.voice_cloning import engine
 from voxwell.main import app
 
-client = TestClient(app)
+client = TestClient(app, base_url="http://127.0.0.1")
 RATE = 24000
 
 SCRIPT = """
