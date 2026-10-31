@@ -62,6 +62,24 @@ TOOLS = [
         }, ["prompt"]),
     },
     {
+        "name": "make_music",
+        "description": "Make a song (with sung lyrics) or an instrumental from a style description, on this computer "
+        "(ACE-Step). The music engine must be installed once from the Music page or with `voxwell music --install`. "
+        "Takes minutes on CPU. Saves a WAV and returns its path and seed.",
+        "inputSchema": _schema({
+            "prompt": {"type": "string", "description": "Genre, mood, instruments, vocals, e.g. 'dreamy synth-pop, female vocals, 100 bpm'."},
+            "lyrics": {"type": "string", "description": "The lyrics, sections marked [Verse], [Chorus], [Bridge]. Required unless instrumental."},
+            "instrumental": {"type": "boolean", "description": "No vocals. Default false."},
+            "language": {**_LANGUAGE, "description": "Language of the lyrics: en, es, fr, de, it, pt, ru, zh, ja or ko. Default en."},
+            "duration": {"type": "number", "description": "Seconds, 10 to 300. Default 30."},
+            "bpm": {"type": "integer", "description": "Tempo, 30 to 300. Omit to let the model choose."},
+            "key": {"type": "string", "description": "e.g. 'A minor'. Omit to let the model choose."},
+            "seed": {"type": "integer", "description": "Reuse a previous seed to repeat a result."},
+            "reference_path": {**_FILE, "description": "An audio file on this computer whose style to follow (optional)."},
+            "output_path": {"type": "string", "description": "Where to save the WAV. Default: the Voxwell MCP folder."},
+        }, ["prompt"]),
+    },
+    {
         "name": "transcribe",
         "description": "Transcribe an audio or video file on this computer to text.",
         "inputSchema": _schema({
@@ -250,6 +268,13 @@ def generate_sound(args: dict) -> str:
                 seed=args.get("seed"), steps=100, output=args.get("output_path") or _default_folder())
 
 
+def make_music(args: dict) -> str:
+    return _run(cli.cmd_music, prompt=_required(args, "prompt"), lyrics=args.get("lyrics"), lyrics_file=None,
+                instrumental=bool(args.get("instrumental")), language=args.get("language") or "en",
+                duration=float(args.get("duration") or 30), bpm=args.get("bpm"), key=args.get("key"), seed=args.get("seed"),
+                steps=8, reference=args.get("reference_path"), install=False, output=args.get("output_path") or _default_folder())
+
+
 def transcribe(args: dict) -> str:
     text = _run(cli.cmd_transcribe, file=_required(args, "file_path"), language=args.get("language"), format="txt", output=None,
                 **_speaker_args(args))
@@ -339,7 +364,7 @@ def chat_with_agent(args: dict) -> str:
 
 
 HANDLERS = {
-    "list_voices": list_voices, "voice_collections": voice_collections, "speak": speak, "generate_sound": generate_sound, "transcribe": transcribe, "edit_transcript": edit_transcript, "align_script": align_script, "isolate_voice": isolate_voice,
+    "list_voices": list_voices, "voice_collections": voice_collections, "speak": speak, "generate_sound": generate_sound, "make_music": make_music, "transcribe": transcribe, "edit_transcript": edit_transcript, "align_script": align_script, "isolate_voice": isolate_voice,
     "clone_voice": clone_voice, "design_voice": design_voice, "convert_voice": convert_voice, "dub_video": dub_video,
     "chat_with_agent": chat_with_agent,
     "translate_speech": translate_speech,

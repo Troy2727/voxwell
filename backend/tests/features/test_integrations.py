@@ -224,7 +224,7 @@ def test_mcp_handshake_and_tool_list(mcp):
     assert init["result"]["protocolVersion"] == "2025-03-26" and "tools" in init["result"]["capabilities"]
     assert mcp_server.handle({"jsonrpc": "2.0", "method": "notifications/initialized"}) is None
     names = {t["name"] for t in mcp("tools/list")["result"]["tools"]}
-    assert names == {"list_voices", "voice_collections", "speak", "generate_sound", "transcribe", "edit_transcript", "align_script", "isolate_voice", "clone_voice", "design_voice", "convert_voice", "dub_video", "manage_pronunciations", "apply_effects", "translate_speech", "chat_with_agent"}
+    assert names == {"list_voices", "voice_collections", "speak", "generate_sound", "make_music", "transcribe", "edit_transcript", "align_script", "isolate_voice", "clone_voice", "design_voice", "convert_voice", "dub_video", "manage_pronunciations", "apply_effects", "translate_speech", "chat_with_agent"}
     assert names == set(mcp_server.HANDLERS)
     assert mcp("ping")["result"] == {}
     assert mcp("resources/list")["error"]["code"] == -32601
@@ -412,3 +412,31 @@ def test_mcp_voice_collections(mcp):
     assert "Deleted the collection 'Cast'" in text(action="delete", name="Cast")
     assert voices.list_voices() == [anna]
     assert tool(mcp, "voice_collections", action="show", name="Nope")["isError"] is True
+
+
+def test_mcp_make_music(mcp, monkeypatch, tmp_path):
+    from voxwell.features.music import engine as music_engine
+    from voxwell.features.music import jobs as music_jobs
+    from voxwell.features.music import runtime as music_runtime
+
+    assert "not installed" in tool(mcp, "make_music", prompt="lo-fi", instrumental=True)["content"][0]["text"]
+
+    seen = []
+
+    def generate(fields, files, on_progress):
+        seen.append((fields, sorted(files)))
+        return wav_bytes(), {"seed": fields["seed"], "metas": {}}
+
+    monkeypatch.setattr(music_runtime, "is_installed", lambda: True)
+    monkeypatch.setattr(music_engine, "generate", generate)
+    monkeypatch.setattr(music_jobs, "submit", lambda *args: music_jobs._run(*args))
+    reference = tmp_path / "ref.wav"
+    reference.write_bytes(wav_bytes())
+    out = tmp_path / "song.wav"
+    result = tool(mcp, "make_music", prompt="dreamy synth-pop", lyrics="[Chorus]\nLa la", duration=20, bpm=100, key="A minor",
+                  seed=9, reference_path=str(reference), output_path=str(out))
+    assert result["isError"] is False and str(out) in result["content"][0]["text"] and out.read_bytes() == wav_bytes()
+    (fields, files), = seen
+    assert fields["lyrics"] == "[Chorus]\nLa la" and fields["bpm"] == 100 and fields["key_scale"] == "A minor" and fields["seed"] == 9
+    assert fields["audio_duration"] == 20 and files == ["reference_audio"]
+    assert tool(mcp, "make_music", prompt="pop")["isError"] is True  # lyrics or instrumental is required

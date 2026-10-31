@@ -131,6 +131,7 @@ Voxwell is **MIT licensed**, and every model it runs allows commercial use ([one
 | **Audiobook** | EPUB, TXT or Markdown, chapter by chapter. You can stop and resume. |
 | **Effects** | Add reverb, distance, background noise or stereo pan, to any recording or while generating in Voice cloning and Stories. |
 | **Sound effects** | Describe a sound and generate it with Stable Audio Open. Needs a free Hugging Face token and accepting the model's terms. |
+| **Music** | Songs with sung lyrics, or instrumentals, from a description (ACE-Step 1.5). AI can write the lyrics; regenerate any section, follow a style reference, or split a track into vocals and instrumental. Installs once from the Music page (about 12 GB). |
 
 **Video and translation**
 
@@ -300,6 +301,7 @@ Every model runs locally. Its license is recorded in its feature's `backend/voxw
 | [Qwen2.5-1.5B-Instruct](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct) | AI direction, transcript clean-up, voice agents | Apache-2.0 |
 | HTDemucs | Voice isolation | MIT |
 | [Stable Audio Open 1.0](https://huggingface.co/stabilityai/stable-audio-open-1.0) | Sound effects | Stability AI Community License |
+| [ACE-Step 1.5](https://github.com/ACE-Step/ACE-Step-1.5) | Music (in its own environment; see `features/music/LICENSES.md`) | MIT |
 
 > **The rule:** code and weights must both allow commercial use. Stable Audio Open is the one owner-approved exception: its license is free below US$1M in annual revenue. `backend/tests/test_dependency_licenses.py` fails if a GPL, AGPL or non-commercial package is ever installed.
 >

@@ -1,7 +1,7 @@
 import type { ComponentType } from 'react';
 import {
   AudioLines, AudioWaveform, BookOpen, Bot, FileText, FolderOpen, Languages, Layers, LayoutGrid, Library,
-  type LucideIcon, MessagesSquare, Mic, Plug, Speech, SpellCheck, Volume2, Wand2, Wrench,
+  type LucideIcon, MessagesSquare, Mic, Music, Plug, Speech, SpellCheck, Volume2, Wand2, Wrench,
 } from 'lucide-react';
 import AgentsPage from './agents/Page';
 import AudioEffectsPage from './audio_effects/Page';
@@ -11,6 +11,7 @@ import DictationPage from './dictation/Page';
 import DubbingPage from './dubbing/Page';
 import GalleryPage from './gallery/Page';
 import IntegrationsPage from './integrations/Page';
+import MusicPage from './music/Page';
 import ProjectsPage from './projects/Page';
 import SoundPage from './sound/Page';
 import PronunciationPage from './pronunciation/Page';
@@ -36,6 +37,7 @@ export const FEATURES: FeatureEntry[] = [
   { id: 'voices', title: 'Saved voices', group: 'Voices', icon: Library, Page: VoicesPage },
   { id: 'gallery', title: 'Gallery', group: 'Voices', icon: LayoutGrid, Page: GalleryPage },
   { id: 'sound', title: 'Sound effects', group: 'Create', icon: Volume2, Page: SoundPage },
+  { id: 'music', title: 'Music', group: 'Create', icon: Music, Page: MusicPage },
   { id: 'stories', title: 'Stories', group: 'Create', icon: MessagesSquare, Page: StoriesPage },
   { id: 'audiobook', title: 'Audiobook', group: 'Create', icon: BookOpen, Page: AudiobookPage },
   { id: 'dubbing', title: 'Dubbing', group: 'Dub & transcribe', icon: Languages, Page: DubbingPage },
