@@ -47,6 +47,7 @@ export default function Page() {
   const [script, setScript] = useState('');
   const [preview, setPreview] = useState<Preview | null>(null);
   const [name, setName] = useState('');
+  const [suggested, setSuggested] = useState('');
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState<Voice | null>(null);
@@ -67,7 +68,9 @@ export default function Page() {
     setSaved(null);
     try {
       setPreview(await sendJson<Preview>('/api/voice_remix/preview', 'POST', { voice_id: voiceId, prompt, strength, script: script.trim() || null }));
-      if (!name.trim() && source) setName(`${source.name} (remix)`);
+      // Suggest a name from the voice remixed, unless the user typed their own.
+      if (source && (!name.trim() || name === suggested)) setName(`${source.name} (remix)`);
+      if (source) setSuggested(`${source.name} (remix)`);
     } catch (e) {
       setError(message(e));
     } finally {
@@ -81,8 +84,8 @@ export default function Page() {
     setError('');
     try {
       const voice = await sendJson<Voice>('/api/voice_remix/save', 'POST', { preview_id: preview.preview_id, name });
+      await refreshVoices(); // so "Remix this one further" finds the new voice
       setSaved(voice);
-      void refreshVoices();
       toast.success(`Saved "${voice.name}" to your voices.`);
     } catch (e) {
       setError(message(e));

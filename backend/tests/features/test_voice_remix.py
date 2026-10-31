@@ -74,7 +74,35 @@ def test_blend_mixes_the_two_renders_frame_by_frame():
     assert torch.equal(engine.blend(original, designed, 0.0), original[..., :325])
 
 
-def test_max_strength_returns_the_designed_voice_without_converting(monkeypatch, tmp_path):
-    monkeypatch.setattr(engine.design, "design", lambda prompt, script: b"DESIGNED")
-    monkeypatch.setattr(engine.tools, "_load_vc", lambda: pytest.fail("max must not run voice conversion"))
-    assert engine.remix(tmp_path / "unused.wav", "deep voice", "max", "Hello") == b"DESIGNED"
+def test_max_strength_returns_the_designed_voice_watermarked_without_converting(monkeypatch, tmp_path):
+    import io
+    import wave
+
+    import numpy as np
+
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(44100)
+        w.writeframes(b"\x00\x10" * 4410)
+    marked = []
+
+    class Watermarker:
+        def apply_watermark(self, samples, sample_rate):
+            marked.append(sample_rate)
+            return np.zeros_like(samples)
+
+    class FakeVC:
+        watermarker = Watermarker()
+
+        @property
+        def s3gen(self):
+            pytest.fail("max must not run voice conversion")
+
+    monkeypatch.setattr(engine.design, "design", lambda prompt, script: buf.getvalue())
+    monkeypatch.setattr(engine.tools, "_load_vc", lambda: FakeVC())
+    out = engine.remix(tmp_path / "unused.wav", "deep voice", "max", "Hello")
+    assert marked == [44100]
+    with wave.open(io.BytesIO(out)) as w:
+        assert w.getframerate() == 44100 and w.getnframes() == 4410

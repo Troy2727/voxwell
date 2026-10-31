@@ -52,10 +52,16 @@ def remix(source_voice: Path, prompt: str, strength: str, script: str) -> bytes:
 
     weight = STRENGTHS[strength]
     designed_wav = design.design(prompt, script)
-    if weight >= 1.0:
-        return designed_wav
-
     vc = tools._load_vc()
+    if weight >= 1.0:
+        # The designed take as it is, but marked as AI-made like every other remix.
+        import io
+
+        import soundfile as sf
+
+        samples, rate = sf.read(io.BytesIO(designed_wav), dtype="float32")
+        return cloning._to_wav(torch.from_numpy(vc.watermarker.apply_watermark(samples, sample_rate=rate)), rate)
+
     with tempfile.TemporaryDirectory() as tmp:
         designed = Path(tmp) / "designed.wav"
         designed.write_bytes(designed_wav)

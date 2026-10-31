@@ -1,4 +1,3 @@
-import asyncio
 import importlib.util
 import re
 import time
@@ -47,11 +46,11 @@ def status():
 
 
 @router.post("/preview")
-async def preview(req: PreviewRequest):
+def preview(req: PreviewRequest):  # sync: FastAPI runs it in a worker thread
     prompt = req.prompt.strip()
     script = (req.script or "").strip() or engine.DEFAULT_SCRIPT
     if not prompt:
-        raise HTTPException(422, "Describe how the voice should change.")
+        raise HTTPException(422, "Describe the voice you want.")
     if len(prompt) > MAX_PROMPT:
         raise HTTPException(422, f"The description is too long ({MAX_PROMPT} characters max).")
     if len(script) > MAX_SCRIPT:
@@ -63,9 +62,9 @@ async def preview(req: PreviewRequest):
     except KeyError:
         raise HTTPException(404, "Pick a saved voice to remix.")
     try:
-        wav = await asyncio.to_thread(engine.remix, source, prompt, req.strength, script)
-    except Exception as exc:
-        raise HTTPException(500, f"Voice remix failed: {type(exc).__name__}: {exc}")
+        wav = engine.remix(source, prompt, req.strength, script)
+    except Exception as exc:  # the type only: messages can hold file paths
+        raise HTTPException(500, f"Voice remix failed: {type(exc).__name__}") from exc
     folder = data_dir("voice_remix")
     cutoff = time.time() - PREVIEW_TTL_SECONDS
     for old in folder.glob("*.wav"):
