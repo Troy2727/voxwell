@@ -6,6 +6,7 @@ replies with only {"tool": "<name>", "arguments": {...}}; the result comes back 
 
 import base64
 import json
+import logging
 import re
 
 from voxwell import voices
@@ -14,6 +15,8 @@ from voxwell.features.agents.store import Agent, AgentError
 from voxwell.features.audiobook.books import render_text
 from voxwell.features.audiobook.chunking import chapter_chunks
 from voxwell.features.voice_cloning.engine import LANGUAGES
+
+log = logging.getLogger(__name__)
 
 MAX_TOOL_ROUNDS = 3  # tool calls per turn; then the model must answer
 MAX_HISTORY = 12  # earlier messages (user and assistant) the client may send back
@@ -111,8 +114,11 @@ def respond(agent: Agent, history: list[dict], message: str) -> dict:
             entry = {"tool": call["tool"], "arguments": call["arguments"]}
             try:
                 entry["result"] = tools.run(call["tool"], call["arguments"], agent.tools)
-            except Exception as exc:  # ToolError, or a tool that failed: the model hears why
-                entry["error"] = str(exc) or "The tool failed."
+            except tools.ToolError as exc:  # its user_message is written for the user and the model
+                entry["error"] = exc.user_message or "The tool failed."
+            except Exception:
+                log.exception("Agent tool %s failed", call["tool"])
+                entry["error"] = "The tool failed."
         calls.append(entry)
         feedback = f"Result of {entry['tool']}: {entry['result']}" if "result" in entry else f"Error: {entry['error']}"
         if round_ == MAX_TOOL_ROUNDS - 1:
@@ -133,6 +139,7 @@ def reply_and_speak(agent: Agent, history: list[dict], message: str, spoken: boo
     if spoken:
         try:
             result["audio"] = speak(agent, result["reply"])
-        except Exception as exc:
-            result["warning"] = f"Could not speak the reply: {exc}"
+        except Exception:
+            log.exception("Could not speak an agent reply")
+            result["warning"] = "Could not speak the reply; see the Voxwell log."
     return result

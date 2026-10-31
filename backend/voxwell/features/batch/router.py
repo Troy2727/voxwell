@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from voxwell.features.batch import watch
 from voxwell.features.dubbing import jobs
 from voxwell.features.dubbing.router import check_settings, start_dub
+from voxwell.paths import is_network_path
 
 router = APIRouter(tags=["batch"])
 
@@ -75,6 +76,9 @@ def get_watch():
 def put_watch(req: WatchSettings):
     folder, target = req.folder.strip(), req.target_language
     if req.enabled:
+        # Opening a network path would make Windows sign in to that server as the user.
+        if is_network_path(folder):
+            raise HTTPException(422, "Choose a folder on this computer, not a network folder.")
         if not folder or not Path(folder).is_dir():
             raise HTTPException(422, "Choose a folder that exists.")
         target = check_settings(req.target_language, req.voice)

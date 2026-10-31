@@ -8,7 +8,7 @@ from dataclasses import asdict, dataclass, field
 from voxwell import voices
 from voxwell.features.agents.tools import TOOLS
 from voxwell.features.voice_cloning.engine import LANGUAGES
-from voxwell.paths import data_dir
+from voxwell.paths import child_path, data_dir
 
 _ID = re.compile(r"^[0-9a-f]{12}$")
 MAX_NAME = 80
@@ -32,7 +32,7 @@ class Agent:
 def _path(agent_id: str):
     if not _ID.match(agent_id):
         raise KeyError(agent_id)
-    return data_dir("agents") / f"{agent_id}.json"
+    return child_path(data_dir("agents"), f"{agent_id}.json")
 
 
 def validate(name: str, system_prompt: str, voice: str, language: str, tools: list[str]) -> None:

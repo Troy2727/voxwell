@@ -1,6 +1,7 @@
 """Voice agents: saved agents you talk to (live or push-to-talk) or chat with in text."""
 
 import importlib.util
+import logging
 from dataclasses import asdict
 
 from fastapi import APIRouter, HTTPException, WebSocket
@@ -9,6 +10,8 @@ from pydantic import BaseModel, Field
 from voxwell import live_audio
 from voxwell.features.agents import conversation, store, tools
 from voxwell.features.voice_cloning.engine import LANGUAGES
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["agents"])
 
@@ -89,7 +92,8 @@ def chat(agent_id: str, req: ChatRequest):
     except store.AgentError as exc:
         raise HTTPException(422, str(exc))
     except Exception as exc:
-        raise HTTPException(500, f"The agent failed: {exc}")
+        log.exception("Voice agent %s failed", agent_id)
+        raise HTTPException(500, "The agent failed; see the Voxwell log.") from exc
 
 
 @router.websocket("/agents/{agent_id}/live")

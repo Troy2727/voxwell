@@ -19,7 +19,7 @@ from voxwell import voices
 from voxwell.features.audiobook.chunking import chapter_chunks
 from voxwell.features.audiobook.importer import Chapter
 from voxwell.features.voice_cloning import engine
-from voxwell.paths import data_dir
+from voxwell.paths import child_path, data_dir
 
 STATE_FILE = "book.json"
 DEFAULT_VOICE = "default"
@@ -97,7 +97,7 @@ def get(book_id: str) -> Book | None:
     """Look up a book by an already-validated id, loading it from disk after a restart."""
     with _lock:
         book = _books.get(book_id)
-        if book is None and (book := _load(_root() / book_id)):
+        if book is None and (book := _load(child_path(_root(), book_id))):
             _books[book_id] = book
         return book
 

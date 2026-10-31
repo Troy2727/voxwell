@@ -18,7 +18,7 @@ from voxwell import voices
 from voxwell.features.audio_effects.dsp import Effects, apply_to_wav
 from voxwell.features.stories.script import parse
 from voxwell.features.voice_cloning import engine
-from voxwell.paths import data_dir
+from voxwell.paths import child_path, data_dir
 
 STATE_FILE = "job.json"
 AUDIO_FILE = "story.wav"
@@ -82,7 +82,7 @@ def get(job_id: str) -> Job | None:
     """Look up a job by an already-validated id, loading it from disk after a restart."""
     with _lock:
         job = _jobs.get(job_id)
-        if job is None and (job := _load(_root() / job_id)):
+        if job is None and (job := _load(child_path(_root(), job_id))):
             _jobs[job_id] = job
         return job
 

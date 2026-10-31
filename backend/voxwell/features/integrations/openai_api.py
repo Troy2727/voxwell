@@ -10,6 +10,7 @@ No API key is needed: the server only listens on 127.0.0.1.
 """
 
 import io
+import logging
 import os
 import tempfile
 from pathlib import Path
@@ -33,6 +34,8 @@ router = APIRouter(tags=["openai-compatible"])
 MAX_INPUT = 4096  # OpenAI's limit for /audio/speech
 OPENAI_VOICES = {"alloy", "ash", "ballad", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer", "verse"}
 MEDIA_TYPES = {"wav": "audio/wav", "mp3": "audio/mpeg", "flac": "audio/flac", "opus": "audio/ogg", "aac": "audio/aac", "pcm": "audio/pcm"}
+EXTENSIONS = {"mp3": "mp3", "flac": "flac", "opus": "ogg", "aac": "m4a"}  # for ffmpeg, which picks the container by it
+log = logging.getLogger(__name__)
 
 
 class SpeechRequest(BaseModel):
@@ -70,7 +73,7 @@ def _encode(wav: bytes, fmt: str) -> bytes:
     if fmt == "pcm":  # raw 16-bit little-endian mono, as OpenAI returns it
         return wav[44:]
     with tempfile.TemporaryDirectory(dir=data_dir("integrations")) as tmp:
-        src, out = Path(tmp) / "in.wav", Path(tmp) / f"out.{ 'ogg' if fmt == 'opus' else 'm4a' if fmt == 'aac' else fmt}"
+        src, out = Path(tmp) / "in.wav", Path(tmp) / f"out.{EXTENSIONS[fmt]}"
         src.write_bytes(wav)
         codec = {"mp3": ["-c:a", "libmp3lame", "-q:a", "2"], "flac": ["-c:a", "flac"], "opus": ["-c:a", "libopus"], "aac": ["-c:a", "aac"]}[fmt]
         run_ffmpeg(["-i", str(src), *codec, str(out)])
@@ -115,10 +118,13 @@ def speech(req: SpeechRequest):
                 tools.fit(src, seconds, seconds / req.speed, out)
                 wav = out.read_bytes()
         body = _encode(wav, req.response_format)
-    except DubbingError as exc:  # ffmpeg missing or failed (other formats / speed need it)
-        return _error(400, f"{exc} (response_format 'wav' with speed 1.0 works without ffmpeg)")
-    except Exception as exc:
-        return _error(500, f"Speech synthesis failed: {exc}")
+    except DubbingError:  # ffmpeg missing or failed (other formats / speed need it)
+        log.exception("ffmpeg failed for an OpenAI-compatible speech request")
+        return _error(400, f"Converting the audio needs ffmpeg, which is missing or failed; see the Voxwell log. "
+                           "response_format 'wav' with speed 1.0 works without ffmpeg.")
+    except Exception:
+        log.exception("Speech synthesis failed for an OpenAI-compatible request")
+        return _error(500, "Speech synthesis failed; see the Voxwell log.")
     return Response(body, media_type=MEDIA_TYPES[req.response_format])
 
 
@@ -148,8 +154,9 @@ async def transcriptions(
             t = stt.transcribe(path, (language or "").strip().lower() or None)
         except stt.AudioError as exc:
             return _error(400, str(exc), "file")
-        except Exception as exc:
-            return _error(500, f"Transcription failed: {exc}")
+        except Exception:
+            log.exception("Transcription failed for an OpenAI-compatible request")
+            return _error(500, "Transcription failed; see the Voxwell log.")
     finally:
         path.unlink(missing_ok=True)
     segments = [s for s in t.segments if s.text]

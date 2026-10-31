@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from voxwell import voices
 from voxwell.features.audio_effects.dsp import Effects
 from voxwell.features.voice_cloning import engine, history
-from voxwell.paths import data_dir
+from voxwell.paths import child_path, data_dir
 
 router = APIRouter(tags=["voice_cloning"])
 
@@ -93,7 +93,7 @@ def synthesize(req: SynthesizeRequest):
 def get_audio(audio_id: str):
     if not _AUDIO_ID.match(audio_id):
         raise HTTPException(404, "Audio not found.")
-    path = data_dir("voice_cloning") / f"{audio_id}.wav"
+    path = child_path(data_dir("voice_cloning"), f"{audio_id}.wav")
     if not path.exists():
         raise HTTPException(404, "Audio not found.")
     return FileResponse(path, media_type="audio/wav", filename=f"{audio_id}.wav")

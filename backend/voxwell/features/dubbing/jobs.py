@@ -15,7 +15,7 @@ from pathlib import Path
 
 from voxwell.features.dubbing import pipeline
 from voxwell.features.dubbing.ffmpeg import DubbingError
-from voxwell.paths import data_dir
+from voxwell.paths import child_path, data_dir
 
 STATE_FILE = "job.json"
 INTERRUPTED = "Interrupted because Voxwell closed. Start the dub again."
@@ -119,7 +119,7 @@ def get(job_id: str) -> Job | None:
     with _lock:
         job = _jobs.get(job_id)
         if job is None:
-            job = _load(data_dir("dubbing", "jobs") / job_id)
+            job = _load(child_path(data_dir("dubbing", "jobs"), job_id))
             if job is not None:
                 _jobs[job_id] = job
         return job
