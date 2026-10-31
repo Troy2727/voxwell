@@ -18,8 +18,8 @@
     </linearGradient>
   </defs>
   <style>
-    .a { stop-color: #EA580C; } .b { stop-color: #D97706; } .c { stop-color: #CA8A04; }
-    @media (prefers-color-scheme: dark) { .a { stop-color: #FF7A00; } .b { stop-color: #FFA800; } .c { stop-color: #FFC800; } }
+    .a { stop-color: #6D28D9; } .b { stop-color: #7C3AED; } .c { stop-color: #8B5CF6; }
+    @media (prefers-color-scheme: dark) { .a { stop-color: #8B5CF6; } .b { stop-color: #A78BFA; } .c { stop-color: #C4B5FD; } }
   </style>
   <rect width="7" height="9" x="3" y="3" rx="1" />
   <rect width="7" height="5" x="14" y="3" rx="1" />

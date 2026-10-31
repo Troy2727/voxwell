@@ -18,8 +18,8 @@
     </linearGradient>
   </defs>
   <style>
-    .a { stop-color: #EA580C; } .b { stop-color: #D97706; } .c { stop-color: #CA8A04; }
-    @media (prefers-color-scheme: dark) { .a { stop-color: #FF7A00; } .b { stop-color: #FFA800; } .c { stop-color: #FFC800; } }
+    .a { stop-color: #1D4ED8; } .b { stop-color: #2563EB; } .c { stop-color: #3B82F6; }
+    @media (prefers-color-scheme: dark) { .a { stop-color: #3B82F6; } .b { stop-color: #60A5FA; } .c { stop-color: #93C5FD; } }
   </style>
   <circle cx="12" cy="12" r="10" />
   <path d="M12 16v-4" />
