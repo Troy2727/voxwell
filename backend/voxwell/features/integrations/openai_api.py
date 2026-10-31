@@ -9,6 +9,7 @@ names ("alloy", ...) use the default voice. *`language` is a Voxwell extension (
 No API key is needed: the server only listens on 127.0.0.1.
 """
 
+import asyncio
 import io
 import logging
 import os
@@ -26,12 +27,15 @@ from voxwell.features.dictation import engine as stt
 from voxwell.features.dubbing.ffmpeg import DubbingError, run_ffmpeg
 from voxwell.features.dubbing.fitting import build_srt, srt_time
 from voxwell.features.tools import engine as tools
+from voxwell.features.transcription import jobs as transcription_jobs
 from voxwell.features.voice_cloning.engine import LANGUAGES
 from voxwell.paths import data_dir
 
 router = APIRouter(tags=["openai-compatible"])
 
 MAX_INPUT = 4096  # OpenAI's limit for /audio/speech
+MAX_TRANSCRIPTION_BYTES = 25 * 1024 * 1024  # OpenAI's limit for /audio/transcriptions
+UPLOAD_CHUNK = 1024 * 1024
 OPENAI_VOICES = {"alloy", "ash", "ballad", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer", "verse"}
 MEDIA_TYPES = {"wav": "audio/wav", "mp3": "audio/mpeg", "flac": "audio/flac", "opus": "audio/ogg", "aac": "audio/aac", "pcm": "audio/pcm"}
 EXTENSIONS = {"mp3": "mp3", "flac": "flac", "opus": "ogg", "aac": "m4a"}  # for ffmpeg, which picks the container by it
@@ -133,6 +137,12 @@ def _vtt(segments) -> str:
     return "WEBVTT\n\n" + "\n".join(cues)
 
 
+def _transcribe(path: Path, language: str | None):
+    """One transcription at a time on the shared Whisper model, like the Transcribe feature."""
+    with transcription_jobs._one_at_a_time:
+        return stt.transcribe(path, language)
+
+
 @router.post("/audio/transcriptions")
 async def transcriptions(
     file: UploadFile = File(...),
@@ -142,16 +152,22 @@ async def transcriptions(
 ):
     if response_format not in ("json", "text", "srt", "vtt", "verbose_json"):
         return _error(400, "response_format must be json, text, srt, vtt or verbose_json.", "response_format")
-    data = await file.read()
-    if not data:
-        return _error(400, "The file is empty.", "file")
     fd, name = tempfile.mkstemp(suffix=".audio", dir=data_dir("integrations"))
     path = Path(name)
     try:
+        # Streamed to disk in chunks and capped, so a huge upload never sits in memory.
+        size = 0
         with os.fdopen(fd, "wb") as f:
-            f.write(data)
+            while chunk := await file.read(UPLOAD_CHUNK):
+                size += len(chunk)
+                if size > MAX_TRANSCRIPTION_BYTES:
+                    return _error(413, f"The file is too large ({MAX_TRANSCRIPTION_BYTES // (1024 * 1024)} MB max, as in OpenAI's API).", "file")
+                f.write(chunk)
+        if size == 0:
+            return _error(400, "The file is empty.", "file")
         try:
-            t = stt.transcribe(path, (language or "").strip().lower() or None)
+            # In a worker thread, so the server keeps answering other requests meanwhile.
+            t = await asyncio.to_thread(_transcribe, path, (language or "").strip().lower() or None)
         except stt.AudioError:  # transcribe() raises it only with DECODE_ERROR; never echo exception text
             return _error(400, stt.DECODE_ERROR, "file")
         except Exception:

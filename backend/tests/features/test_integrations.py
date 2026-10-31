@@ -144,6 +144,39 @@ def test_verbose_json(fake_stt):
     assert body["segments"][1] == {"id": 1, "start": 1.5, "end": 2.0, "text": "Bye."}
 
 
+def test_transcription_upload_is_capped(monkeypatch, fake_stt, isolated_data_dir):
+    from voxwell.features.integrations import openai_api
+
+    monkeypatch.setattr(openai_api, "MAX_TRANSCRIPTION_BYTES", 10)
+    monkeypatch.setattr(openai_api, "UPLOAD_CHUNK", 4)
+    r = transcribe(data=b"x" * 11)
+    assert r.status_code == 413 and r.json()["error"]["param"] == "file"
+    assert transcribe(data=b"x" * 10).status_code == 200
+    assert not list((isolated_data_dir / "integrations").glob("*.audio"))  # nothing left behind
+
+
+def test_transcription_waits_its_turn_off_the_event_loop(monkeypatch):
+    """Runs in a worker thread (the server keeps answering) and holds the Transcribe feature's lock."""
+    import asyncio
+
+    from voxwell.features.transcription import jobs as transcription_jobs
+
+    seen = {}
+
+    def fake(path, language=None, on_progress=None):
+        seen["locked"] = transcription_jobs._one_at_a_time.locked()
+        try:
+            asyncio.get_running_loop()
+            seen["on_loop"] = True
+        except RuntimeError:
+            seen["on_loop"] = False
+        return Transcript("Hi.", "en", [Segment(0.0, 1.0, "Hi.")])
+
+    monkeypatch.setattr(stt, "transcribe", fake)
+    assert transcribe().json() == {"text": "Hi."}
+    assert seen == {"locked": True, "on_loop": False}
+
+
 def test_transcription_errors(monkeypatch, fake_stt):
     assert transcribe(data=b"").status_code == 400
     assert transcribe("pdf").status_code == 400
