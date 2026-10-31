@@ -250,11 +250,7 @@ Model weights download on first use of each feature.
 
 [voxwell.vercel.app](https://voxwell.vercel.app) is the same UI, hosted. It does no work itself: it talks to the Voxwell backend on your own computer (`http://127.0.0.1:8765`), so start Voxwell first (the desktop app, or `uv run voxwell` in `backend`). Until it is running, the site says so. Chrome asks once whether the site may connect to apps on your device; choose **Allow**.
 
-The site asks you to sign in. Accounts are by invitation, so use the demo login:
-
-| Email | Password |
-|---|---|
-| `guest@example.com` | `4FUeir2UQDuKFXJL` |
+The site asks you to sign in, and sign-in is limited to the owner. To use Voxwell yourself, run the desktop app.
 
 <br/>
 
