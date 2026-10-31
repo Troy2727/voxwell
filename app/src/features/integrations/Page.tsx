@@ -31,6 +31,7 @@ const TOOLS: { cli: string; mcp: string; what: string }[] = [
   { cli: 'collection', mcp: 'voice_collections', what: 'Organize saved voices into collections' },
   { cli: 'speak', mcp: 'speak', what: 'Turn text into speech (WAV)' },
   { cli: 'sound', mcp: 'generate_sound', what: 'Generate a sound effect from a description' },
+  { cli: 'music', mcp: 'make_music', what: 'Make a song or instrumental from a description and lyrics' },
   { cli: 'transcribe', mcp: 'transcribe', what: 'Transcribe an audio or video file' },
   { cli: 'align', mcp: 'align_script', what: 'Time a script against its recording (SRT or VTT)' },
   { cli: 'edit', mcp: 'edit_transcript', what: 'Clean up a transcript with the local AI model' },

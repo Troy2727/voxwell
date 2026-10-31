@@ -194,6 +194,66 @@ def cmd_sound(client: Client, args) -> tuple[str, dict]:
     return f"Saved the sound to {out} (seed {sound['seed']})", {"path": str(out), "seed": sound["seed"], "duration": sound["duration"]}
 
 
+def _install_music(client: Client, quiet: bool) -> None:
+    """Install the music engine (once, several GB) and wait for it."""
+    quiet = quiet or not sys.stderr.isatty()
+    status = client.get_json("/api/music/status")
+    if not status["installed"] and status["install"]["state"] != "installing":  # else join the running install
+        client.post_json("/api/music/install", {})
+    while True:
+        status = client.get_json("/api/music/status")
+        if status["installed"]:
+            break
+        install = status["install"]
+        if install["state"] == "failed":
+            raise CliError(install["error"] or "Installing the music engine failed.")
+        if install["state"] == "idle":  # Voxwell restarted mid-install
+            raise CliError("The music engine install stopped (Voxwell restarted). Run `voxwell music --install` again.")
+        if not quiet:
+            print(f"\rInstalling the music engine: {install['percent']:3.0f}% ({install['step']})".ljust(90), end="", file=sys.stderr, flush=True)
+        time.sleep(POLL_SECONDS)
+    if not quiet:
+        print(file=sys.stderr)
+
+
+def cmd_music(client: Client, args) -> tuple[str, dict]:
+    if args.install:
+        _install_music(client, args.json)
+        if not args.prompt:
+            return "The music engine is installed.", {"installed": True}
+    if not (args.prompt or "").strip():
+        raise CliError("Describe the music to make.")
+    if not client.get_json("/api/music/status")["installed"]:
+        raise CliError("The music engine is not installed yet (several GB). Run `voxwell music --install` or open the Music page.")
+    lyrics = args.lyrics or ""
+    if args.lyrics_file:
+        lyrics = _existing_file(args.lyrics_file).read_text(encoding="utf-8")
+    fields = {"prompt": args.prompt.strip(), "lyrics": lyrics, "instrumental": str(args.instrumental).lower(),
+              "language": args.language, "duration": args.duration, "steps": args.steps}
+    for name in ("bpm", "key", "seed"):
+        if getattr(args, name) not in (None, ""):
+            fields[name] = getattr(args, name)
+    if args.reference:
+        track = client.post_form("/api/music/generate", fields, _existing_file(args.reference))
+    else:
+        body = urllib.parse.urlencode(fields).encode()
+        track = json.loads(client.request("POST", "/api/music/generate", body, {"Content-Type": "application/x-www-form-urlencoded"}))
+    quiet = args.json or not sys.stderr.isatty()
+    while track["status"] not in ("done", "failed"):
+        if not quiet:
+            print(f"\rMaking music: {track['progress'] * 100:3.0f}% ({track['stage']})".ljust(70), end="", file=sys.stderr, flush=True)
+        time.sleep(POLL_SECONDS)
+        track = client.get_json(f"/api/music/tracks/{track['id']}")
+    if not quiet:
+        print(file=sys.stderr)
+    if track["status"] == "failed":
+        raise CliError(track["error"] or "Music generation failed.")
+    out = _output_path(args.output, f"music-{_stamp()}.wav", ".wav")
+    out.write_bytes(client.request("GET", track["url"]))
+    info = {"path": str(out), "id": track["id"], "seed": track["seed"], "duration": track["duration"], "bpm": track["bpm"], "key": track["key"]}
+    return f"Saved the track to {out} (seed {track['seed']})", info
+
+
 def cmd_collection(client: Client, args) -> tuple[str, dict]:
     action, name, rest = args.action, (args.name or "").strip(), args.rest
     base = "/api/voice_collections"
@@ -458,6 +518,21 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--steps", type=int, default=100, help="quality steps, 10 to 250 (default 100; fewer is faster)")
     p.add_argument("-o", "--output", help="WAV file or folder (default: ./sound-<time>.wav)")
     p.set_defaults(run=cmd_sound)
+    p = sub.add_parser("music", parents=[common], help="make a song or instrumental from a description and lyrics (WAV)")
+    p.add_argument("prompt", nargs="?", help='style, e.g. "upbeat indie pop, bright guitars, warm female vocals"')
+    p.add_argument("--lyrics", help="the lyrics; mark sections with [Verse], [Chorus], ...")
+    p.add_argument("--lyrics-file", help="read the lyrics from a text file")
+    p.add_argument("--instrumental", action="store_true", help="no vocals")
+    p.add_argument("-l", "--language", default="en", help="language of the lyrics (default en)")
+    p.add_argument("-d", "--duration", type=float, default=30, help="seconds, 10 to 300 (default 30)")
+    p.add_argument("--bpm", type=int, help="tempo, 30 to 300 (default: the model chooses)")
+    p.add_argument("--key", help='e.g. "A minor" (default: the model chooses)')
+    p.add_argument("--seed", type=int, help="repeat a previous result by reusing its seed")
+    p.add_argument("--steps", type=int, default=8, help="quality steps, 4 to 20 (default 8)")
+    p.add_argument("--reference", help="an audio file whose style and sound to follow")
+    p.add_argument("--install", action="store_true", help="install the music engine first (once; several GB)")
+    p.add_argument("-o", "--output", help="WAV file or folder (default: ./music-<time>.wav)")
+    p.set_defaults(run=cmd_music)
     p = sub.add_parser("collection", parents=[common], help="organize saved voices into collections (folders)")
     p.add_argument("action", choices=["list", "show", "create", "rename", "delete", "add", "remove"],
                    help="list collections; show a collection's voices; create/rename/delete one; add/remove voices")
