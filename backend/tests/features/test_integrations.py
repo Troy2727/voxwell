@@ -149,11 +149,11 @@ def test_transcription_errors(monkeypatch, fake_stt):
     assert transcribe("pdf").status_code == 400
 
     def bad(*a, **k):
-        raise AudioError("Could not decode the audio.")
+        raise AudioError("text that must not reach the client")
 
     monkeypatch.setattr(stt, "transcribe", bad)
     r = transcribe()
-    assert r.status_code == 400 and r.json()["error"]["message"] == "Could not decode the audio."
+    assert r.status_code == 400 and r.json()["error"]["message"] == stt.DECODE_ERROR
 
 
 # --- integrations info ---------------------------------------------------------------------

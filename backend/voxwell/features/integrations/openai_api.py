@@ -152,8 +152,8 @@ async def transcriptions(
             f.write(data)
         try:
             t = stt.transcribe(path, (language or "").strip().lower() or None)
-        except stt.AudioError:  # transcribe() raises it only for audio it cannot decode
-            return _error(400, "Could not decode the audio.", "file")
+        except stt.AudioError:  # transcribe() raises it only with DECODE_ERROR; never echo exception text
+            return _error(400, stt.DECODE_ERROR, "file")
         except Exception:
             log.exception("Transcription failed for an OpenAI-compatible request")
             return _error(500, "Transcription failed; see the Voxwell log.")

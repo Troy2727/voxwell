@@ -25,6 +25,9 @@ class AudioError(ValueError):
     """The audio is empty or cannot be decoded."""
 
 
+DECODE_ERROR = "Could not decode the audio."  # the message transcribe() raises AudioError with
+
+
 DEFAULT_MODEL = "small"
 _model = None
 _lock = threading.Lock()
@@ -67,7 +70,7 @@ def transcribe(
     except Exception as exc:
         # PyAV (the decoder) raises its own error types for unreadable audio.
         if type(exc).__module__.split(".")[0] == "av":
-            raise AudioError("Could not decode the audio.") from exc
+            raise AudioError(DECODE_ERROR) from exc
         raise
     text = " ".join(p.text for p in parts if p.text).strip()
     return Transcript(text=text, language=info.language, segments=parts)
@@ -103,6 +106,6 @@ def transcribe_words(
                 on_progress(min(s.end / info.duration, 1.0))
     except Exception as exc:
         if type(exc).__module__.split(".")[0] == "av":
-            raise AudioError("Could not decode the audio.") from exc
+            raise AudioError(DECODE_ERROR) from exc
         raise
     return WordTimings(language=info.language, words=words)
