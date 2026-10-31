@@ -156,15 +156,20 @@ def _download_source() -> None:
     except OSError as exc:
         archive.unlink(missing_ok=True)
         raise EngineError(f"Could not download ACE-Step: {exc}")
+    # Extract beside the final folder and rename it into place only when complete, so an
+    # interrupted extraction never leaves a source_dir() that later installs would trust.
     target = source_dir()
+    partial = target.with_name(target.name + ".part")
+    shutil.rmtree(partial, ignore_errors=True)
     shutil.rmtree(target, ignore_errors=True)
     try:
         with zipfile.ZipFile(archive) as zf:
-            _extract_without_top_folder(zf, target)
+            _extract_without_top_folder(zf, partial)
     except zipfile.BadZipFile:
         raise EngineError("The ACE-Step download is corrupted. Try again.")
     finally:
         archive.unlink(missing_ok=True)
+    partial.replace(target)
 
 
 def _extract_without_top_folder(zf: zipfile.ZipFile, target: Path) -> None:
@@ -212,7 +217,15 @@ def _sync_packages() -> None:
 
 
 def _dir_bytes(path: Path) -> int:
-    return sum(p.stat().st_size for p in path.rglob("*") if p.is_file())
+    """Bytes under `path`, skipping files huggingface_hub renames or removes mid-count."""
+    total = 0
+    for p in path.rglob("*"):
+        try:
+            if p.is_file():
+                total += p.stat().st_size
+        except OSError:
+            pass
+    return total
 
 
 def _download_weights() -> None:

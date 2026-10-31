@@ -284,10 +284,77 @@ def test_engine_speaks_ace_steps_api(monkeypatch, tmp_path):
                                     lambda f, s: progress.append((f, s)))
     finally:
         server.shutdown()
-    assert wav == b"audio:/tmp/song.wav" and info == {"seed": 777, "metas": {"bpm": 120}}
+    assert wav == b"audio:/tmp/song.wav" and info == {"metas": {"bpm": 120}}
     assert (0.4, "Diffusion") in progress
     (content_type, body), = FakeAceStep.released
     assert content_type.startswith("multipart/form-data")
     assert b'name="prompt"\r\n\r\nlo-fi' in body and b'name="audio_format"\r\n\r\nwav' in body
     assert b'name="thinking"\r\n\r\nfalse' in body and b'name="bpm"' not in body  # None is left out
     assert b'name="reference_audio"; filename=' in body and b"REFERENCE-BYTES" in body
+
+
+def test_an_unreadable_track_record_does_not_hide_the_others(fake_engine, isolated_data_dir):
+    track_id = client.post("/api/music/generate", data=form()).json()["id"]
+    (isolated_data_dir / "music" / "tracks" / f"{'c' * 32}.json").write_text('{"id": "cc', encoding="utf-8")  # cut short
+    assert [t["id"] for t in client.get("/api/music/tracks").json()] == [track_id]
+
+
+def test_a_track_deleted_while_generating_leaves_no_audio(monkeypatch, installed, isolated_data_dir):
+    def generate(fields, files, on_progress):
+        client.delete(f"/api/music/tracks/{track_ids[0]}")  # the user deletes it meanwhile
+        return wav_bytes(), {"metas": {}}
+
+    track_ids = []
+    monkeypatch.setattr(engine, "generate", generate)
+    monkeypatch.setattr(jobs, "submit", lambda track_id, *rest: track_ids.append(track_id) or jobs._run(track_id, *rest))
+    client.post("/api/music/generate", data=form())
+    assert not list((isolated_data_dir / "music" / "tracks").iterdir())
+
+
+def test_a_claimed_track_is_not_settled_as_orphaned():
+    jobs.claim("d" * 32)
+    try:
+        history.create(history.Track(id="d" * 32, title="t", prompt="p", lyrics="", instrumental=True, language="en",
+                                     duration=30, bpm=None, key="", seed=1, steps=8, created=0))
+        assert client.get(f"/api/music/tracks/{'d' * 32}").json()["status"] == "queued"
+    finally:
+        jobs._active.discard("d" * 32)
+
+
+def test_a_broken_source_download_leaves_no_half_installed_folder(monkeypatch):
+    monkeypatch.setattr(runtime.urllib.request, "urlopen", lambda url, timeout: io.BytesIO(b"not a zip"))
+    with pytest.raises(runtime.EngineError):
+        runtime._download_source()
+    assert not runtime.source_dir().exists()
+
+
+class FakeInstallClient:
+    def __init__(self, states):
+        self.states, self.posted = list(states), []
+
+    def get_json(self, path):
+        state = self.states.pop(0) if len(self.states) > 1 else self.states[0]
+        return {"installed": state == "installed", "install": {"state": "idle" if state == "installed" else state, "percent": 0, "step": "", "error": "boom"}}
+
+    def post_json(self, path, body):
+        self.posted.append(path)
+
+
+def test_cli_install_joins_a_running_install(monkeypatch):
+    from voxwell import cli
+
+    monkeypatch.setattr(cli, "POLL_SECONDS", 0)
+    running = FakeInstallClient(["installing", "installing", "installed"])
+    cli._install_music(running, quiet=True)
+    assert running.posted == []  # no second install was started
+    fresh = FakeInstallClient(["idle", "installing", "installed"])
+    cli._install_music(fresh, quiet=True)
+    assert fresh.posted == ["/api/music/install"]
+
+
+def test_cli_install_stops_when_voxwell_restarts_mid_install(monkeypatch):
+    from voxwell import cli
+
+    monkeypatch.setattr(cli, "POLL_SECONDS", 0)
+    with pytest.raises(cli.CliError, match="stopped"):
+        cli._install_music(FakeInstallClient(["installing", "idle"]), quiet=True)

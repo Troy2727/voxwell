@@ -12,6 +12,11 @@ _worker: threading.Thread | None = None
 _start_lock = threading.Lock()
 
 
+def claim(track_id: str) -> None:
+    """Mark a track as this run's before its record is written (see router._settle)."""
+    _active.add(track_id)
+
+
 def submit(track_id: str, fields: dict, files: dict[str, Path], cleanup: list[Path]) -> None:
     """Queue a track whose record already exists; `cleanup` files are deleted once it finishes."""
     global _worker
@@ -37,7 +42,7 @@ def _run(track_id: str, fields: dict, files: dict[str, Path], cleanup: list[Path
         history.update(track_id, status="generating", progress=max(0.0, min(fraction, 1.0)), stage=stage)
 
     try:
-        history.update(track_id, status="generating", stage="Starting")
+        history.update(track_id, status="generating", stage="Starting", error="")
         wav, info = engine.generate(fields, files, progress)
         history.save_audio(track_id, wav)
         metas = info["metas"]
