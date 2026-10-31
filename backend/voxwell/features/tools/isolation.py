@@ -11,7 +11,7 @@ import urllib.request
 from pathlib import Path
 
 from voxwell.features.tools import htdemucs
-from voxwell.paths import data_dir
+from voxwell.paths import data_dir, replace_file
 
 WEIGHTS_URL = "https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/955717e8-8726e21a.th"
 WEIGHTS_SHA256 = "8726e21a993978c7ba086d3872e7608d7d5bfca646ca4aca459ffda844faa8b4"
@@ -58,7 +58,7 @@ def weights_path() -> Path:
     if _sha256(part) != WEIGHTS_SHA256:
         part.unlink(missing_ok=True)
         raise IsolationError("The downloaded voice isolation model is corrupted. Try again.")
-    part.replace(path)
+    replace_file(part, path)
     return path
 
 

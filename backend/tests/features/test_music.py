@@ -363,16 +363,18 @@ def test_cli_install_stops_when_voxwell_restarts_mid_install(monkeypatch):
 def test_a_record_save_survives_a_brief_sharing_violation(monkeypatch):
     from voxwell import paths
 
-    real_replace, calls = paths.os.replace, []
+    calls, real = [], paths._replace
 
     def flaky(src, dst):
         calls.append(dst)
         if len(calls) <= 2:
-            raise PermissionError(32, "The process cannot access the file")
-        real_replace(src, dst)
+            exc = PermissionError(13, "The process cannot access the file")
+            exc.winerror = 32
+            raise exc
+        real(src, dst)
 
-    monkeypatch.setattr(paths.os, "replace", flaky)
-    monkeypatch.setattr(paths.time, "sleep", lambda s: None)
+    monkeypatch.setattr(paths, "_replace", flaky)
+    monkeypatch.setattr(paths, "_sleep", lambda s: None)
     track = history.create(history.Track(id="e" * 32, title="t", prompt="p", lyrics="", instrumental=True, language="en",
                                          duration=30, bpm=None, key="", seed=1, steps=8, created=0))
     assert len(calls) == 3 and history.get(track.id).title == "t"

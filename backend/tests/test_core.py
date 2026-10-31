@@ -134,34 +134,56 @@ def test_network_paths_are_recognised(value, network):
     assert is_network_path(value) is network
 
 
-def test_replace_file_retries_a_brief_sharing_violation(tmp_path, monkeypatch):
-    """Windows antivirus can hold a freshly written file for a moment; the rename is retried."""
+def _held(winerror=32):
+    exc = PermissionError(13, "The process cannot access the file")
+    exc.winerror = winerror  # set by hand: only Windows exceptions carry it
+    return exc
+
+
+def test_replace_file_retries_while_windows_antivirus_holds_the_file(tmp_path, monkeypatch):
     from voxwell import paths
 
-    real_replace, calls = paths.os.replace, []
+    calls, real = [], paths._replace
 
     def flaky(src, dst):
         calls.append(dst)
         if len(calls) <= 2:
-            raise PermissionError(32, "The process cannot access the file")
-        real_replace(src, dst)
+            raise _held()
+        real(src, dst)
 
-    monkeypatch.setattr(paths.os, "replace", flaky)
-    monkeypatch.setattr(paths.time, "sleep", lambda s: None)
+    monkeypatch.setattr(paths, "_replace", flaky)
+    monkeypatch.setattr(paths, "_sleep", lambda s: None)
     (tmp_path / "a.tmp").write_text("new")
     paths.replace_file(tmp_path / "a.tmp", tmp_path / "a.json")
     assert len(calls) == 3 and (tmp_path / "a.json").read_text() == "new"
 
 
-def test_replace_file_gives_up_and_removes_the_temporary_file(tmp_path, monkeypatch):
+def test_replace_file_gives_up_keeps_the_error_and_removes_the_temporary_file(tmp_path, monkeypatch):
     from voxwell import paths
 
-    def locked(src, dst):
-        raise PermissionError(32, "The process cannot access the file")
+    original = _held()
+    monkeypatch.setattr(paths, "_replace", lambda src, dst: (_ for _ in ()).throw(original))
+    monkeypatch.setattr(paths, "_sleep", lambda s: None)
+    monkeypatch.setattr(paths, "REPLACE_BUDGET_SECONDS", 0.0)
+    (tmp_path / "a.tmp").write_text("new")
+    with pytest.raises(PermissionError) as raised:
+        paths.replace_file(tmp_path / "a.tmp", tmp_path / "a.json")
+    assert raised.value is original and not (tmp_path / "a.tmp").exists()
 
-    monkeypatch.setattr(paths.os, "replace", locked)
-    monkeypatch.setattr(paths.time, "sleep", lambda s: None)
+
+def test_replace_file_does_not_retry_a_lasting_error(tmp_path, monkeypatch):
+    """A read-only folder (EACCES, no winerror) fails at once on every OS; no 5-second wait."""
+    from voxwell import paths
+
+    calls = []
+
+    def denied(src, dst):
+        calls.append(dst)
+        raise PermissionError(13, "Permission denied")
+
+    monkeypatch.setattr(paths, "_replace", denied)
+    monkeypatch.setattr(paths, "_sleep", lambda s: pytest.fail("must not wait"))
     (tmp_path / "a.tmp").write_text("new")
     with pytest.raises(PermissionError):
         paths.replace_file(tmp_path / "a.tmp", tmp_path / "a.json")
-    assert not (tmp_path / "a.tmp").exists()
+    assert len(calls) == 1 and not (tmp_path / "a.tmp").exists()

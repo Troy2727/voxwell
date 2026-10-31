@@ -22,7 +22,7 @@ import zipfile
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from voxwell.paths import data_dir
+from voxwell.paths import data_dir, replace_file
 
 COMMIT = "ca1e85fe9430179831e6bc6be790c332190a3866"
 SOURCE_URL = f"https://codeload.github.com/ACE-Step/ACE-Step-1.5/zip/{COMMIT}"
@@ -169,7 +169,7 @@ def _download_source() -> None:
         raise EngineError("The ACE-Step download is corrupted. Try again.")
     finally:
         archive.unlink(missing_ok=True)
-    partial.replace(target)
+    replace_file(partial, target)
 
 
 def _extract_without_top_folder(zf: zipfile.ZipFile, target: Path) -> None:

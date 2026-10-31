@@ -1,3 +1,4 @@
+import contextlib
 import os
 import re
 import time
@@ -33,26 +34,37 @@ def child_path(folder: Path, name: str) -> Path:
     return Path(path)
 
 
-REPLACE_ATTEMPTS = 40  # 50 ms apart: 2 seconds in all
+REPLACE_BUDGET_SECONDS = 5.0
+# Windows errors a scanner's brief hold produces: access denied (5), sharing violation (32), lock
+# violation (33). Anything else, and any error on macOS or Linux, is not retried.
+_TRANSIENT_WINERRORS = {5, 32, 33}
+# Seams for tests, so they never patch the os and time modules for the whole process.
+_replace = os.replace
+_sleep = time.sleep
 
 
 def replace_file(source: Path, target: Path) -> None:
-    """os.replace(source, target), retried for a moment on Windows sharing violations.
+    """os.replace(source, target), retried briefly while Windows antivirus holds the file.
 
-    Atomic saves write a temporary file and rename it over the real one. On Windows, real-time
-    antivirus can hold that fresh temporary file briefly, and the rename then fails with
-    PermissionError; it succeeds once the scan is done. If it never does, the temporary file is
-    removed before the error is raised.
+    Atomic saves and downloads write a temporary file and rename it into place. Real-time
+    antivirus can hold that fresh file for a moment, and the rename then fails until the scan is
+    done, so it is retried with growing pauses for up to REPLACE_BUDGET_SECONDS. If it still fails
+    (or fails for another reason) the temporary file is removed and the original error raised.
     """
-    for attempt in range(REPLACE_ATTEMPTS):
+    deadline = time.monotonic() + REPLACE_BUDGET_SECONDS
+    delay = 0.05
+    while True:
         try:
-            os.replace(source, target)
+            _replace(source, target)
             return
-        except PermissionError:
-            if attempt == REPLACE_ATTEMPTS - 1:
+        except OSError as exc:
+            if getattr(exc, "winerror", None) in _TRANSIENT_WINERRORS and time.monotonic() + delay < deadline:
+                _sleep(delay)
+                delay = min(delay * 2, 0.5)
+                continue
+            with contextlib.suppress(OSError):  # still held: keep the original error
                 Path(source).unlink(missing_ok=True)
-                raise
-            time.sleep(0.05)
+            raise
 
 
 def is_network_path(value: str) -> bool:
