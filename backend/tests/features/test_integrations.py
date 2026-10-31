@@ -1,3 +1,4 @@
+import asyncio
 import io
 import json
 import re
@@ -148,7 +149,6 @@ def test_transcription_upload_is_capped(monkeypatch, fake_stt, isolated_data_dir
     from voxwell.features.integrations import openai_api
 
     monkeypatch.setattr(openai_api, "MAX_TRANSCRIPTION_BYTES", 10)
-    monkeypatch.setattr(openai_api, "UPLOAD_CHUNK", 4)
     r = transcribe(data=b"x" * 11)
     assert r.status_code == 413 and r.json()["error"]["param"] == "file"
     assert transcribe(data=b"x" * 10).status_code == 200
@@ -157,10 +157,6 @@ def test_transcription_upload_is_capped(monkeypatch, fake_stt, isolated_data_dir
 
 def test_transcription_waits_its_turn_off_the_event_loop(monkeypatch):
     """Runs in a worker thread (the server keeps answering) and holds the Transcribe feature's lock."""
-    import asyncio
-
-    from voxwell.features.transcription import jobs as transcription_jobs
-
     seen = {}
 
     def fake(path, language=None, on_progress=None):

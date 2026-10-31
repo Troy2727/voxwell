@@ -158,3 +158,22 @@ def test_translate_file(models):
 def test_audio_ids_are_checked():
     assert client.get("/api/translation/audio/..%2Fsecret").status_code == 404
     assert client.get("/api/translation/audio/" + "0" * 32).status_code == 404
+
+
+def test_translate_file_transcribes_off_the_event_loop(models, monkeypatch):
+    import asyncio
+
+    on_loop = []
+    real = stt.transcribe
+
+    def watching(path, language=None, **kwargs):
+        try:
+            asyncio.get_running_loop()
+            on_loop.append(True)
+        except RuntimeError:
+            on_loop.append(False)
+        return real(path, language, **kwargs)
+
+    monkeypatch.setattr(stt, "transcribe", watching)
+    r = client.post("/api/translation/file", files={"file": ("talk.wav", wav_bytes(), "audio/wav")}, data={"target": "it"})
+    assert r.status_code == 200 and on_loop == [False]

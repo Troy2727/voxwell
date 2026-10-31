@@ -1,3 +1,4 @@
+import asyncio
 import importlib.util
 import logging
 import os
@@ -16,6 +17,8 @@ log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["dictation"])
 
+MAX_UPLOAD = 50 * 1024 * 1024  # as translation's file upload
+
 
 @router.get("/status")
 def status():
@@ -24,7 +27,9 @@ def status():
 
 @router.post("/transcribe")
 async def transcribe(file: UploadFile = File(...), language: str | None = Form(None)):
-    data = await file.read()
+    data = await file.read(MAX_UPLOAD + 1)
+    if len(data) > MAX_UPLOAD:
+        raise HTTPException(413, "The recording is too large (50 MB max).")
     if not data:
         raise HTTPException(422, "The recording is empty.")
     # The upload's filename is never used; ffmpeg/PyAV sniff the container themselves.
@@ -34,7 +39,8 @@ async def transcribe(file: UploadFile = File(...), language: str | None = Form(N
         with os.fdopen(fd, "wb") as f:
             f.write(data)
         try:
-            result = engine.transcribe(path, language or None)
+            # In a worker thread, so the server (live audio included) keeps answering meanwhile.
+            result = await asyncio.to_thread(engine.transcribe, path, language or None)
         except engine.AudioError as exc:
             raise HTTPException(422, str(exc))
         except Exception as exc:
