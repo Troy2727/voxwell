@@ -6,13 +6,12 @@ makes speech (cloning, stories, audiobook, dubbing, tools, the OpenAI-compatible
 """
 
 import json
-import os
 import re
 import threading
 import uuid
 from dataclasses import asdict, dataclass
 
-from voxwell.paths import child_path, data_dir
+from voxwell.paths import child_path, data_dir, replace_file
 
 MAX_WORD = 100
 MAX_RESPELLING = 200
@@ -55,7 +54,7 @@ def _save(language: str, entries: list[Entry]) -> None:
     path = _path(language)
     tmp = path.with_name(f"{path.name}.{uuid.uuid4().hex}.tmp")
     tmp.write_text(json.dumps([asdict(e) for e in entries], ensure_ascii=False, indent=2), encoding="utf-8")
-    os.replace(tmp, path)
+    replace_file(tmp, path)
 
 
 def _clean(word: str, respelling: str) -> tuple[str, str]:

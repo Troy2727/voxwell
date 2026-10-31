@@ -132,3 +132,36 @@ def test_network_paths_are_recognised(value, network):
     from voxwell.paths import is_network_path
 
     assert is_network_path(value) is network
+
+
+def test_replace_file_retries_a_brief_sharing_violation(tmp_path, monkeypatch):
+    """Windows antivirus can hold a freshly written file for a moment; the rename is retried."""
+    from voxwell import paths
+
+    real_replace, calls = paths.os.replace, []
+
+    def flaky(src, dst):
+        calls.append(dst)
+        if len(calls) <= 2:
+            raise PermissionError(32, "The process cannot access the file")
+        real_replace(src, dst)
+
+    monkeypatch.setattr(paths.os, "replace", flaky)
+    monkeypatch.setattr(paths.time, "sleep", lambda s: None)
+    (tmp_path / "a.tmp").write_text("new")
+    paths.replace_file(tmp_path / "a.tmp", tmp_path / "a.json")
+    assert len(calls) == 3 and (tmp_path / "a.json").read_text() == "new"
+
+
+def test_replace_file_gives_up_and_removes_the_temporary_file(tmp_path, monkeypatch):
+    from voxwell import paths
+
+    def locked(src, dst):
+        raise PermissionError(32, "The process cannot access the file")
+
+    monkeypatch.setattr(paths.os, "replace", locked)
+    monkeypatch.setattr(paths.time, "sleep", lambda s: None)
+    (tmp_path / "a.tmp").write_text("new")
+    with pytest.raises(PermissionError):
+        paths.replace_file(tmp_path / "a.tmp", tmp_path / "a.json")
+    assert not (tmp_path / "a.tmp").exists()

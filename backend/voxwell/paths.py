@@ -1,5 +1,6 @@
 import os
 import re
+import time
 from pathlib import Path
 from urllib.parse import quote
 
@@ -30,6 +31,28 @@ def child_path(folder: Path, name: str) -> Path:
     if not path.startswith(base + os.sep) or os.sep in path[len(base) + 1:]:
         raise ValueError(f"Not a file name: {name!r}")
     return Path(path)
+
+
+REPLACE_ATTEMPTS = 40  # 50 ms apart: 2 seconds in all
+
+
+def replace_file(source: Path, target: Path) -> None:
+    """os.replace(source, target), retried for a moment on Windows sharing violations.
+
+    Atomic saves write a temporary file and rename it over the real one. On Windows, real-time
+    antivirus can hold that fresh temporary file briefly, and the rename then fails with
+    PermissionError; it succeeds once the scan is done. If it never does, the temporary file is
+    removed before the error is raised.
+    """
+    for attempt in range(REPLACE_ATTEMPTS):
+        try:
+            os.replace(source, target)
+            return
+        except PermissionError:
+            if attempt == REPLACE_ATTEMPTS - 1:
+                Path(source).unlink(missing_ok=True)
+                raise
+            time.sleep(0.05)
 
 
 def is_network_path(value: str) -> bool:

@@ -2,14 +2,13 @@
 the page can show its progress; `status` is queued, generating, done or failed."""
 
 import json
-import os
 import re
 import threading
 import time
 from dataclasses import asdict, dataclass, fields
 from pathlib import Path
 
-from voxwell.paths import child_path, data_dir
+from voxwell.paths import child_path, data_dir, replace_file
 
 _ID = re.compile(r"^[0-9a-f]{32}$")
 _lock = threading.Lock()  # one writer thread and many API readers share these files
@@ -77,7 +76,7 @@ def _write(track: Track) -> None:
     path = _meta(track.id)
     tmp = path.with_suffix(".json.tmp")
     tmp.write_text(json.dumps(asdict(track)), encoding="utf-8")
-    os.replace(tmp, path)
+    replace_file(tmp, path)
 
 
 def _read(path: Path) -> Track:
