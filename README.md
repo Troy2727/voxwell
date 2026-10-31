@@ -9,7 +9,6 @@
 <img src="docs/readme/voxwell-banner.gif" alt="Voxwell Voice Studio: a complete voice studio that runs on your machine. Clone and design voices, dub videos, transcribe and talk to voice agents. Every model runs locally. 100% local, MIT licensed, CLI + MCP, OpenAI-compatible API." width="100%" />
 
 <p>
-  <a href="https://voxwell.vercel.app"><img alt="Web UI: voxwell.vercel.app" src="docs/readme/badges/web-ui-voxwell-vercel-app.svg" /></a>
   <a href="https://github.com/Troy2727/voxwell/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Troy2727/voxwell/actions/workflows/ci.yml/badge.svg" /></a>
   <a href="https://www.python.org"><img alt="Python 3.11" src="docs/readme/badges/python-3-11.svg" /></a>
   <a href="https://fastapi.tiangolo.com"><img alt="FastAPI" src="docs/readme/badges/fastapi.svg" /></a>
