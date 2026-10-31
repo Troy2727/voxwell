@@ -8,7 +8,7 @@ Voxwell is the MIT rewrite of an AGPL app (`Troy2727/voxwell-agpl`, archived; lo
 
 ## The website
 
-`voxwell.vercel.app` is the `app/` build. It does no work itself; every call goes to the backend on the visitor's computer (README › The website).
+`voxwell.vercel.app` is the `app/` build. It does no work itself; every call goes to the backend on the visitor's computer.
 
 - Which pages may call the backend: `APP_ORIGINS` in `backend/voxwell/origins.py`. It gates both CORS and the live-audio WebSockets, so one edit covers both.
 - Chrome's Local Network Access: the visitor clicks Allow once. Headless Chromium cannot show that prompt, so automated runs pass `--disable-features=LocalNetworkAccessChecks` to stand in for the click.

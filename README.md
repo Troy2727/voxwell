@@ -105,6 +105,20 @@ Voxwell is **MIT licensed**, and every model it runs allows commercial use ([one
       <p><b>Integrations</b><br/><sub>Every CLI command, with its matching MCP tool.</sub></p>
     </td>
   </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="https://github.com/Troy2727/voxwell/blob/main/docs/readme/screenshots/animated/music.gif" title="Open this screenshot full size">
+        <img src="docs/readme/screenshots/animated/music.gif" alt="Music page, with the Style box highlighted." width="100%" />
+      </a>
+      <p><b>Music</b><br/><sub>Describe a style; get a song with sung lyrics, or an instrumental.</sub></p>
+    </td>
+    <td width="50%" valign="top">
+      <a href="https://github.com/Troy2727/voxwell/blob/main/docs/readme/screenshots/animated/voice-remix.gif" title="Open this screenshot full size">
+        <img src="docs/readme/screenshots/animated/voice-remix.gif" alt="Voice remix page, with the Low, Medium, High and Max strength choices highlighted." width="100%" />
+      </a>
+      <p><b>Voice remix</b><br/><sub>Describe a new voice and choose how far to move from the original.</sub></p>
+    </td>
+  </tr>
 </table>
 
 <p align="center"><sub>Click any screenshot to see it full size.</sub></p>
@@ -244,14 +258,6 @@ Model weights download on first use of each feature.
 | `app/` | `VOXWELL_DEV=1 npm run electron` | Desktop shell against the dev server |
 
 </details>
-
-<br/>
-
-## <img src="docs/readme/icons/globe.svg" width="24" height="24" alt="" /> The website
-
-[voxwell.vercel.app](https://voxwell.vercel.app) is the same UI, hosted. It does no work itself: it talks to the Voxwell backend on your own computer (`http://127.0.0.1:8765`), so start Voxwell first (the desktop app, or `uv run voxwell` in `backend`). Until it is running, the site says so. Chrome asks once whether the site may connect to apps on your device; choose **Allow**.
-
-The site asks you to sign in, and sign-in is limited to the owner. To use Voxwell yourself, run the desktop app.
 
 <br/>
 
