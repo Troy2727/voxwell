@@ -17,6 +17,7 @@ from voxwell.features.tools.router import _read_audio
 from voxwell.paths import attachment, download_name
 
 router = APIRouter(tags=["music"])
+_stems_lock = asyncio.Lock()
 
 MAX_PROMPT = 512  # ACE-Step's caption limit
 MAX_LYRICS = 4096
@@ -155,6 +156,7 @@ async def generate(
         path = history.scratch_path(track.id, "reference")
         path.write_bytes(wav)
         files["reference_audio"], cleanup = path, [path]
+    jobs.claim(track.id)  # before the record exists, so a concurrent list never settles it as orphaned
     history.create(track)
     fields = {
         "task_type": "text2music",
@@ -193,8 +195,10 @@ def edit_section(track_id: str, req: EditRequest):
         raise HTTPException(422, f"Pick a section of at least {MIN_EDIT_SECONDS} seconds inside the track ({length:.0f} s).")
     prompt = req.prompt.strip() or parent.prompt
     new_lyrics = req.lyrics.strip() or parent.lyrics
+    new_id = uuid.uuid4().hex
+    jobs.claim(new_id)
     track = history.create(history.Track(
-        id=uuid.uuid4().hex,
+        id=new_id,
         title=f"{parent.title[:71]} (edited)",
         prompt=prompt,
         lyrics=new_lyrics,
@@ -232,21 +236,23 @@ async def split_stems(track_id: str):
     track = _track(track_id)
     if track.status != "done":
         raise HTTPException(409, "Wait for the track to finish first.")
-    if not track.stems:
-        vocals = history.scratch_path(track.id, "vocals")
-        instrumental = history.scratch_path(track.id, "instrumental")
-        try:
-            await asyncio.to_thread(isolation.isolate, history.audio_path(track.id), vocals, instrumental)
-        except isolation.IsolationError as exc:
-            raise HTTPException(422, str(exc))
-        except Exception as exc:
-            vocals.unlink(missing_ok=True)
-            instrumental.unlink(missing_ok=True)
-            raise HTTPException(500, f"Splitting the track failed: {type(exc).__name__}")
-        try:
-            track = history.update(track.id, stems=True)
-        except KeyError:
-            raise HTTPException(404, "Track not found.")
+    async with _stems_lock:  # one split at a time: two would write (and clean up) the same files
+        track = _track(track_id)
+        if not track.stems:
+            vocals = history.part_path(track.id, "vocals")
+            instrumental = history.part_path(track.id, "instrumental")
+            try:
+                await asyncio.to_thread(isolation.isolate, history.audio_path(track.id), vocals, instrumental)
+            except Exception as exc:
+                vocals.unlink(missing_ok=True)
+                instrumental.unlink(missing_ok=True)
+                if isinstance(exc, isolation.IsolationError):
+                    raise HTTPException(422, str(exc))
+                raise HTTPException(500, f"Splitting the track failed: {type(exc).__name__}")
+            try:
+                track = history.update(track.id, stems=True)
+            except KeyError:
+                raise HTTPException(404, "Track not found.")
     return _item(track)
 
 

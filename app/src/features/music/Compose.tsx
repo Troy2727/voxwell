@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type Dispatch, type SetStateAction } from 'react';
 import { Music, Sparkles } from 'lucide-react';
 import { formatTime, generate, writeLyrics, type MusicStatus, type Settings, type Track } from './api';
 import { ChoiceSelect } from '@/components/choice-select';
@@ -36,14 +36,15 @@ const AUTO = 'auto';
 export function ComposeSection({ status, settings, onChange, onQueued }: {
   status: MusicStatus;
   settings: Settings;
-  onChange: (settings: Settings) => void;
+  onChange: Dispatch<SetStateAction<Settings>>;
   onQueued: (track: Track) => void;
 }) {
   const [reference, setReference] = useState<File | null>(null);
   const [writing, setWriting] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const set = (patch: Partial<Settings>) => onChange({ ...settings, ...patch });
+  // Applied to the latest settings, so a slow reply (AI lyrics) keeps edits made while it ran.
+  const set = (patch: Partial<Settings>) => onChange((current) => ({ ...current, ...patch }));
   const { limits } = status;
 
   async function aiLyrics() {

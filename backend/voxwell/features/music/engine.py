@@ -74,7 +74,7 @@ def _data(raw: bytes):
 
 
 def generate(fields: dict, files: dict[str, Path], on_progress: Callable[[float, str], None]) -> tuple[bytes, dict]:
-    """Run one ACE-Step task; returns (WAV bytes, result info such as the seed and metadata).
+    """Run one ACE-Step task; returns (WAV bytes, {"metas": the detected BPM, key, ...}).
 
     `fields` are /release_task form fields; `files` maps upload fields (src_audio,
     reference_audio) to local files. `on_progress(fraction, stage)` is called while it runs.
@@ -112,8 +112,7 @@ def generate(fields: dict, files: dict[str, Path], on_progress: Callable[[float,
     first = results[0]
     audio_path = urllib.parse.parse_qs(urllib.parse.urlsplit(first["file"]).query)["path"][0]
     wav = _request(base, key, "/v1/audio?" + urllib.parse.urlencode({"path": audio_path}), timeout=300)
-    seed = str(first.get("seed_value") or "").split(",")[0].strip()
-    return wav, {"seed": int(seed) if seed.isdigit() else None, "metas": first.get("metas") or {}}
+    return wav, {"metas": first.get("metas") or {}}
 
 
 def _stage(item: dict) -> str:

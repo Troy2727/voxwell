@@ -2,6 +2,7 @@
 the page can show its progress; `status` is queued, generating, done or failed."""
 
 import json
+import os
 import re
 import threading
 import time
@@ -50,12 +51,17 @@ def _meta(track_id: str) -> Path:
     return _folder() / f"{track_id}.json"
 
 
-def audio_path(track_id: str, part: str = "mix") -> Path:
-    """Path of a track's audio (mix, vocals or instrumental); KeyError if unknown or not there."""
+def part_path(track_id: str, part: str = "mix") -> Path:
+    """Where a track's audio part (mix, vocals or instrumental) is stored; KeyError if malformed."""
     if part not in PARTS:
         raise KeyError(part)
     suffix = ".wav" if part == "mix" else f".{part}.wav"
-    path = _folder() / f"{track_id}{suffix}"
+    return _folder() / f"{_meta(track_id).stem}{suffix}"
+
+
+def audio_path(track_id: str, part: str = "mix") -> Path:
+    """Path of a track's existing audio part; KeyError if unknown or not there."""
+    path = part_path(track_id, part)
     if not _meta(track_id).exists() or not path.exists():
         raise KeyError(track_id)
     return path
@@ -67,7 +73,11 @@ def scratch_path(track_id: str, name: str) -> Path:
 
 
 def _write(track: Track) -> None:
-    _meta(track.id).write_text(json.dumps(asdict(track)), encoding="utf-8")
+    """Write via a temporary file and rename, so a crash mid-write never leaves a broken record."""
+    path = _meta(track.id)
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(asdict(track)), encoding="utf-8")
+    os.replace(tmp, path)
 
 
 def _read(path: Path) -> Track:
@@ -103,14 +113,22 @@ def update(track_id: str, **changes) -> Track:
         return track
 
 
-def save_audio(track_id: str, wav: bytes, part: str = "mix") -> None:
-    suffix = ".wav" if part == "mix" else f".{part}.wav"
-    (_folder() / f"{_meta(track_id).stem}{suffix}").write_bytes(wav)
+def save_audio(track_id: str, wav: bytes) -> None:
+    """Store a track's generated mix; KeyError (nothing written) if the track was deleted meanwhile."""
+    with _lock:
+        if not _meta(track_id).exists():
+            raise KeyError(track_id)
+        part_path(track_id).write_bytes(wav)
 
 
 def list_tracks() -> list[Track]:
     with _lock:
-        tracks = [_read(p) for p in _folder().glob("*.json")]
+        tracks = []
+        for path in _folder().glob("*.json"):
+            try:
+                tracks.append(_read(path))
+            except (ValueError, TypeError):  # an unreadable record must not hide all the others
+                continue
     return sorted(tracks, key=lambda t: t.created, reverse=True)
 
 

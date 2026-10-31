@@ -197,7 +197,9 @@ def cmd_sound(client: Client, args) -> tuple[str, dict]:
 def _install_music(client: Client, quiet: bool) -> None:
     """Install the music engine (once, several GB) and wait for it."""
     quiet = quiet or not sys.stderr.isatty()
-    client.post_json("/api/music/install", {})
+    status = client.get_json("/api/music/status")
+    if not status["installed"] and status["install"]["state"] != "installing":  # else join the running install
+        client.post_json("/api/music/install", {})
     while True:
         status = client.get_json("/api/music/status")
         if status["installed"]:
@@ -205,6 +207,8 @@ def _install_music(client: Client, quiet: bool) -> None:
         install = status["install"]
         if install["state"] == "failed":
             raise CliError(install["error"] or "Installing the music engine failed.")
+        if install["state"] == "idle":  # Voxwell restarted mid-install
+            raise CliError("The music engine install stopped (Voxwell restarted). Run `voxwell music --install` again.")
         if not quiet:
             print(f"\rInstalling the music engine: {install['percent']:3.0f}% ({install['step']})".ljust(90), end="", file=sys.stderr, flush=True)
         time.sleep(POLL_SECONDS)
