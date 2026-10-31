@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { AudioLines } from 'lucide-react';
-import { api } from '../../api';
+import { api, apiUrl } from '../../api';
+import { AudioResult } from '@/components/audio-result';
 import { FileDrop } from '@/components/file-drop';
 import { ErrorAlert, Field, message, Muted } from '@/components/page';
 import { Button } from '@/components/ui/button';
-import { Result } from './Result';
 
 type Isolated = { voice: { url: string }; background: { url: string }; seconds: number };
 
@@ -45,10 +45,10 @@ export function Isolate() {
       {result && (
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="Voice">
-            <Result url={result.voice.url} name="voice.wav" />
+            <AudioResult src={apiUrl(result.voice.url)} download="voice.wav" />
           </Field>
           <Field label="Background">
-            <Result url={result.background.url} name="background.wav" />
+            <AudioResult src={apiUrl(result.background.url)} download="background.wav" />
           </Field>
         </div>
       )}

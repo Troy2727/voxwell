@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { Timer } from 'lucide-react';
-import { api } from '../../api';
+import { api, apiUrl } from '../../api';
+import { AudioResult } from '@/components/audio-result';
 import { FileDrop } from '@/components/file-drop';
 import { ErrorAlert, Field, message, Muted } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Result } from './Result';
 
 export function Fit() {
   const [file, setFile] = useState<File | null>(null);
@@ -48,7 +48,7 @@ export function Fit() {
       {result && (
         <>
           <Muted>Was {result.original_seconds.toFixed(2)} s, now {Number(seconds).toFixed(2)} s.</Muted>
-          <Result url={result.url} name="fitted.wav" />
+          <AudioResult src={apiUrl(result.url)} download="fitted.wav" />
         </>
       )}
     </>
