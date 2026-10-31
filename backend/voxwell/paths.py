@@ -17,6 +17,19 @@ def data_dir(*parts: str) -> Path:
     return path
 
 
+def child_path(folder: Path, name: str) -> Path:
+    """`folder / name`, refused (ValueError) unless the result stays directly inside `folder`.
+
+    Callers validate their ids already; this is the containment check itself, in the form static
+    analysis (CodeQL) recognises: normalise the path, then check it is still under the folder.
+    """
+    base = os.path.normpath(folder)
+    path = os.path.normpath(os.path.join(base, name))
+    if not path.startswith(base + os.sep) or os.sep in path[len(base) + 1:]:
+        raise ValueError(f"Not a file name: {name!r}")
+    return Path(path)
+
+
 _UNSAFE_NAME = re.compile(r'[\\/:*?"<>|\x00-\x1f]')
 
 

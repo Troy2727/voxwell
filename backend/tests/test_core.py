@@ -100,3 +100,22 @@ def test_voice_library_roundtrip():
 def test_voice_audio_path_rejects_bad_ids(bad):
     with pytest.raises(KeyError):
         voices.voice_audio_path(bad)
+
+
+def test_child_path_stays_in_its_folder(tmp_path):
+    from voxwell.paths import child_path
+
+    assert child_path(tmp_path, "abc.wav") == tmp_path / "abc.wav"
+    for name in ("../abc.wav", r"..\abc.wav", "sub/abc.wav", r"sub\abc.wav", "..", "", "C:/x.wav", "/etc/passwd"):
+        with pytest.raises(ValueError):
+            child_path(tmp_path, name)
+
+
+@pytest.mark.parametrize("path", [
+    "/api/audio_effects/audio/{}", "/api/audiobook/previews/{}", "/api/tools/audio/{}", "/api/translation/audio/{}",
+    "/api/voice_remix/audio/{}", "/api/voice_design/audio/{}", "/api/voice_cloning/audio/{}", "/api/voices/{}/audio",
+    "/api/sound/audio/{}", "/api/music/audio/{}",
+])
+@pytest.mark.parametrize("bad_id", ["..", r"..\..\x", "a" * 32 + r"\..", "%2e%2e"])
+def test_audio_routes_refuse_malformed_ids_with_404(path, bad_id):
+    assert client.get(path.format(bad_id)).status_code == 404

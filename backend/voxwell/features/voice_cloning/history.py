@@ -6,7 +6,7 @@ import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from voxwell.paths import data_dir
+from voxwell.paths import child_path, data_dir
 
 _ID = re.compile(r"^[0-9a-f]{32}$")
 TITLE_LENGTH = 60
@@ -26,7 +26,7 @@ def _paths(clip_id: str) -> tuple[Path, Path]:
     """Return (wav, json) for a clip id; KeyError if unknown or malformed."""
     if not _ID.match(clip_id):
         raise KeyError(clip_id)
-    wav = data_dir("voice_cloning") / f"{clip_id}.wav"
+    wav = child_path(data_dir("voice_cloning"), f"{clip_id}.wav")
     meta = wav.with_suffix(".json")
     if not (wav.exists() and meta.exists()):
         raise KeyError(clip_id)

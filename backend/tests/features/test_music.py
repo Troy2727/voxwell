@@ -293,6 +293,23 @@ def test_engine_speaks_ace_steps_api(monkeypatch, tmp_path):
     assert b'name="reference_audio"; filename=' in body and b"REFERENCE-BYTES" in body
 
 
+def test_a_record_save_survives_a_brief_sharing_violation(monkeypatch):
+    """Windows antivirus can hold a fresh file for a moment; the rename is retried."""
+    real_replace, calls = history.os.replace, []
+
+    def flaky_replace(src, dst):
+        calls.append(dst)
+        if len(calls) <= 2:
+            raise PermissionError(32, "The process cannot access the file")
+        real_replace(src, dst)
+
+    monkeypatch.setattr(history.os, "replace", flaky_replace)
+    monkeypatch.setattr(history.time, "sleep", lambda s: None)
+    track = history.create(history.Track(id="e" * 32, title="t", prompt="p", lyrics="", instrumental=True, language="en",
+                                         duration=30, bpm=None, key="", seed=1, steps=8, created=0))
+    assert len(calls) == 3 and history.get(track.id).title == "t"
+
+
 def test_an_unreadable_track_record_does_not_hide_the_others(fake_engine, isolated_data_dir):
     track_id = client.post("/api/music/generate", data=form()).json()["id"]
     (isolated_data_dir / "music" / "tracks" / f"{'c' * 32}.json").write_text('{"id": "cc', encoding="utf-8")  # cut short

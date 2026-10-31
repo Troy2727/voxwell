@@ -199,11 +199,13 @@ def test_history_is_trimmed_and_checked(llm):
     assert r.status_code == 422
 
 
-def test_tts_failure_keeps_the_text(llm, monkeypatch):
+def test_tts_failure_keeps_the_text(llm, monkeypatch, caplog):
     agent = make_agent()
     monkeypatch.setattr(tts, "synthesize", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("no GPU memory")))
     body = chat(agent["id"], "hello").json()
-    assert body["reply"] == "Done." and "audio" not in body and "no GPU memory" in body["warning"]
+    assert body["reply"] == "Done." and "audio" not in body and body["warning"].startswith("Could not speak the reply")
+    # The exception's own text goes to the server log, never into the response.
+    assert "no GPU memory" not in body["warning"] and "no GPU memory" in caplog.text
 
 
 def test_chat_errors(llm):
@@ -257,3 +259,16 @@ def test_store_never_uses_names_as_paths():
     agent = store.create(name="../../evil", system_prompt="", voice="", language="en", tools=[])
     assert [p.name for p in data_dir("agents").iterdir()] == [f"{agent.id}.json"]
     assert json.loads((data_dir("agents") / f"{agent.id}.json").read_text(encoding="utf-8"))["name"] == "../../evil"
+
+
+def test_a_tool_that_crashes_reports_a_fixed_message(llm, monkeypatch, caplog):
+    from voxwell.features.agents import tools
+
+    def crash(name, arguments, allowed):
+        raise RuntimeError("secret detail C:/Users/someone/file")
+
+    monkeypatch.setattr(tools, "run", crash)
+    llm.replies = ['{"tool": "calculator", "arguments": {"expression": "1+1"}}', "Sorry."]
+    body = chat(make_agent()["id"], "add").json()
+    assert body["tool_calls"][0]["error"] == "The tool failed."
+    assert "secret detail" not in str(body) and "secret detail" in caplog.text

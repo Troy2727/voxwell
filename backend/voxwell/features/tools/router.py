@@ -19,7 +19,7 @@ from voxwell import voices
 from voxwell.features.dubbing.ffmpeg import DubbingError, ffmpeg_path
 from voxwell.features.tools import direction, engine, isolation
 from voxwell.features.voice_cloning import engine as cloning_engine
-from voxwell.paths import data_dir
+from voxwell.paths import child_path, data_dir
 
 router = APIRouter(tags=["tools"])
 
@@ -246,7 +246,9 @@ def probe(file: UploadFile = File(...)):
 
 @router.get("/audio/{output_id}")
 def audio(output_id: str):
-    path = data_dir("tools") / f"{output_id}.wav"
-    if not _OUTPUT_ID.match(output_id) or not path.exists():
+    if not _OUTPUT_ID.match(output_id):
+        raise HTTPException(404, "Result not found.")
+    path = child_path(data_dir("tools"), f"{output_id}.wav")
+    if not path.exists():
         raise HTTPException(404, "Result not found.")
     return FileResponse(path, media_type="audio/wav")

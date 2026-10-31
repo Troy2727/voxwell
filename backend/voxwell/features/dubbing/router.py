@@ -27,8 +27,8 @@ def status():
     try:
         ffmpeg.ffmpeg_path()
         return {"ready": True, "languages": sorted(LANGUAGES)}
-    except ffmpeg.DubbingError as exc:
-        return {"ready": False, "reason": str(exc), "languages": sorted(LANGUAGES)}
+    except ffmpeg.DubbingError:  # ffmpeg_path() raises only this
+        return {"ready": False, "reason": ffmpeg.NOT_FOUND, "languages": sorted(LANGUAGES)}
 
 
 def check_settings(target_language: str, voice: str) -> str:

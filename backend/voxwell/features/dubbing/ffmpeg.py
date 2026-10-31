@@ -9,13 +9,16 @@ class DubbingError(Exception):
     """A pipeline failure with a user-readable message."""
 
 
+NOT_FOUND = (
+    "ffmpeg was not found. Install ffmpeg (https://ffmpeg.org/download.html) "
+    "and make sure it is on your PATH, or set VOXWELL_FFMPEG to its location."
+)
+
+
 def ffmpeg_path() -> str:
     found = os.environ.get("VOXWELL_FFMPEG") or shutil.which("ffmpeg")
     if not found:
-        raise DubbingError(
-            "ffmpeg was not found. Install ffmpeg (https://ffmpeg.org/download.html) "
-            "and make sure it is on your PATH, or set VOXWELL_FFMPEG to its location."
-        )
+        raise DubbingError(NOT_FOUND)
     return found
 
 

@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 from voxwell import voices
 from voxwell.features.voice_design import engine
-from voxwell.paths import data_dir
+from voxwell.paths import child_path, data_dir
 
 router = APIRouter(tags=["voice_design"])
 
@@ -41,7 +41,7 @@ def _delete_old_previews(folder) -> None:
 def _preview_path(preview_id: str):
     if not _PREVIEW_ID.match(preview_id):
         raise HTTPException(404, "Preview not found.")
-    path = data_dir("voice_design") / f"{preview_id}.wav"
+    path = child_path(data_dir("voice_design"), f"{preview_id}.wav")
     if not path.exists():
         raise HTTPException(404, "Preview not found.")
     return path

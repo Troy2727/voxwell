@@ -12,7 +12,7 @@ import threading
 import uuid
 from dataclasses import asdict, dataclass
 
-from voxwell.paths import data_dir
+from voxwell.paths import child_path, data_dir
 
 MAX_WORD = 100
 MAX_RESPELLING = 200
@@ -38,7 +38,7 @@ class Entry:
 def _path(language: str):
     if not _LANGUAGE.match(language):  # the language names a file, so never trust it as a path
         raise ValueError(f"Invalid language '{language}'.")
-    return data_dir("pronunciation") / f"{language}.json"
+    return child_path(data_dir("pronunciation"), f"{language}.json")
 
 
 def list_entries(language: str) -> list[Entry]:

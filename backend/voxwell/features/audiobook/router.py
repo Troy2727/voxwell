@@ -13,7 +13,7 @@ from voxwell import voices
 from voxwell.features.audiobook import books
 from voxwell.features.audiobook.importer import ImportError_, import_book
 from voxwell.features.voice_cloning.engine import LANGUAGES
-from voxwell.paths import attachment, data_dir, download_name
+from voxwell.paths import attachment, child_path, data_dir, download_name
 
 router = APIRouter(tags=["audiobook"])
 
@@ -160,8 +160,10 @@ def preview(book_id: str, req: PreviewRequest):
 
 @router.get("/previews/{preview_id}")
 def preview_audio(preview_id: str):
-    path = data_dir("audiobooks_previews") / f"{preview_id}.wav"
-    if not _PREVIEW_ID.match(preview_id) or not path.exists():
+    if not _PREVIEW_ID.match(preview_id):
+        raise HTTPException(404, "Preview not found.")
+    path = child_path(data_dir("audiobooks_previews"), f"{preview_id}.wav")
+    if not path.exists():
         raise HTTPException(404, "Preview not found.")
     return FileResponse(path, media_type="audio/wav")
 

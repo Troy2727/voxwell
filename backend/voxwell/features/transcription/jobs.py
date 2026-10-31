@@ -14,7 +14,7 @@ from pathlib import Path
 
 from voxwell.features.dictation import engine
 from voxwell.features.transcription import diarization
-from voxwell.paths import data_dir
+from voxwell.paths import child_path, data_dir
 
 STATE_FILE = "job.json"
 RESULT_FILE = "transcript.json"
@@ -77,7 +77,7 @@ def get(job_id: str) -> Job | None:
     """Look up a job by an already-validated id, loading it from disk after a restart."""
     with _lock:
         job = _jobs.get(job_id)
-        if job is None and (job := _load(_root() / job_id)):
+        if job is None and (job := _load(child_path(_root(), job_id))):
             _jobs[job_id] = job
         return job
 

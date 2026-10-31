@@ -15,7 +15,7 @@ from pydantic import BaseModel
 from voxwell import live_audio
 from voxwell.features.dictation import engine as stt
 from voxwell.features.translation import pipeline
-from voxwell.paths import data_dir
+from voxwell.paths import child_path, data_dir
 
 router = APIRouter(tags=["translation"])
 
@@ -114,8 +114,10 @@ async def translate_file(
 
 @router.get("/audio/{output_id}")
 def audio(output_id: str):
-    path = data_dir("translation") / f"{output_id}.wav"
-    if not _OUTPUT_ID.match(output_id) or not path.exists():
+    if not _OUTPUT_ID.match(output_id):
+        raise HTTPException(404, "Not found.")
+    path = child_path(data_dir("translation"), f"{output_id}.wav")
+    if not path.exists():
         raise HTTPException(404, "Not found.")
     return FileResponse(path, media_type="audio/wav")
 

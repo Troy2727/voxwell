@@ -207,3 +207,9 @@ def test_server_start_launches_the_watcher(monkeypatch):
     with TestClient(app, base_url="http://127.0.0.1"):
         pass
     assert started == [True]
+
+
+@pytest.mark.parametrize("folder", [r"\\server\share\inbox", "//server/share/inbox"])
+def test_watch_refuses_network_folders(mocked, folder):
+    r = client.put("/api/batch/watch", json={"enabled": True, "folder": folder, "target_language": "en", "voice": "original"})
+    assert r.status_code == 422 and "network" in r.json()["detail"]

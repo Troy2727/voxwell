@@ -10,7 +10,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
 from voxwell.features.audio_effects import dsp
-from voxwell.paths import data_dir
+from voxwell.paths import child_path, data_dir
 
 router = APIRouter(tags=["audio_effects"])
 
@@ -64,7 +64,9 @@ async def apply(
 
 @router.get("/audio/{output_id}")
 def get_audio(output_id: str):
-    path = data_dir("audio_effects") / f"{output_id}.wav"
-    if not _OUTPUT_ID.match(output_id) or not path.exists():
+    if not _OUTPUT_ID.match(output_id):
+        raise HTTPException(404, "Audio not found.")
+    path = child_path(data_dir("audio_effects"), f"{output_id}.wav")
+    if not path.exists():
         raise HTTPException(404, "Audio not found.")
     return FileResponse(path, media_type="audio/wav", filename=f"{output_id}.wav")

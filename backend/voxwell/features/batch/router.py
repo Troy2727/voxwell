@@ -4,7 +4,7 @@ Every dub is an ordinary dubbing job (see dubbing.jobs), so it runs in the share
 queue and shows up in Projects.
 """
 
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
@@ -75,6 +75,10 @@ def get_watch():
 def put_watch(req: WatchSettings):
     folder, target = req.folder.strip(), req.target_language
     if req.enabled:
+        # A network path (\\server\share, //server/share) would make Windows sign in to that server
+        # as the user; the CLI refuses them for the same reason (cli._on_this_computer).
+        if PureWindowsPath(folder).drive.startswith("\\\\"):
+            raise HTTPException(422, "Choose a folder on this computer, not a network folder.")
         if not folder or not Path(folder).is_dir():
             raise HTTPException(422, "Choose a folder that exists.")
         target = check_settings(req.target_language, req.voice)

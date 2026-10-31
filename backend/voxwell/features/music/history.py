@@ -9,11 +9,12 @@ import time
 from dataclasses import asdict, dataclass, fields
 from pathlib import Path
 
-from voxwell.paths import data_dir
+from voxwell.paths import child_path, data_dir
 
 _ID = re.compile(r"^[0-9a-f]{32}$")
 _lock = threading.Lock()  # one writer thread and many API readers share these files
 PARTS = ("mix", "vocals", "instrumental")
+REPLACE_ATTEMPTS = 40  # 2 seconds in all; see _write
 
 
 @dataclass
@@ -48,7 +49,7 @@ def _folder() -> Path:
 def _meta(track_id: str) -> Path:
     if not _ID.match(track_id):
         raise KeyError(track_id)
-    return _folder() / f"{track_id}.json"
+    return child_path(_folder(), f"{track_id}.json")
 
 
 def part_path(track_id: str, part: str = "mix") -> Path:
@@ -56,7 +57,7 @@ def part_path(track_id: str, part: str = "mix") -> Path:
     if part not in PARTS:
         raise KeyError(part)
     suffix = ".wav" if part == "mix" else f".{part}.wav"
-    return _folder() / f"{_meta(track_id).stem}{suffix}"
+    return child_path(_folder(), f"{_meta(track_id).stem}{suffix}")
 
 
 def audio_path(track_id: str, part: str = "mix") -> Path:
@@ -69,7 +70,7 @@ def audio_path(track_id: str, part: str = "mix") -> Path:
 
 def scratch_path(track_id: str, name: str) -> Path:
     """A working file for a queued track (an uploaded reference), deleted with the track."""
-    return _folder() / f"{_meta(track_id).stem}.{name}.wav"
+    return child_path(_folder(), f"{_meta(track_id).stem}.{name}.wav")
 
 
 def _write(track: Track) -> None:
@@ -77,7 +78,16 @@ def _write(track: Track) -> None:
     path = _meta(track.id)
     tmp = path.with_suffix(".json.tmp")
     tmp.write_text(json.dumps(asdict(track)), encoding="utf-8")
-    os.replace(tmp, path)
+    # On Windows an antivirus scanning the fresh file can hold it for a moment, which makes
+    # the rename fail with a sharing violation (PermissionError); it succeeds once released.
+    for attempt in range(REPLACE_ATTEMPTS):
+        try:
+            os.replace(tmp, path)
+            return
+        except PermissionError:
+            if attempt == REPLACE_ATTEMPTS - 1:
+                raise
+            time.sleep(0.05)
 
 
 def _read(path: Path) -> Track:

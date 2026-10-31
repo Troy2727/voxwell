@@ -7,7 +7,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from voxwell import voice_collections
-from voxwell.paths import data_dir
+from voxwell.paths import child_path, data_dir
 
 _ID = re.compile(r"^[0-9a-f]{12}$")
 
@@ -36,7 +36,7 @@ def voice_audio_path(voice_id: str) -> Path:
     """Return the WAV path for a voice id; KeyError if unknown or malformed."""
     if not _ID.match(voice_id):
         raise KeyError(voice_id)
-    path = data_dir("voices") / f"{voice_id}.wav"
+    path = child_path(data_dir("voices"), f"{voice_id}.wav")
     if not path.exists():
         raise KeyError(voice_id)
     return path
