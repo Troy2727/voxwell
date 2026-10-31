@@ -123,7 +123,7 @@ def test_no_speech_is_an_error(monkeypatch):
 
 @pytest.mark.parametrize("exc,message", [
     (AudioError("Could not decode the audio."), "Could not decode the audio."),
-    (RuntimeError("CUDA out of memory"), "Transcription failed: CUDA out of memory"),
+    (RuntimeError("CUDA out of memory"), "Transcription failed; see the Voxwell log."),
 ])
 def test_engine_errors(monkeypatch, exc, message):
     def boom(*a, **k):

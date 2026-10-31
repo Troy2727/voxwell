@@ -202,7 +202,7 @@ def test_engine_errors(monkeypatch):
     assert r.status_code == 422 and r.json()["detail"] == "Could not decode the audio."
     monkeypatch.setattr(engine, "transcribe_words", fails(RuntimeError("out of memory")))
     r = post()
-    assert r.status_code == 500 and r.json()["detail"] == "Alignment failed: out of memory"
+    assert r.status_code == 500 and r.json()["detail"] == "Alignment failed; see the Voxwell log."
 
 
 def test_no_speech_heard_still_returns_estimated_cues(monkeypatch):

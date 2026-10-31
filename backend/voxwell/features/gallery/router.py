@@ -5,6 +5,7 @@ every time and the voice you save is exactly the one you heard.
 """
 
 import importlib.util
+import logging
 import threading
 from dataclasses import asdict
 
@@ -16,6 +17,8 @@ from voxwell import voices
 from voxwell.features.gallery.presets import BY_ID, PRESETS, Preset
 from voxwell.features.voice_design import engine
 from voxwell.paths import data_dir
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["gallery"])
 _generating = threading.Lock()  # one sample at a time; a second click waits and reuses it
@@ -60,7 +63,8 @@ def sample(preset_id: str):
             try:
                 wav = engine.design(preset.description, preset.sample)
             except Exception as exc:
-                raise HTTPException(500, f"Could not create the voice: {exc}")
+                log.exception("Could not create the voice")
+                raise HTTPException(500, "Could not create the voice; see the Voxwell log.") from exc
             path.write_bytes(wav)
     return _view(preset)
 

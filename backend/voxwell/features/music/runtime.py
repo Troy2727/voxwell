@@ -8,6 +8,7 @@ port with a random key. That server watches Voxwell's process and exits when it 
 included, so it never outlives the app.
 """
 
+import logging
 import os
 import secrets
 import shutil
@@ -23,6 +24,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from voxwell.paths import data_dir, replace_file
+
+log = logging.getLogger(__name__)
 
 COMMIT = "ca1e85fe9430179831e6bc6be790c332190a3866"
 SOURCE_URL = f"https://codeload.github.com/ACE-Step/ACE-Step-1.5/zip/{COMMIT}"
@@ -143,8 +146,9 @@ def _install_worker() -> None:
         _set(state="idle", step="Installed", percent=100, detail="")
     except EngineError as exc:
         _set(state="failed", error=str(exc))
-    except Exception as exc:  # report, never crash the server
-        _set(state="failed", error=f"Installing the music engine failed: {type(exc).__name__}: {exc}")
+    except Exception:  # report, never crash the server
+        log.exception("Installing the music engine failed")
+        _set(state="failed", error="Installing the music engine failed; see the Voxwell log.")
 
 
 def _download_source() -> None:

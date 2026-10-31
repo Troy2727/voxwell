@@ -1,6 +1,7 @@
 """Speech translation: live (speak and hear the translation turn by turn) and one-off (text or a recording)."""
 
 import importlib.util
+import logging
 import os
 import re
 import tempfile
@@ -16,6 +17,8 @@ from voxwell import live_audio
 from voxwell.features.dictation import engine as stt
 from voxwell.features.translation import pipeline
 from voxwell.paths import child_path, data_dir
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["translation"])
 
@@ -48,11 +51,13 @@ def _translate_and_speak(text: str, source: str, target: str, reference) -> dict
     except pipeline.TranslationError as exc:
         raise HTTPException(422, str(exc))
     except Exception as exc:
-        raise HTTPException(500, f"Translation failed: {exc}")
+        log.exception("Translation failed")
+        raise HTTPException(500, "Translation failed; see the Voxwell log.") from exc
     try:
         wav = pipeline.speak(translation, target, reference)
     except Exception as exc:
-        raise HTTPException(500, f"Speech synthesis failed: {exc}")
+        log.exception("Speech synthesis failed")
+        raise HTTPException(500, "Speech synthesis failed; see the Voxwell log.") from exc
     folder = data_dir("translation")
     cutoff = time.time() - OUTPUT_TTL_SECONDS
     for old in folder.glob("*.wav"):
@@ -104,7 +109,8 @@ async def translate_file(
         except stt.AudioError as exc:
             raise HTTPException(422, str(exc))
         except Exception as exc:
-            raise HTTPException(500, f"Transcription failed: {exc}")
+            log.exception("Transcription failed")
+            raise HTTPException(500, "Transcription failed; see the Voxwell log.") from exc
     finally:
         path.unlink(missing_ok=True)
     if not heard.text:

@@ -1,10 +1,13 @@
 """One background worker generates queued tracks in order (the engine runs one task at a time)."""
 
+import logging
 import queue
 import threading
 from pathlib import Path
 
 from voxwell.features.music import engine, history
+
+log = logging.getLogger(__name__)
 
 _queue: queue.Queue = queue.Queue()
 _active: set[str] = set()  # queued or generating in this process
@@ -56,8 +59,9 @@ def _run(track_id: str, fields: dict, files: dict[str, Path], cleanup: list[Path
         pass  # the track was deleted while it was generating
     except engine.GenerationError as exc:
         _fail(track_id, str(exc))
-    except Exception as exc:  # report it on the track, never kill the worker
-        _fail(track_id, f"Music generation failed: {type(exc).__name__}: {exc}")
+    except Exception:  # report it on the track, never kill the worker
+        log.exception("Music generation failed")
+        _fail(track_id, "Music generation failed; see the Voxwell log.")
     finally:
         _active.discard(track_id)
         for path in cleanup:

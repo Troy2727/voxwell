@@ -1,5 +1,6 @@
 import importlib.util
 import io
+import logging
 import re
 import uuid
 import zipfile
@@ -14,6 +15,8 @@ from voxwell.features.audiobook import books
 from voxwell.features.audiobook.importer import ImportError_, import_book
 from voxwell.features.voice_cloning.engine import LANGUAGES
 from voxwell.paths import attachment, child_path, data_dir, download_name
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["audiobook"])
 
@@ -149,7 +152,8 @@ def preview(book_id: str, req: PreviewRequest):
     except ValueError as exc:
         raise HTTPException(422, str(exc))
     except Exception as exc:
-        raise HTTPException(500, f"Preview failed: {exc}")
+        log.exception("Preview failed")
+        raise HTTPException(500, "Preview failed; see the Voxwell log.") from exc
     folder = data_dir("audiobooks_previews")
     for old in folder.glob("*.wav"):  # one preview at a time is enough
         old.unlink(missing_ok=True)

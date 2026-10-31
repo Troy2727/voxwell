@@ -6,6 +6,7 @@ job.json (script, cast, state) and, once done, story.wav in its folder.
 
 import io
 import json
+import logging
 import shutil
 import threading
 import time
@@ -19,6 +20,8 @@ from voxwell.features.audio_effects.dsp import Effects, apply_to_wav
 from voxwell.features.stories.script import parse
 from voxwell.features.voice_cloning import engine
 from voxwell.paths import child_path, data_dir
+
+log = logging.getLogger(__name__)
 
 STATE_FILE = "job.json"
 AUDIO_FILE = "story.wav"
@@ -153,8 +156,9 @@ def _work(job: Job) -> None:
             job.state, job.step, job.percent = "done", "Done", 100
         except ValueError as exc:
             job.state, job.error = "error", str(exc)
-        except Exception as exc:  # surface any engine failure as a job error, without a traceback
-            job.state, job.error = "error", f"{job.step} failed: {exc}"
+        except Exception:  # an unexpected failure: the details go to the log, not to the user
+            log.exception("Story failed at %s", job.step)
+            job.state, job.error = "error", f"{job.step} failed; see the Voxwell log."
         _save(job)
 
 
