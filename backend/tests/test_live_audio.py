@@ -125,7 +125,9 @@ def test_worker_drops_turns_when_the_queue_is_full():
 def test_worker_reports_a_failed_turn_and_continues(monkeypatch):
     def process(pcm, index):
         if index == 0:
-            raise ValueError("Could not decode the audio.")
+            from voxwell.features.dictation.engine import AudioError
+
+            raise AudioError("Could not decode the audio.")  # Voxwell's own error: its message is shown
         return {"text": "ok"}
 
     _, sent = _run_worker(process, 2)
@@ -160,3 +162,13 @@ def test_app_origins_allowed(origin):
 @pytest.mark.parametrize("origin", ["https://evil.example", "http://localhost:5174", "http://127.0.0.1:5173", "", "null", "file://"])
 def test_other_origins_refused(origin):
     assert not websocket_origin_allowed(origin)
+
+
+def test_a_turn_error_shows_voxwells_own_messages_and_hides_the_rest(caplog):
+    from voxwell.features.dictation.engine import AudioError
+    from voxwell.features.translation.pipeline import TranslationError
+
+    assert live_audio.turn_error_message(AudioError("Could not decode the audio.")) == "Could not decode the audio."
+    assert live_audio.turn_error_message(TranslationError("Cannot translate from jw.")) == "Cannot translate from jw."
+    hidden = live_audio.turn_error_message(RuntimeError("CUDA error at C:/internal/path"))
+    assert hidden == live_audio.TURN_FAILED and "C:/internal/path" in caplog.text

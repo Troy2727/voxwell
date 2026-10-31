@@ -89,7 +89,7 @@ def test_interpret_model_errors(monkeypatch):
 
     monkeypatch.setattr(direction, "_ask", boom)
     r = client.post("/api/tools/direction/interpret", json={"note": "angry"})
-    assert r.status_code == 500 and "download failed" in r.json()["detail"]
+    assert r.status_code == 500 and "download failed" not in r.json()["detail"] and r.json()["detail"].endswith("see the Voxwell log.")
 
 
 @pytest.fixture

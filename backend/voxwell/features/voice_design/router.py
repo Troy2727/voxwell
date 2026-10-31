@@ -1,4 +1,5 @@
 import importlib.util
+import logging
 import re
 import time
 import uuid
@@ -10,6 +11,8 @@ from pydantic import BaseModel
 from voxwell import voices
 from voxwell.features.voice_design import engine
 from voxwell.paths import child_path, data_dir
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["voice_design"])
 
@@ -65,7 +68,8 @@ def preview(req: PreviewRequest):
     try:
         wav = engine.design(description, sample)
     except Exception as exc:
-        raise HTTPException(500, f"Voice generation failed: {exc}") from exc
+        log.exception("Voice generation failed")
+        raise HTTPException(500, "Voice generation failed; see the Voxwell log.") from exc
     folder = data_dir("voice_design")
     _delete_old_previews(folder)
     preview_id = uuid.uuid4().hex

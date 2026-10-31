@@ -1,4 +1,5 @@
 import importlib.util
+import logging
 import os
 import re
 import tempfile
@@ -10,6 +11,8 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile, WebSocket
 from voxwell import live_audio
 from voxwell.features.dictation import engine
 from voxwell.paths import data_dir
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["dictation"])
 
@@ -35,7 +38,8 @@ async def transcribe(file: UploadFile = File(...), language: str | None = Form(N
         except engine.AudioError as exc:
             raise HTTPException(422, str(exc))
         except Exception as exc:
-            raise HTTPException(500, f"Transcription failed: {exc}")
+            log.exception("Transcription failed")
+            raise HTTPException(500, "Transcription failed; see the Voxwell log.") from exc
         return {
             "text": result.text,
             "language": result.language,
@@ -55,12 +59,8 @@ async def live(ws: WebSocket):
             raise ValueError("language must be an ISO 639-1 code such as en.")
 
         def process(pcm: bytes, index: int) -> dict:
-            try:
-                result = live_audio.transcribe_turn(pcm, language)
-            except engine.AudioError:
-                raise  # its message is already for the user
-            except Exception as exc:
-                raise RuntimeError(f"Transcription failed: {exc}") from exc
+            # An AudioError's message reaches the user; any other failure is logged (live_audio).
+            result = live_audio.transcribe_turn(pcm, language)
             return {"text": result.text, "language": result.language}
 
         return process

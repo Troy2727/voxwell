@@ -1,6 +1,7 @@
 """Tool engines: voice conversion (Chatterbox VC) and ffmpeg-based audio tools."""
 
 import json
+import logging
 import os
 import shutil
 import subprocess
@@ -9,6 +10,8 @@ from pathlib import Path
 
 from voxwell.features.dubbing.ffmpeg import DubbingError, ffmpeg_path, run_ffmpeg
 from voxwell.features.voice_cloning import engine as cloning
+
+log = logging.getLogger(__name__)
 
 MIN_TEMPO, MAX_TEMPO = 0.25, 4.0  # beyond this speech stops being intelligible
 
@@ -72,7 +75,8 @@ def probe(source: Path) -> dict:
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, errors="replace")
     except OSError as exc:
-        raise DubbingError(f"Could not run ffprobe: {exc}") from exc
+        log.exception("Could not run ffprobe")
+        raise DubbingError("Could not run ffprobe; see the Voxwell log.") from exc
     if proc.returncode != 0:
         raise DubbingError("This file could not be read as audio or video.")
     data = json.loads(proc.stdout or "{}")

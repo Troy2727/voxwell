@@ -3,6 +3,7 @@
 
 import importlib.util
 import io
+import logging
 import re
 import shutil
 import tempfile
@@ -20,6 +21,8 @@ from voxwell.features.dubbing.ffmpeg import DubbingError, ffmpeg_path
 from voxwell.features.tools import direction, engine, isolation
 from voxwell.features.voice_cloning import engine as cloning_engine
 from voxwell.paths import child_path, data_dir
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["tools"])
 
@@ -88,7 +91,8 @@ async def convert(file: UploadFile = File(...), voice_id: str = Form(...)):
     try:
         out.write_bytes(engine.convert(source, target))
     except Exception as exc:
-        raise HTTPException(500, f"Voice conversion failed: {exc}")
+        log.exception("Voice conversion failed")
+        raise HTTPException(500, "Voice conversion failed; see the Voxwell log.") from exc
     finally:
         source.unlink(missing_ok=True)
     return _result(output_id)
@@ -109,7 +113,8 @@ async def isolate(file: UploadFile = File(...)):
     except isolation.IsolationError as exc:
         raise HTTPException(422, str(exc))
     except Exception as exc:
-        raise HTTPException(500, f"Voice isolation failed: {exc}")
+        log.exception("Voice isolation failed")
+        raise HTTPException(500, "Voice isolation failed; see the Voxwell log.") from exc
     finally:
         source.unlink(missing_ok=True)
     return {"voice": _result(voice_id), "background": _result(background_id), "seconds": round(seconds, 3)}
@@ -138,7 +143,8 @@ def speak(req: SpeakRequest):
     try:
         wav = cloning_engine.synthesize(text, req.language, reference)
     except Exception as exc:
-        raise HTTPException(500, f"Speech synthesis failed: {exc}")
+        log.exception("Speech synthesis failed")
+        raise HTTPException(500, "Speech synthesis failed; see the Voxwell log.") from exc
     output_id, out = _new_output()
     out.write_bytes(wav)
     return _result(output_id)
@@ -174,7 +180,8 @@ def interpret(req: DirectionRequest):
     except direction.DirectionError as exc:
         raise HTTPException(422, str(exc))
     except Exception as exc:
-        raise HTTPException(500, f"The AI director failed: {exc}")
+        log.exception("The AI director failed")
+        raise HTTPException(500, "The AI director failed; see the Voxwell log.") from exc
 
 
 @router.post("/direction/speak")
@@ -197,7 +204,8 @@ def directed_speak(req: DirectedSpeakRequest):
             text, req.language, reference, exaggeration=exaggeration_for(req.intensity), cfg_weight=PACE_CFG[req.pace]
         )
     except Exception as exc:
-        raise HTTPException(500, f"Speech synthesis failed: {exc}")
+        log.exception("Speech synthesis failed")
+        raise HTTPException(500, "Speech synthesis failed; see the Voxwell log.") from exc
     output_id, out = _new_output()
     tempo = PACE_TEMPO[req.pace]
     if tempo != 1.0 and _ffmpeg_ready():  # without ffmpeg, pace comes from the CFG setting alone

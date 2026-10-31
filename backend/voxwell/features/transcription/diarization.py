@@ -6,6 +6,7 @@ or token) and checked against pinned SHA-256 hashes before use; see LICENSES.md.
 """
 
 import hashlib
+import logging
 import os
 import shutil
 import tarfile
@@ -16,6 +17,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from voxwell.paths import data_dir, replace_file
+
+log = logging.getLogger(__name__)
 
 _RELEASES = "https://github.com/k2-fsa/sherpa-onnx/releases/download"
 SEGMENTATION_URL = f"{_RELEASES}/speaker-segmentation-models/sherpa-onnx-pyannote-segmentation-3-0.tar.bz2"
@@ -59,7 +62,8 @@ def _download(url: str, sha256: str, dest: Path) -> None:
             shutil.copyfileobj(response, out)
     except OSError as exc:
         part.unlink(missing_ok=True)
-        raise DiarizationError(f"Could not download the speaker model: {exc}")
+        log.exception("Downloading a speaker model failed")
+        raise DiarizationError("Could not download the speaker model. Check the internet connection and try again.") from exc
     if _sha256(part) != sha256:
         part.unlink(missing_ok=True)
         raise DiarizationError("The downloaded speaker model is corrupted. Try again.")
@@ -83,7 +87,8 @@ def model_paths() -> tuple[Path, Path]:
                         shutil.copyfileobj(src, out)
                 replace_file(part, segmentation)
             except (tarfile.TarError, KeyError, OSError) as exc:
-                raise DiarizationError(f"The speaker model archive could not be read: {exc}")
+                log.exception("Reading the speaker model archive failed")
+                raise DiarizationError("The speaker model archive could not be read; see the Voxwell log.") from exc
             finally:
                 archive.unlink(missing_ok=True)
     return segmentation, embedding
@@ -114,7 +119,8 @@ def diarize(audio_path: Path, num_speakers: int = 0, on_progress: Callable[[floa
     try:
         samples = decode_audio(str(audio_path), sampling_rate=diarizer.sample_rate)
     except Exception as exc:
-        raise DiarizationError(f"Could not decode the audio: {exc}")
+        log.exception("Decoding audio for speaker labels failed")
+        raise DiarizationError("Could not decode the audio for speaker labels.") from exc
 
     def progress(done: int, total: int) -> int:
         if on_progress and total:

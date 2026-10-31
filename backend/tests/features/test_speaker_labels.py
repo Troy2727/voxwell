@@ -223,13 +223,14 @@ def test_an_archive_without_the_model_is_an_error(monkeypatch, isolated_data_dir
     assert not (isolated_data_dir / "models" / "diarization" / "pyannote-segmentation-3-0.onnx").exists()
 
 
-def test_download_failure_is_a_clear_error(monkeypatch, isolated_data_dir):
+def test_download_failure_is_a_clear_error(monkeypatch, isolated_data_dir, caplog):
     def offline(url, timeout=0):
         raise OSError("no network")
 
     monkeypatch.setattr(diarization.urllib.request, "urlopen", offline)
-    with pytest.raises(DiarizationError, match="Could not download the speaker model: no network"):
+    with pytest.raises(DiarizationError, match="Could not download the speaker model. Check the internet connection") as raised:
         diarization.model_paths()
+    assert "no network" not in str(raised.value) and "no network" in caplog.text  # the detail is in the log
 
 
 def test_speaker_count_is_validated_before_any_download(monkeypatch):

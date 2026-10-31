@@ -82,7 +82,7 @@ def test_engine_error(monkeypatch):
 
     monkeypatch.setattr(engine, "design", boom)
     r = client.post("/api/voice_design/preview", json={"description": "x"})
-    assert r.status_code == 500 and "no gpu" in r.json()["detail"]
+    assert r.status_code == 500 and "no gpu" not in r.json()["detail"] and r.json()["detail"].endswith("see the Voxwell log.")
 
 
 @pytest.mark.parametrize("pid", ["..%2F..%2Fsecret", "not-a-valid-id", "%2e%2e", "a" * 31])

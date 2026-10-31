@@ -7,6 +7,7 @@ it is rendered, so a render interrupted by closing Voxwell resumes where it stop
 
 import io
 import json
+import logging
 import shutil
 import threading
 import time
@@ -16,10 +17,13 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from voxwell import voices
+from voxwell.errors import user_message
 from voxwell.features.audiobook.chunking import chapter_chunks
 from voxwell.features.audiobook.importer import Chapter
 from voxwell.features.voice_cloning import engine
 from voxwell.paths import child_path, data_dir
+
+log = logging.getLogger(__name__)
 
 STATE_FILE = "book.json"
 DEFAULT_VOICE = "default"
@@ -208,10 +212,11 @@ def _work(book: Book) -> None:
                 ch.status = "done"
                 save(book)  # resume point
             book.state, book.step, book.percent, book.error = "done", "Done", 100, None
-        except ValueError as exc:
-            book.state, book.error = "error", str(exc)
-        except Exception as exc:  # surface any engine failure as a job error, without a traceback
-            book.state, book.error = "error", f"{book.step} failed: {exc}"
+        except Exception as exc:
+            if (message := user_message(exc)) is None:  # not Voxwell's own message: log it instead
+                log.exception("Audiobook failed at %s", book.step)
+                message = f"{book.step} failed; see the Voxwell log."
+            book.state, book.error = "error", message
         save(book)
 
 

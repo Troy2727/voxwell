@@ -22,6 +22,7 @@ Closing the socket without "end" drops the turns still waiting.
 import asyncio
 import io
 import json
+import logging
 import math
 import os
 import sys
@@ -35,8 +36,11 @@ from pathlib import Path
 
 from fastapi import WebSocket
 
+from voxwell.errors import user_message
 from voxwell.origins import websocket_origin_allowed
 from voxwell.paths import data_dir
+
+log = logging.getLogger(__name__)
 
 SAMPLE_RATE = 16000
 WINDOW_MS = 20  # voice activity is decided per 20 ms window
@@ -154,6 +158,18 @@ class TurnDetector:
         self._announced = False
 
 
+TURN_FAILED = "This turn could not be processed; see the Voxwell log."
+
+
+def turn_error_message(exc: Exception) -> str:
+    """What the client sees for a failed turn: a message Voxwell wrote (errors.user_message), or a
+    fixed one, with the details in the log."""
+    if (message := user_message(exc)) is not None:
+        return message
+    log.error("A live turn could not be processed", exc_info=exc)
+    return TURN_FAILED
+
+
 class TurnWorker:
     """Processes turns one at a time, so results come out in turn order, with a bounded backlog."""
 
@@ -189,7 +205,7 @@ class TurnWorker:
                 result = await asyncio.to_thread(self._process, pcm, index)
                 message = {**result, "type": "turn", "index": index}
             except Exception as exc:
-                message = {"type": "error", "index": index, "message": str(exc) or "This turn could not be processed."}
+                message = {"type": "error", "index": index, "message": turn_error_message(exc)}
             if not await self._send(message):
                 return  # the client is gone
 

@@ -8,6 +8,7 @@ port with a random key. That server watches Voxwell's process and exits when it 
 included, so it never outlives the app.
 """
 
+import logging
 import os
 import secrets
 import shutil
@@ -23,6 +24,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from voxwell.paths import data_dir, replace_file
+
+log = logging.getLogger(__name__)
 
 COMMIT = "ca1e85fe9430179831e6bc6be790c332190a3866"
 SOURCE_URL = f"https://codeload.github.com/ACE-Step/ACE-Step-1.5/zip/{COMMIT}"
@@ -143,8 +146,9 @@ def _install_worker() -> None:
         _set(state="idle", step="Installed", percent=100, detail="")
     except EngineError as exc:
         _set(state="failed", error=str(exc))
-    except Exception as exc:  # report, never crash the server
-        _set(state="failed", error=f"Installing the music engine failed: {type(exc).__name__}: {exc}")
+    except Exception:  # report, never crash the server
+        log.exception("Installing the music engine failed")
+        _set(state="failed", error="Installing the music engine failed; see the Voxwell log.")
 
 
 def _download_source() -> None:
@@ -155,7 +159,8 @@ def _download_source() -> None:
             shutil.copyfileobj(response, out)
     except OSError as exc:
         archive.unlink(missing_ok=True)
-        raise EngineError(f"Could not download ACE-Step: {exc}")
+        log.exception("Downloading ACE-Step failed")
+        raise EngineError("Could not download ACE-Step. Check the internet connection and try again.") from exc
     # Extract beside the final folder and rename it into place only when complete, so an
     # interrupted extraction never leaves a source_dir() that later installs would trust.
     target = source_dir()
@@ -213,7 +218,8 @@ def _sync_packages() -> None:
             tail = (tail + [line])[-20:]
             _set(detail=line[:200])
     if proc.wait() != 0:
-        raise EngineError("Installing the music engine's packages failed:\n" + "\n".join(tail[-8:]))
+        log.error("uv sync failed:\n%s", "\n".join(tail))
+        raise EngineError("Installing the music engine's packages failed; see the Voxwell log.")
 
 
 def _dir_bytes(path: Path) -> int:
@@ -249,7 +255,8 @@ def _download_weights() -> None:
     try:
         snapshot_download(WEIGHTS_REPO, revision=WEIGHTS_REVISION, local_dir=checkpoints, allow_patterns=WEIGHTS)
     except Exception as exc:
-        raise EngineError(f"Could not download the music model: {exc}")
+        log.exception("Downloading the music model failed")
+        raise EngineError("Could not download the music model. Check the internet connection and try again.") from exc
     finally:
         done.set()
 
@@ -296,10 +303,12 @@ def ensure_running() -> tuple[str, str]:
         deadline = time.monotonic() + START_TIMEOUT_SECONDS
         while not _healthy(server["base"]):
             if server["proc"].poll() is not None:
-                raise EngineError("The music engine stopped while starting:\n" + log_tail())
+                log.error("The music engine stopped while starting:\n%s", log_tail())
+                raise EngineError("The music engine stopped while starting; see the Voxwell log.")
             if time.monotonic() > deadline:
                 stop()
-                raise EngineError("The music engine took too long to start.\n" + log_tail())
+                log.error("The music engine took too long to start:\n%s", log_tail())
+                raise EngineError("The music engine took too long to start; see the Voxwell log.")
             time.sleep(1.0)
         server["ready"] = True
         return server["base"], server["key"]

@@ -103,8 +103,9 @@ def poll_once() -> None:
                 try:
                     _export(job, folder, Path(name).stem)
                     rec["status"] = "saved"
-                except OSError as exc:
-                    rec.update(status="failed", error=f"Could not save the dub: {exc}")
+                except OSError:
+                    log.exception("Could not save the dub of %s", name)
+                    rec.update(status="failed", error="Could not save the dub; see the Voxwell log.")
             elif job.state == "error":
                 rec.update(status="failed", error=job.error)
         _save(cfg)

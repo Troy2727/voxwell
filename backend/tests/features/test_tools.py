@@ -135,7 +135,7 @@ def test_convert_engine_error(monkeypatch):
     monkeypatch.setattr(engine, "convert", boom)
     voice = voices.save_voice("Target", wav_bytes(1), "upload")
     r = client.post("/api/tools/convert", files={"file": ("a.wav", wav_bytes(1))}, data={"voice_id": voice.id})
-    assert r.status_code == 500 and "download failed" in r.json()["detail"]
+    assert r.status_code == 500 and "download failed" not in r.json()["detail"] and r.json()["detail"].endswith("see the Voxwell log.")
 
 
 # --- voice isolation -----------------------------------------------------------------------
@@ -177,7 +177,7 @@ def test_isolate_errors(monkeypatch, error, status):
 
     monkeypatch.setattr(isolation, "isolate", fail)
     r = client.post("/api/tools/isolate", files={"file": ("a.wav", wav_bytes(1))})
-    assert r.status_code == status and str(error) in r.json()["detail"]
+    assert r.status_code == status and (str(error) in r.json()["detail"]) == (status == 422)  # only IsolationError text is for the user
 
 
 def test_separate_windows_line_up_with_the_audio(monkeypatch):

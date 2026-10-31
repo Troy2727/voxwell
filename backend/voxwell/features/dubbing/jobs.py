@@ -6,6 +6,7 @@ is deleted to keep disk use down.
 """
 
 import json
+import logging
 import shutil
 import threading
 import time
@@ -16,6 +17,8 @@ from pathlib import Path
 from voxwell.features.dubbing import pipeline
 from voxwell.features.dubbing.ffmpeg import DubbingError
 from voxwell.paths import child_path, data_dir
+
+log = logging.getLogger(__name__)
 
 STATE_FILE = "job.json"
 INTERRUPTED = "Interrupted because Voxwell closed. Start the dub again."
@@ -141,8 +144,9 @@ def _work(job: Job) -> None:
             job.state, job.error = "error", str(exc)
         except NotImplementedError:
             job.state, job.error = "error", f"{job.step} is not available yet."
-        except Exception as exc:  # surface any engine failure as a job error, without a traceback
-            job.state, job.error = "error", f"{job.step} failed: {exc}"
+        except Exception:  # an unexpected failure: the details go to the log, not to the user
+            log.exception("Dub failed at %s", job.step)
+            job.state, job.error = "error", f"{job.step} failed; see the Voxwell log."
         _cleanup(job)
         _save(job)
 

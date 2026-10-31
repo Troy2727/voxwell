@@ -78,7 +78,7 @@ def test_engine_error(monkeypatch):
 
     monkeypatch.setattr(engine, "design", boom)
     r = client.post(f"/api/gallery/presets/{FIRST.id}/sample")
-    assert r.status_code == 500 and "no model" in r.json()["detail"]
+    assert r.status_code == 500 and "no model" not in r.json()["detail"] and r.json()["detail"].endswith("see the Voxwell log.")
     assert client.get("/api/gallery/presets").json()[0]["ready"] is False
 
 

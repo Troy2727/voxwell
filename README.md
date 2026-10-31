@@ -9,7 +9,6 @@
 <img src="docs/readme/voxwell-banner.gif" alt="Voxwell Voice Studio: a complete voice studio that runs on your machine. Clone and design voices, dub videos, transcribe and talk to voice agents. Every model runs locally. 100% local, MIT licensed, CLI + MCP, OpenAI-compatible API." width="100%" />
 
 <p>
-  <a href="https://voxwell.vercel.app"><img alt="Web UI: voxwell.vercel.app" src="docs/readme/badges/web-ui-voxwell-vercel-app.svg" /></a>
   <a href="https://github.com/Troy2727/voxwell/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Troy2727/voxwell/actions/workflows/ci.yml/badge.svg" /></a>
   <a href="https://www.python.org"><img alt="Python 3.11" src="docs/readme/badges/python-3-11.svg" /></a>
   <a href="https://fastapi.tiangolo.com"><img alt="FastAPI" src="docs/readme/badges/fastapi.svg" /></a>
@@ -40,8 +39,8 @@
 
 <br/>
 
-<a href="https://github.com/Troy2727/voxwell/blob/main/docs/readme/screenshots/animated/tour.gif" title="Open this screenshot full size">
-  <img src="docs/readme/screenshots/animated/tour.gif" alt="A tour of the Voxwell dashboard: the Gallery of ready-made voices, then the Voice cloning, Dubbing, Voice agents, Live translation, Transcribe and Integrations pages." width="100%" />
+<a href="https://github.com/Troy2727/voxwell/blob/main/docs/readme/screenshots/animated/tour-v2.gif" title="Open this screenshot full size">
+  <img src="docs/readme/screenshots/animated/tour-v2.gif" alt="A tour of the Voxwell dashboard: the Gallery of ready-made voices, then the Voice cloning, Voice remix, Music, Dubbing, Voice agents, Live translation, Transcribe and Integrations pages." width="100%" />
 </a>
 <br />
 <sub>Click the screenshot to see it full size.</sub>
@@ -65,42 +64,42 @@ Voxwell is **MIT licensed**, and every model it runs allows commercial use ([one
 <table>
   <tr>
     <td width="50%" valign="top">
-      <a href="https://github.com/Troy2727/voxwell/blob/main/docs/readme/screenshots/animated/voice-cloning.gif" title="Open this screenshot full size">
-        <img src="docs/readme/screenshots/animated/voice-cloning.gif" alt="Voice cloning page, with the reference clip drop zone highlighted." width="100%" />
+      <a href="https://github.com/Troy2727/voxwell/blob/main/docs/readme/screenshots/animated/voice-cloning-v2.gif" title="Open this screenshot full size">
+        <img src="docs/readme/screenshots/animated/voice-cloning-v2.gif" alt="Voice cloning page, with the reference clip drop zone highlighted." width="100%" />
       </a>
       <p><b>Voice cloning</b><br/><sub>Upload a few seconds of speech, then make it say anything.</sub></p>
     </td>
     <td width="50%" valign="top">
-      <a href="https://github.com/Troy2727/voxwell/blob/main/docs/readme/screenshots/animated/dubbing.gif" title="Open this screenshot full size">
-        <img src="docs/readme/screenshots/animated/dubbing.gif" alt="Dubbing page, with the target language and voice pickers highlighted." width="100%" />
+      <a href="https://github.com/Troy2727/voxwell/blob/main/docs/readme/screenshots/animated/dubbing-v2.gif" title="Open this screenshot full size">
+        <img src="docs/readme/screenshots/animated/dubbing-v2.gif" alt="Dubbing page, with the target language and voice pickers highlighted." width="100%" />
       </a>
       <p><b>Dubbing</b><br/><sub>Pick a language; keep the original voice or use one of yours.</sub></p>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <a href="https://github.com/Troy2727/voxwell/blob/main/docs/readme/screenshots/animated/voice-agents.gif" title="Open this screenshot full size">
-        <img src="docs/readme/screenshots/animated/voice-agents.gif" alt="Voice agents page, with the Hold to talk and Live conversation buttons highlighted." width="100%" />
+      <a href="https://github.com/Troy2727/voxwell/blob/main/docs/readme/screenshots/animated/voice-agents-v2.gif" title="Open this screenshot full size">
+        <img src="docs/readme/screenshots/animated/voice-agents-v2.gif" alt="Voice agents page, with the Hold to talk and Live conversation buttons highlighted." width="100%" />
       </a>
       <p><b>Voice agents</b><br/><sub>Type, hold to talk, or have a live conversation.</sub></p>
     </td>
     <td width="50%" valign="top">
-      <a href="https://github.com/Troy2727/voxwell/blob/main/docs/readme/screenshots/animated/live-translation.gif" title="Open this screenshot full size">
-        <img src="docs/readme/screenshots/animated/live-translation.gif" alt="Live translation page, with the Start button highlighted." width="100%" />
+      <a href="https://github.com/Troy2727/voxwell/blob/main/docs/readme/screenshots/animated/live-translation-v2.gif" title="Open this screenshot full size">
+        <img src="docs/readme/screenshots/animated/live-translation-v2.gif" alt="Live translation page, with the Start button highlighted." width="100%" />
       </a>
       <p><b>Live translation</b><br/><sub>Speak one language, hear another, turn by turn.</sub></p>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <a href="https://github.com/Troy2727/voxwell/blob/main/docs/readme/screenshots/animated/transcribe.gif" title="Open this screenshot full size">
-        <img src="docs/readme/screenshots/animated/transcribe.gif" alt="Transcribe page, with the file drop zone and the speaker labels option highlighted." width="100%" />
+      <a href="https://github.com/Troy2727/voxwell/blob/main/docs/readme/screenshots/animated/transcribe-v2.gif" title="Open this screenshot full size">
+        <img src="docs/readme/screenshots/animated/transcribe-v2.gif" alt="Transcribe page, with the file drop zone and the speaker labels option highlighted." width="100%" />
       </a>
       <p><b>Transcribe</b><br/><sub>TXT, SRT or VTT, with speaker labels or your own script.</sub></p>
     </td>
     <td width="50%" valign="top">
-      <a href="https://github.com/Troy2727/voxwell/blob/main/docs/readme/screenshots/animated/integrations.gif" title="Open this screenshot full size">
-        <img src="docs/readme/screenshots/animated/integrations.gif" alt="Integrations page, with the table of CLI commands and matching MCP tools highlighted." width="100%" />
+      <a href="https://github.com/Troy2727/voxwell/blob/main/docs/readme/screenshots/animated/integrations-v2.gif" title="Open this screenshot full size">
+        <img src="docs/readme/screenshots/animated/integrations-v2.gif" alt="Integrations page, with the table of CLI commands and matching MCP tools highlighted." width="100%" />
       </a>
       <p><b>Integrations</b><br/><sub>Every CLI command, with its matching MCP tool.</sub></p>
     </td>

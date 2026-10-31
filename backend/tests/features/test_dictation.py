@@ -69,7 +69,7 @@ def test_engine_error_and_cleanup(monkeypatch):
     monkeypatch.setattr(engine, "transcribe", boom)
     r = _post()
     assert r.status_code == 500
-    assert "model exploded" in r.json()["detail"]
+    assert "model exploded" not in r.json()["detail"] and r.json()["detail"].endswith("see the Voxwell log.")
     assert list(data_dir("dictation").iterdir()) == []
 
 
@@ -198,7 +198,7 @@ def test_live_failed_turn_is_reported_and_the_session_continues(monkeypatch):
         _send_audio(ws, speech(500))
         ws.send_json({"type": "end"})
         messages = _until_done(ws)
-    assert {"type": "error", "index": 0, "message": "Transcription failed: model exploded"} in messages
+    assert {"type": "error", "index": 0, "message": "This turn could not be processed; see the Voxwell log."} in messages
     assert messages[-1] == {"type": "done"}
 
 

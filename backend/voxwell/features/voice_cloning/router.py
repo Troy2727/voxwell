@@ -1,5 +1,6 @@
 import importlib.util
 import io
+import logging
 import re
 import uuid
 from dataclasses import asdict
@@ -12,6 +13,8 @@ from voxwell import voices
 from voxwell.features.audio_effects.dsp import Effects
 from voxwell.features.voice_cloning import engine, history
 from voxwell.paths import child_path, data_dir
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["voice_cloning"])
 
@@ -82,7 +85,8 @@ def synthesize(req: SynthesizeRequest):
         extra = {"effects": req.effects} if req.effects else {}
         wav = engine.synthesize(text, req.language, reference, **extra)
     except Exception as exc:
-        raise HTTPException(500, f"Speech synthesis failed: {exc}")
+        log.exception("Speech synthesis failed")
+        raise HTTPException(500, "Speech synthesis failed; see the Voxwell log.") from exc
     audio_id = uuid.uuid4().hex
     (data_dir("voice_cloning") / f"{audio_id}.wav").write_bytes(wav)
     history.record(audio_id, text, req.language, voice_name)

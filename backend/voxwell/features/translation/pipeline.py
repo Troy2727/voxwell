@@ -4,6 +4,7 @@ Used turn by turn by the live page and once per request by the CLI's `translate`
 """
 
 import base64
+import logging
 from pathlib import Path
 
 from voxwell import live_audio, voices
@@ -11,6 +12,8 @@ from voxwell.features.audiobook.books import render_text
 from voxwell.features.audiobook.chunking import chapter_chunks, chunks
 from voxwell.features.dubbing import translate
 from voxwell.features.voice_cloning.engine import LANGUAGES as SPEECH_LANGUAGES
+
+log = logging.getLogger(__name__)
 
 # Languages Whisper (dictation's speech recognition) can transcribe; checked against the installed
 # faster-whisper in test_model_api_contracts.py.
@@ -72,6 +75,7 @@ def translate_turn(pcm: bytes, source: str | None, target: str, reference: Path 
         return result
     try:
         result["audio"] = base64.b64encode(speak(result["translation"], target, reference)).decode("ascii")
-    except Exception as exc:
-        result["warning"] = f"Could not speak the translation: {exc}"
+    except Exception:
+        log.exception("Could not speak a translation")
+        result["warning"] = "Could not speak the translation; see the Voxwell log."
     return result
