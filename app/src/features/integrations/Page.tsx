@@ -38,6 +38,7 @@ const TOOLS: { cli: string; mcp: string; what: string }[] = [
   { cli: 'isolate', mcp: 'isolate_voice', what: 'Split a recording into the voice and the background' },
   { cli: 'clone', mcp: 'clone_voice', what: 'Save a voice from a short, clean recording' },
   { cli: 'design', mcp: 'design_voice', what: 'Create a voice from a description' },
+  { cli: 'remix', mcp: 'remix_voice', what: 'Make a new voice from a saved one and a description' },
   { cli: 'effects', mcp: 'apply_effects', what: 'Add reverb, distance, noise or pan to a recording' },
   { cli: 'pronounce', mcp: 'manage_pronunciations', what: 'List, add or remove how a word is pronounced' },
   { cli: 'convert', mcp: 'convert_voice', what: 'Re-speak a recording in a saved voice' },

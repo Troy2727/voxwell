@@ -16,7 +16,7 @@ _ID = re.compile(r"^[0-9a-f]{12}$")
 class Voice:
     id: str
     name: str
-    source: str  # "upload" or "design"
+    source: str  # "upload", "design" or "remix"
 
 
 def save_voice(name: str, wav: bytes, source: str) -> Voice:

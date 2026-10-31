@@ -41,8 +41,11 @@ export const sendJson = <T,>(path: string, method: string, body?: unknown) =>
 export interface Voice {
   id: string;
   name: string;
-  source: 'upload' | 'design';
+  source: 'upload' | 'design' | 'remix';
 }
+
+/** Older backends or future sources fall back to 'Uploaded', as before. */
+export const voiceSourceLabel = (source: Voice['source']) => ({ upload: 'Uploaded', design: 'Designed', remix: 'Remixed' })[source] ?? 'Uploaded';
 
 export const listVoices = () => api<Voice[]>('/api/voices');
 

@@ -1,7 +1,7 @@
 import type { ComponentType } from 'react';
 import {
   AudioLines, AudioWaveform, BookOpen, Bot, FileText, FolderOpen, Languages, Layers, LayoutGrid, Library,
-  type LucideIcon, MessagesSquare, Mic, Music, Plug, Speech, SpellCheck, Volume2, Wand2, Wrench,
+  type LucideIcon, MessagesSquare, Mic, Music, Plug, Shuffle, Speech, SpellCheck, Volume2, Wand2, Wrench,
 } from 'lucide-react';
 import AgentsPage from './agents/Page';
 import AudioEffectsPage from './audio_effects/Page';
@@ -21,6 +21,7 @@ import TranscriptionPage from './transcription/Page';
 import TranslationPage from './translation/Page';
 import VoiceCloningPage from './voice_cloning/Page';
 import VoiceDesignPage from './voice_design/Page';
+import VoiceRemixPage from './voice_remix/Page';
 import VoicesPage from './voices/Page';
 
 export interface FeatureEntry {
@@ -34,6 +35,7 @@ export interface FeatureEntry {
 export const FEATURES: FeatureEntry[] = [
   { id: 'voice_cloning', title: 'Voice cloning', group: 'Create', icon: AudioLines, Page: VoiceCloningPage },
   { id: 'voice_design', title: 'Voice design', group: 'Create', icon: Wand2, Page: VoiceDesignPage },
+  { id: 'voice_remix', title: 'Voice remix', group: 'Voices', icon: Shuffle, Page: VoiceRemixPage },
   { id: 'voices', title: 'Saved voices', group: 'Voices', icon: Library, Page: VoicesPage },
   { id: 'gallery', title: 'Gallery', group: 'Voices', icon: LayoutGrid, Page: GalleryPage },
   { id: 'sound', title: 'Sound effects', group: 'Create', icon: Volume2, Page: SoundPage },

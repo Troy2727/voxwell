@@ -44,7 +44,8 @@ def design(description: str, sample_text: str) -> bytes:
     device, model, tok = c["device"], c["model"], c["tokenizer"]
     input_ids = tok(description, return_tensors="pt").input_ids.to(device)
     prompt_ids = tok(sample_text, return_tensors="pt").input_ids.to(device)
-    out = model.generate(input_ids=input_ids, prompt_input_ids=prompt_ids)
+    with _lock:  # one generation at a time on the shared model (voice design and voice remix both call this)
+        out = model.generate(input_ids=input_ids, prompt_input_ids=prompt_ids)
     audio = out.cpu().numpy().squeeze()
     buf = io.BytesIO()
     sf.write(buf, audio, model.config.sampling_rate, format="WAV")

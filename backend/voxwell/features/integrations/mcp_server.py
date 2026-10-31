@@ -137,6 +137,19 @@ TOOLS = [
         }, ["description", "name"]),
     },
     {
+        "name": "remix_voice",
+        "description": "Make a new voice from a saved one and a description of the voice wanted (e.g. 'an older man with a deep, raspy voice speaks slowly'). "
+        "The original voice is kept. Saves the new voice and returns its name and id.",
+        "inputSchema": _schema({
+            "voice": {**_VOICE, "description": "The saved voice name or id to start from."},
+            "prompt": {"type": "string", "description": "The voice wanted: gender, age, pitch, pace, accent, tone (not a change like 'older')."},
+            "name": {"type": "string", "description": "Name for the new voice."},
+            "strength": {"type": "string", "enum": ["low", "medium", "high", "max"],
+                         "description": "How far to move from the original. low keeps most of it; max replaces it. Default medium."},
+            "script": {"type": "string", "description": "English text the preview says (optional)."},
+        }, ["voice", "prompt", "name"]),
+    },
+    {
         "name": "convert_voice",
         "description": "Re-speak a recording in a saved voice, keeping the words and timing. Returns the WAV path.",
         "inputSchema": _schema({
@@ -317,6 +330,14 @@ def design_voice(args: dict) -> str:
                 sample=args.get("sample_text"), preview=None)
 
 
+def remix_voice(args: dict) -> str:
+    strength = args.get("strength") or "medium"
+    if strength not in ("low", "medium", "high", "max"):
+        raise ToolError("strength must be low, medium, high or max.")
+    return _run(cli.cmd_remix, voice=_required(args, "voice"), prompt=_required(args, "prompt"), name=_required(args, "name"),
+                strength=strength, script=args.get("script"), preview=None)
+
+
 def convert_voice(args: dict) -> str:
     return _run(cli.cmd_convert, file=_required(args, "file_path"), voice=_required(args, "voice"),
                 output=args.get("output_path") or _default_folder())
@@ -365,7 +386,7 @@ def chat_with_agent(args: dict) -> str:
 
 HANDLERS = {
     "list_voices": list_voices, "voice_collections": voice_collections, "speak": speak, "generate_sound": generate_sound, "make_music": make_music, "transcribe": transcribe, "edit_transcript": edit_transcript, "align_script": align_script, "isolate_voice": isolate_voice,
-    "clone_voice": clone_voice, "design_voice": design_voice, "convert_voice": convert_voice, "dub_video": dub_video,
+    "clone_voice": clone_voice, "design_voice": design_voice, "remix_voice": remix_voice, "convert_voice": convert_voice, "dub_video": dub_video,
     "chat_with_agent": chat_with_agent,
     "translate_speech": translate_speech,
     "apply_effects": apply_effects,
