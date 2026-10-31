@@ -4,7 +4,7 @@ Every dub is an ordinary dubbing job (see dubbing.jobs), so it runs in the share
 queue and shows up in Projects.
 """
 
-from pathlib import Path, PureWindowsPath
+from pathlib import Path
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from voxwell.features.batch import watch
 from voxwell.features.dubbing import jobs
 from voxwell.features.dubbing.router import check_settings, start_dub
+from voxwell.paths import is_network_path
 
 router = APIRouter(tags=["batch"])
 
@@ -75,9 +76,8 @@ def get_watch():
 def put_watch(req: WatchSettings):
     folder, target = req.folder.strip(), req.target_language
     if req.enabled:
-        # A network path (\\server\share, //server/share) would make Windows sign in to that server
-        # as the user; the CLI refuses them for the same reason (cli._on_this_computer).
-        if PureWindowsPath(folder).drive.startswith("\\\\"):
+        # Opening a network path would make Windows sign in to that server as the user.
+        if is_network_path(folder):
             raise HTTPException(422, "Choose a folder on this computer, not a network folder.")
         if not folder or not Path(folder).is_dir():
             raise HTTPException(422, "Choose a folder that exists.")

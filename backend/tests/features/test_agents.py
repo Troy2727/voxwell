@@ -272,3 +272,12 @@ def test_a_tool_that_crashes_reports_a_fixed_message(llm, monkeypatch, caplog):
     body = chat(make_agent()["id"], "add").json()
     assert body["tool_calls"][0]["error"] == "The tool failed."
     assert "secret detail" not in str(body) and "secret detail" in caplog.text
+
+
+def test_an_agent_crash_returns_a_fixed_500(llm, monkeypatch, caplog):
+    def crash(*args, **kwargs):
+        raise RuntimeError("secret detail at C:/internal/path")
+
+    monkeypatch.setattr(conversation, "reply_and_speak", crash)
+    r = chat(make_agent()["id"], "hello")
+    assert r.status_code == 500 and "secret detail" not in r.text and "secret detail" in caplog.text

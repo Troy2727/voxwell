@@ -16,7 +16,7 @@ from fastapi import HTTPException
 
 from voxwell.features.dubbing import jobs
 from voxwell.features.dubbing.router import VIDEO_EXTS, start_dub
-from voxwell.paths import data_dir
+from voxwell.paths import data_dir, is_network_path
 
 POLL_SECONDS = 5
 OUTPUT_FOLDER = "dubbed"
@@ -66,6 +66,10 @@ def poll_once() -> None:
     with _lock:
         cfg = load()
         if not cfg["enabled"]:
+            return
+        if is_network_path(cfg["folder"]):  # a config saved before network folders were refused
+            cfg["problem"] = "The watched folder is on another computer. Choose a folder on this computer."
+            _save(cfg)
             return
         folder = Path(cfg["folder"])
         if not folder.is_dir():

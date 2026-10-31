@@ -17,7 +17,9 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
-from pathlib import Path, PureWindowsPath
+from pathlib import Path
+
+from voxwell.paths import is_network_path  # stdlib-only module, like this one
 
 POLL_SECONDS = 2
 
@@ -103,7 +105,7 @@ def _on_this_computer(value: str) -> str:
     Opening one signs in to that server as the user (Windows sends NTLM), and the MCP tools take
     their paths from an AI assistant, which a document or web page can steer.
     """
-    if PureWindowsPath(value).drive.startswith("\\\\"):
+    if is_network_path(value):
         raise CliError(f"Use a file on this computer, not a network path: {value}")
     return value
 

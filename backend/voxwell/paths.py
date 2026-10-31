@@ -3,14 +3,14 @@ import re
 from pathlib import Path
 from urllib.parse import quote
 
-from platformdirs import user_data_dir
-
 
 def data_dir(*parts: str) -> Path:
     """Return (and create) a folder under the Voxwell data root.
 
     VOXWELL_DATA_DIR overrides the platform default; tests always set it.
     """
+    from platformdirs import user_data_dir  # here, so the stdlib-only CLI can import this module
+
     root = Path(os.environ.get("VOXWELL_DATA_DIR") or user_data_dir("Voxwell", appauthor=False))
     path = root.joinpath(*parts)
     path.mkdir(parents=True, exist_ok=True)
@@ -30,6 +30,19 @@ def child_path(folder: Path, name: str) -> Path:
     if not path.startswith(base + os.sep) or os.sep in path[len(base) + 1:]:
         raise ValueError(f"Not a file name: {name!r}")
     return Path(path)
+
+
+def is_network_path(value: str) -> bool:
+    r"""Whether a path names another computer: \\server, \\server\share, //server/share or
+    \\?\UNC\server\share. Opening one makes Windows sign in to that server as the user (NTLM).
+    Local device paths (\\?\C:\..., \\.\C:\...) are not network paths."""
+    path = value.strip().replace("/", "\\")
+    if not path.startswith("\\\\"):
+        return False
+    rest = path[2:]
+    if rest.startswith(("?\\", ".\\")):
+        return rest[2:].upper().startswith("UNC\\")
+    return True
 
 
 _UNSAFE_NAME = re.compile(r'[\\/:*?"<>|\x00-\x1f]')

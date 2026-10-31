@@ -13,6 +13,7 @@ from voxwell import voices
 from voxwell.features import FEATURES
 from voxwell.features.integrations import openai_api
 from voxwell.origins import APP_HOSTS, APP_ORIGINS
+from voxwell.paths import data_dir
 
 # Model downloads must work behind TLS-inspecting proxies and antivirus, whose certificates
 # live in the OS store, not in Python's bundled one. huggingface_hub does not fall back to the
@@ -71,11 +72,26 @@ def _stop_when_stdin_closes(server) -> None:
     threading.Thread(target=watch, daemon=True, name="voxwell-parent-watch").start()
 
 
+def _log_to_file() -> None:
+    """Errors the API reports as "see the Voxwell log" are written to <data folder>/logs/voxwell.log
+    (and still to the console). Only the server does this, not tests or CLI calls."""
+    import logging
+    from logging.handlers import RotatingFileHandler
+
+    handler = RotatingFileHandler(data_dir("logs") / "voxwell.log", maxBytes=1_000_000, backupCount=2, encoding="utf-8")
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        handlers=[handler, logging.StreamHandler()],
+    )
+
+
 def run():
     import uvicorn
 
     from voxwell.live_audio import MAX_FRAME_BYTES
 
+    _log_to_file()
     port = int(os.environ.get("VOXWELL_PORT", "8765"))
     # Live audio messages are small; the WebSocket layer refuses bigger ones before buffering them.
     server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, ws_max_size=MAX_FRAME_BYTES))

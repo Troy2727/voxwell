@@ -118,4 +118,17 @@ def test_child_path_stays_in_its_folder(tmp_path):
 ])
 @pytest.mark.parametrize("bad_id", ["..", r"..\..\x", "a" * 32 + r"\..", "%2e%2e"])
 def test_audio_routes_refuse_malformed_ids_with_404(path, bad_id):
+    """Each route checks the id before building a path (child_path is tested directly above), so
+    a malformed id is a clean 404 rather than a 500."""
     assert client.get(path.format(bad_id)).status_code == 404
+
+
+@pytest.mark.parametrize("value, network", [
+    (r"\\server", True), ("//server", True), (r"\\server\share\inbox", True), ("//server/share/inbox", True),
+    (r"\\?\UNC\server\share", True), (r"\\?\unc\server\share", True),
+    (r"\\?\C:\videos", False), (r"\\.\C:\videos", False), (r"C:\videos", False), ("/home/me/videos", False), ("videos", False),
+])
+def test_network_paths_are_recognised(value, network):
+    from voxwell.paths import is_network_path
+
+    assert is_network_path(value) is network

@@ -209,7 +209,19 @@ def test_server_start_launches_the_watcher(monkeypatch):
     assert started == [True]
 
 
-@pytest.mark.parametrize("folder", [r"\\server\share\inbox", "//server/share/inbox"])
+@pytest.mark.parametrize("folder", [r"\\server\share\inbox", "//server/share/inbox", r"\\server", r"\\?\UNC\server\share"])
 def test_watch_refuses_network_folders(mocked, folder):
     r = client.put("/api/batch/watch", json={"enabled": True, "folder": folder, "target_language": "en", "voice": "original"})
     assert r.status_code == 422 and "network" in r.json()["detail"]
+
+
+def test_a_saved_network_folder_is_never_opened(mocked, folder, monkeypatch):
+    """A config saved before network folders were refused: the watcher reports it, untouched."""
+    enable(folder)
+    cfg = watch.load()
+    cfg["folder"] = r"\\server\share\inbox"
+    watch._save(cfg)
+    opened = []
+    monkeypatch.setattr(watch, "_videos", lambda path: opened.append(path) or [])
+    watch.poll_once()
+    assert opened == [] and "another computer" in client.get("/api/batch/watch").json()["problem"]

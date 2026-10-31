@@ -14,7 +14,6 @@ from voxwell.paths import child_path, data_dir
 _ID = re.compile(r"^[0-9a-f]{32}$")
 _lock = threading.Lock()  # one writer thread and many API readers share these files
 PARTS = ("mix", "vocals", "instrumental")
-REPLACE_ATTEMPTS = 40  # 2 seconds in all; see _write
 
 
 @dataclass
@@ -78,16 +77,7 @@ def _write(track: Track) -> None:
     path = _meta(track.id)
     tmp = path.with_suffix(".json.tmp")
     tmp.write_text(json.dumps(asdict(track)), encoding="utf-8")
-    # On Windows an antivirus scanning the fresh file can hold it for a moment, which makes
-    # the rename fail with a sharing violation (PermissionError); it succeeds once released.
-    for attempt in range(REPLACE_ATTEMPTS):
-        try:
-            os.replace(tmp, path)
-            return
-        except PermissionError:
-            if attempt == REPLACE_ATTEMPTS - 1:
-                raise
-            time.sleep(0.05)
+    os.replace(tmp, path)
 
 
 def _read(path: Path) -> Track:
