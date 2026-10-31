@@ -14,7 +14,12 @@ from voxwell import voices
 
 
 class ToolError(ValueError):
-    """A tool could not run; the message goes back to the model."""
+    """A tool could not run; `user_message` (written here, never an exception's own text) goes back
+    to the model and is shown in the tool call."""
+
+    def __init__(self, user_message: str):
+        super().__init__(user_message)
+        self.user_message = user_message
 
 
 MAX_EXPRESSION = 200

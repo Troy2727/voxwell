@@ -114,8 +114,8 @@ def respond(agent: Agent, history: list[dict], message: str) -> dict:
             entry = {"tool": call["tool"], "arguments": call["arguments"]}
             try:
                 entry["result"] = tools.run(call["tool"], call["arguments"], agent.tools)
-            except tools.ToolError as exc:  # its message is written for the user and the model
-                entry["error"] = str(exc) or "The tool failed."
+            except tools.ToolError as exc:  # its user_message is written for the user and the model
+                entry["error"] = exc.user_message or "The tool failed."
             except Exception:
                 log.exception("Agent tool %s failed", call["tool"])
                 entry["error"] = "The tool failed."
