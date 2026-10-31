@@ -23,6 +23,8 @@ def child_path(folder: Path, name: str) -> Path:
     Callers validate their ids already; this is the containment check itself, in the form static
     analysis (CodeQL) recognises: normalise the path, then check it is still under the folder.
     """
+    if "/" in name or "\\" in name:  # either separator, on every OS: the same names everywhere
+        raise ValueError(f"Not a file name: {name!r}")
     base = os.path.normpath(folder)
     path = os.path.normpath(os.path.join(base, name))
     if not path.startswith(base + os.sep) or os.sep in path[len(base) + 1:]:
