@@ -224,7 +224,7 @@ def test_mcp_handshake_and_tool_list(mcp):
     assert init["result"]["protocolVersion"] == "2025-03-26" and "tools" in init["result"]["capabilities"]
     assert mcp_server.handle({"jsonrpc": "2.0", "method": "notifications/initialized"}) is None
     names = {t["name"] for t in mcp("tools/list")["result"]["tools"]}
-    assert names == {"list_voices", "voice_collections", "speak", "generate_sound", "make_music", "transcribe", "edit_transcript", "align_script", "isolate_voice", "clone_voice", "design_voice", "convert_voice", "dub_video", "manage_pronunciations", "apply_effects", "translate_speech", "chat_with_agent"}
+    assert names == {"list_voices", "voice_collections", "speak", "generate_sound", "make_music", "transcribe", "edit_transcript", "align_script", "isolate_voice", "clone_voice", "design_voice", "remix_voice", "convert_voice", "dub_video", "manage_pronunciations", "apply_effects", "translate_speech", "chat_with_agent"}
     assert names == set(mcp_server.HANDLERS)
     assert mcp("ping")["result"] == {}
     assert mcp("resources/list")["error"]["code"] == -32601
@@ -440,3 +440,15 @@ def test_mcp_make_music(mcp, monkeypatch, tmp_path):
     assert fields["lyrics"] == "[Chorus]\nLa la" and fields["bpm"] == 100 and fields["key_scale"] == "A minor" and fields["seed"] == 9
     assert fields["audio_duration"] == 20 and files == ["reference_audio"]
     assert tool(mcp, "make_music", prompt="pop")["isError"] is True  # lyrics or instrumental is required
+
+
+def test_mcp_remix_voice(mcp, monkeypatch):
+    from voxwell.features.voice_remix import engine as remix_engine
+
+    voices.save_voice("Anna", wav_bytes(), "upload")
+    seen = []
+    monkeypatch.setattr(remix_engine, "remix", lambda source, prompt, strength, script: seen.append((prompt, strength)) or wav_bytes())
+    text = tool(mcp, "remix_voice", voice="anna", prompt="an older man, deep voice", name="Anna older", strength="high")["content"][0]["text"]
+    assert "'Anna older'" in text and seen == [("an older man, deep voice", "high")]
+    assert {(v.name, v.source) for v in voices.list_voices()} == {("Anna", "upload"), ("Anna older", "remix")}
+    assert tool(mcp, "remix_voice", voice="anna", prompt="x", name="y", strength="huge")["isError"] is True

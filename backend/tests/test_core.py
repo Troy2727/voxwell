@@ -8,7 +8,7 @@ from voxwell.paths import download_name
 client = TestClient(app, base_url="http://127.0.0.1")
 
 FEATURE_IDS = [
-    "voice_cloning", "voice_design", "voices", "voice_collections", "gallery", "sound", "music", "stories", "audiobook", "dubbing", "batch", "dictation",
+    "voice_cloning", "voice_design", "voice_remix", "voices", "voice_collections", "gallery", "sound", "music", "stories", "audiobook", "dubbing", "batch", "dictation",
     "transcription", "translation", "tools", "agents", "integrations", "audio_effects", "pronunciation", "projects",
 ]
 

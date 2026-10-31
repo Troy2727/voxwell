@@ -1,6 +1,6 @@
 ---
 name: voxwell
-description: Voice work on this computer with the local Voxwell app, through its `voxwell` CLI. Use for text-to-speech (speak, narrate, voiceover, read aloud), transcribing audio or video (subtitles, SRT), isolating a voice from music or noise (remove vocals, karaoke, clean up a recording), cloning or designing a voice, making music or songs, converting a recording to another voice, dubbing a video into another language, or translating text or speech into another language and speaking it.
+description: Voice work on this computer with the local Voxwell app, through its `voxwell` CLI. Use for text-to-speech (speak, narrate, voiceover, read aloud), transcribing audio or video (subtitles, SRT), isolating a voice from music or noise (remove vocals, karaoke, clean up a recording), cloning, designing or remixing a voice, making music or songs, converting a recording to another voice, dubbing a video into another language, or translating text or speech into another language and speaking it.
 ---
 
 # Voxwell
@@ -17,6 +17,7 @@ Voxwell runs every model locally; the `voxwell` CLI drives the running Voxwell s
 - Voices are referenced by saved name (any case) or id; `voxwell voices` lists them. `speak` without `--voice` uses the built-in voice; `dub` without `--voice` clones the original speaker.
 - `sound` makes sound effects from a text description (1 to 30 seconds; reuse the printed `seed` to repeat a result). It needs a free Hugging Face token with the Stable Audio Open terms accepted, set on the Voxwell Sound page or as `HF_TOKEN`; if the command says the model is gated, tell the user to do that rather than retrying. Expect minutes per clip on CPU.
 - `music` makes a song from a style description plus lyrics (`--lyrics` or `--lyrics-file`, sections marked `[Verse]`, `[Chorus]`), or an instrumental with `--instrumental`; lyrics are required otherwise. The music engine installs once (about 12 GB) from the Music page or with `voxwell music --install`; if the command says it is not installed, ask the user before installing. A 30-second song takes a couple of minutes on CPU, longer for long songs.
+- `remix VOICE "description" --name NEW` makes a new saved voice from an existing one; describe the voice you want (gender, age, pitch, pace, accent, tone), not a change. `--strength low|medium|high|max` sets how far it moves from the original (max ignores the original). The original voice is never modified.
 - Collections are folders of saved voices (`voxwell collection list|show|create|rename|delete|add|remove`); they only organize voices, so deleting a collection never deletes a voice. Collection names are unique in any case.
 - Languages are ISO 639-1 codes. Speech, cloning and dubbing cover about 20 common languages (Japanese is not one of them) and reject others with an error. Transcription detects the language when `--language` is left out.
 - `chat` sends one message to a voice agent saved in the app (its instructions, tools and voice are set on the Voice agents page) and prints the reply; it does not remember earlier calls. Talking to an agent by voice is only in the app.

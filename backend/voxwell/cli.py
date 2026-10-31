@@ -396,6 +396,22 @@ def cmd_design(client: Client, args) -> tuple[str, dict]:
     return text, result
 
 
+def cmd_remix(client: Client, args) -> tuple[str, dict]:
+    body = {"voice_id": _voice_id(client, args.voice), "prompt": args.prompt, "strength": args.strength, "script": args.script}
+    preview = json.loads(client.post_json("/api/voice_remix/preview", body))
+    result = {}
+    if args.preview:
+        out = _output_path(args.preview, f"remix-preview-{_stamp()}.wav", ".wav")
+        out.write_bytes(client.request("GET", preview["url"]))
+        result["preview_path"] = str(out)
+    voice = json.loads(client.post_json("/api/voice_remix/save", {"preview_id": preview["preview_id"], "name": args.name}))
+    result.update(voice)
+    text = f"Saved the remixed voice '{voice['name']}' (id {voice['id']})."
+    if args.preview:
+        text += f"\nSaved a preview to {result['preview_path']}"
+    return text, result
+
+
 def cmd_convert(client: Client, args) -> tuple[str, dict]:
     source = _existing_file(args.file)
     result = client.post_form("/api/tools/convert", {"voice_id": _voice_id(client, args.voice)}, source)
@@ -584,6 +600,15 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--sample", help="text the preview says")
     p.add_argument("--preview", metavar="FILE", help="also save the preview WAV here")
     p.set_defaults(run=cmd_design)
+    p = sub.add_parser("remix", parents=[common], help="make a new voice from a saved one and a description of the voice you want, and save it")
+    p.add_argument("voice", help="saved voice name or id to start from (it is not changed)")
+    p.add_argument("prompt", help='the voice you want, e.g. "an older man with a deep, raspy voice speaks slowly"')
+    p.add_argument("--name", required=True, help="name for the new voice")
+    p.add_argument("-s", "--strength", choices=["low", "medium", "high", "max"], default="medium",
+                   help="how far to move from the original (default medium; max replaces it entirely)")
+    p.add_argument("--script", help="text the preview says (English)")
+    p.add_argument("--preview", metavar="FILE", help="also save the preview WAV here")
+    p.set_defaults(run=cmd_remix)
 
     p = sub.add_parser("effects", parents=[common], help="add reverb, distance, background noise or stereo pan to a recording")
     p.add_argument("file", help="WAV, MP3, FLAC or OGG")

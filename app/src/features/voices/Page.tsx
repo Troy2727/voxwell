@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { FolderPlus, Library, Pencil, Save, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { apiUrl, listVoiceCollections, listVoices, sendJson, type Voice, type VoiceCollection } from '../../api';
+import { apiUrl, listVoiceCollections, listVoices, sendJson, voiceSourceLabel, type Voice, type VoiceCollection } from '../../api';
 import { AudioResult } from '@/components/audio-result';
 import { ConfirmButton } from '@/components/confirm-button';
 import { EmptyState, ErrorAlert, message, Page as PageLayout } from '@/components/page';
@@ -111,7 +111,7 @@ function VoiceCard({ voice, collections, onChanged, onError }: {
           <div className="flex flex-wrap items-center gap-2">
             {/* A row of its own on a phone, so the actions wrap under it instead of hiding it. */}
             <h2 className="min-w-0 basis-full truncate font-semibold sm:flex-1 sm:basis-auto">{voice.name}</h2>
-            <Badge variant="secondary">{voice.source === 'design' ? 'Designed' : 'Uploaded'}</Badge>
+            <Badge variant="secondary">{voiceSourceLabel(voice.source)}</Badge>
             {collections.length > 0 && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

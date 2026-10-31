@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { apiUrl, listVoiceCollections, type Voice, type VoiceCollection } from '@/api';
+import { apiUrl, listVoiceCollections, voiceSourceLabel, type Voice, type VoiceCollection } from '@/api';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { VoicePicker, type VoiceOption } from '@/components/ui/voice-picker';
 
@@ -26,7 +26,7 @@ export function VoiceSelect({ voices, value, onChange, disabled, defaultLabel = 
     ...(visible ?? []).map((v) => ({
       id: v.id,
       name: v.name,
-      description: v.source === 'design' ? 'Designed' : 'Uploaded',
+      description: voiceSourceLabel(v.source),
       previewUrl: apiUrl(`/api/voices/${v.id}/audio`),
     })),
   ];

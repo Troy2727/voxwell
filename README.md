@@ -119,6 +119,7 @@ Voxwell is **MIT licensed**, and every model it runs allows commercial use ([one
 | --- | --- |
 | **Voice cloning** | Clone a voice from a few seconds of clean speech. Saved voices work everywhere in the app. |
 | **Voice design** | Describe a voice ("warm, low, slight British accent") and Voxwell creates it. |
+| **Voice remix** | Turn a saved voice into a new one by describing it, from a light touch (Low) to a full change (Max). The original stays as it is. |
 | **Gallery** | Start from a ready-made voice. |
 | **Collections** | Keep saved voices organized in folders. |
 | **Pronunciation** | Teach every voice how to say names, brands and jargon. Each language has one list, and it applies to all speech. |
@@ -293,8 +294,8 @@ Every model runs locally. Its license is recorded in its feature's `backend/voxw
 
 | Model | Used for | License |
 | --- | --- | --- |
-| [Chatterbox Multilingual](https://huggingface.co/ResembleAI/chatterbox) | Voice cloning, speech, dubbing, voice conversion | MIT |
-| [Parler-TTS Mini v1](https://huggingface.co/parler-tts/parler-tts-mini-v1) | Voice design | Apache-2.0 |
+| [Chatterbox Multilingual](https://huggingface.co/ResembleAI/chatterbox) | Voice cloning, speech, dubbing, voice conversion, voice remix | MIT |
+| [Parler-TTS Mini v1](https://huggingface.co/parler-tts/parler-tts-mini-v1) | Voice design, voice remix | Apache-2.0 |
 | [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (Whisper small) | Dictation, transcription | MIT |
 | [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) with pyannote segmentation and 3D-Speaker | Speaker labels | Apache-2.0, MIT |
 | [M2M100 418M](https://huggingface.co/facebook/m2m100_418M) | Translation | MIT |

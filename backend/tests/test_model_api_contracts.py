@@ -204,3 +204,22 @@ def test_stable_audio_calls_match_installed_api(monkeypatch):
 
     assert engine.generate("rain", 1.0, 10, 7, "hf_token")[:4] == b"RIFF"
     assert loader.call_args.kwargs["token"] == "hf_token"
+
+
+def test_voice_remix_s3gen_calls_match_installed_api():
+    """Voice remix drives Chatterbox's S3Gen in steps (embed_ref, tokenizer, flow_inference, then
+    hift_inference with S3Gen.inference's trim_fade), so those calls must not drift."""
+    s3gen_module = pytest.importorskip("chatterbox.models.s3gen.s3gen")
+    vc_module = pytest.importorskip("chatterbox.vc")
+    import inspect
+
+    embed = inspect.signature(s3gen_module.S3Token2Mel.embed_ref).parameters
+    assert list(embed)[:3] == ["self", "ref_wav", "ref_sr"] and "device" in embed
+    flow = inspect.signature(s3gen_module.S3Token2Wav.flow_inference).parameters
+    assert list(flow)[:2] == ["self", "speech_tokens"] and {"ref_dict", "finalize"} <= set(flow)
+    assert list(inspect.signature(s3gen_module.S3Token2Wav.hift_inference).parameters) == ["self", "speech_feat", "cache_source"]
+    # Voice remix repeats what S3Gen.inference does between those two steps.
+    assert "self.trim_fade" in inspect.getsource(s3gen_module.S3Token2Wav.inference)
+    assert "self.tokenizer" in inspect.getsource(s3gen_module.S3Token2Mel.__init__)
+    assert vc_module.ChatterboxVC.DEC_COND_LEN > 0
+    assert "self.watermarker" in inspect.getsource(vc_module.ChatterboxVC.__init__)
