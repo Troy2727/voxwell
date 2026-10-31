@@ -18,8 +18,8 @@
     </linearGradient>
   </defs>
   <style>
-    .a { stop-color: #EA580C; } .b { stop-color: #D97706; } .c { stop-color: #CA8A04; }
-    @media (prefers-color-scheme: dark) { .a { stop-color: #FF7A00; } .b { stop-color: #FFA800; } .c { stop-color: #FFC800; } }
+    .a { stop-color: #7E22CE; } .b { stop-color: #9333EA; } .c { stop-color: #A855F7; }
+    @media (prefers-color-scheme: dark) { .a { stop-color: #A855F7; } .b { stop-color: #C084FC; } .c { stop-color: #D8B4FE; } }
   </style>
   <path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z" />
   <path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12" />
