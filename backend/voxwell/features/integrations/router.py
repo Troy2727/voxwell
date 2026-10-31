@@ -1,6 +1,7 @@
 """Integrations: what other apps need to connect (API address, CLI and MCP launch commands), the
 agent skill installer, and the opt-in phone-call settings (see phone.py)."""
 
+import logging
 import os
 import re
 import sys
@@ -17,6 +18,8 @@ from voxwell.features.audiobook.chunking import chapter_chunks
 from voxwell.features.integrations import phone
 from voxwell.features.integrations.openai_api import resolve_voice
 from voxwell.features.voice_cloning.engine import LANGUAGES
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["integrations"])
 
@@ -146,7 +149,8 @@ def render_greeting():
     except KeyError:
         raise HTTPException(422, "The greeting's voice was deleted. Pick another voice.")
     except Exception as exc:
-        raise HTTPException(500, f"Could not record the greeting: {exc}")
+        log.exception("Could not record the greeting")
+        raise HTTPException(500, "Could not record the greeting; see the Voxwell log.") from exc
     phone.greeting_path().write_bytes(wav)
     cfg["greeting_token"] = phone.new_greeting_token()
     phone.save(cfg)

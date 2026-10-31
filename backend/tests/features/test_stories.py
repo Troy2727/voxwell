@@ -148,7 +148,7 @@ def test_engine_failure_is_reported(monkeypatch):
     monkeypatch.setattr(jobs, "start", jobs._work)
     jid = create().json()["id"]
     job = client.get(f"/api/stories/jobs/{jid}").json()
-    assert job["state"] == "error" and job["error"] == "Speaking line 1 of 4 failed: out of memory"
+    assert job["state"] == "error" and job["error"] == "Speaking line 1 of 4 failed; see the Voxwell log."
 
 
 def test_audio_needs_a_finished_story(fake, monkeypatch):

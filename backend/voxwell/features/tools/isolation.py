@@ -5,6 +5,7 @@ first use and checked against a pinned SHA-256 before loading.
 """
 
 import hashlib
+import logging
 import shutil
 import threading
 import urllib.request
@@ -12,6 +13,8 @@ from pathlib import Path
 
 from voxwell.features.tools import htdemucs
 from voxwell.paths import data_dir, replace_file
+
+log = logging.getLogger(__name__)
 
 WEIGHTS_URL = "https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/955717e8-8726e21a.th"
 WEIGHTS_SHA256 = "8726e21a993978c7ba086d3872e7608d7d5bfca646ca4aca459ffda844faa8b4"
@@ -54,7 +57,8 @@ def weights_path() -> Path:
             shutil.copyfileobj(response, out)
     except OSError as exc:
         part.unlink(missing_ok=True)
-        raise IsolationError(f"Could not download the voice isolation model: {exc}")
+        log.exception("Downloading the voice isolation model failed")
+        raise IsolationError("Could not download the voice isolation model. Check the internet connection and try again.") from exc
     if _sha256(part) != WEIGHTS_SHA256:
         part.unlink(missing_ok=True)
         raise IsolationError("The downloaded voice isolation model is corrupted. Try again.")

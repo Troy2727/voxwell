@@ -1,6 +1,7 @@
 """Apply reverb, distance, background noise and stereo pan to an uploaded recording."""
 
 import asyncio
+import logging
 import re
 import time
 import uuid
@@ -11,6 +12,8 @@ from fastapi.responses import FileResponse
 
 from voxwell.features.audio_effects import dsp
 from voxwell.paths import child_path, data_dir
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["audio_effects"])
 
@@ -58,7 +61,8 @@ async def apply(
         wav = await asyncio.to_thread(lambda: dsp.encode_wav(dsp.process(audio, rate, fx), rate))
         (folder / f"{output_id}.wav").write_bytes(wav)
     except Exception as exc:
-        raise HTTPException(500, f"Applying the effects failed: {exc}")
+        log.exception("Applying the effects failed")
+        raise HTTPException(500, "Applying the effects failed; see the Voxwell log.") from exc
     return {"id": output_id, "url": f"/api/audio_effects/audio/{output_id}"}
 
 

@@ -1,4 +1,5 @@
 import importlib.util
+import logging
 import os
 import re
 import shutil
@@ -14,6 +15,8 @@ from voxwell.features.dictation import engine
 from voxwell.features.dubbing.fitting import build_srt, srt_time
 from voxwell.features.transcription import alignment, diarization, editing, jobs
 from voxwell.paths import attachment, data_dir, download_name
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["transcription"])
 
@@ -155,7 +158,8 @@ def align_script(
         except engine.AudioError as exc:
             raise HTTPException(422, str(exc))
         except Exception as exc:
-            raise HTTPException(500, f"Alignment failed: {exc}")
+            log.exception("Alignment failed")
+            raise HTTPException(500, "Alignment failed; see the Voxwell log.") from exc
     finally:
         path.unlink(missing_ok=True)
     result = alignment.align(script, [(w.start, w.end, w.text) for w in timings.words])
@@ -216,5 +220,6 @@ def edit(req: EditRequest):
     try:
         edited = editing.edit_text(text, instruction)
     except Exception as exc:  # the model could not load or run: say so without a traceback
-        raise HTTPException(500, f"The AI editor failed: {exc}")
+        log.exception("The AI editor failed")
+        raise HTTPException(500, "The AI editor failed; see the Voxwell log.") from exc
     return {"text": edited.text, "chunks": edited.chunks, "kept": edited.kept}

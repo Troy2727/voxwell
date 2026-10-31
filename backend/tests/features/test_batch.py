@@ -165,7 +165,7 @@ def test_failed_dub_is_reported(mocked, folder, monkeypatch):
     for _ in range(3):
         watch.poll_once()
     entry = files()["clip.mp4"]
-    assert entry["status"] == "failed" and "no GPU" in entry["error"]
+    assert entry["status"] == "failed" and "no GPU" not in entry["error"] and entry["error"].endswith("failed; see the Voxwell log.")
 
 
 def test_missing_folder_is_reported(mocked, folder):

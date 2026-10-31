@@ -5,6 +5,7 @@ available after a restart. The uploaded file is deleted when the job ends.
 """
 
 import json
+import logging
 import shutil
 import threading
 import time
@@ -15,6 +16,8 @@ from pathlib import Path
 from voxwell.features.dictation import engine
 from voxwell.features.transcription import diarization
 from voxwell.paths import child_path, data_dir
+
+log = logging.getLogger(__name__)
 
 STATE_FILE = "job.json"
 RESULT_FILE = "transcript.json"
@@ -118,8 +121,12 @@ def _label_speakers(job: Job, data: dict) -> None:
             job.dir / job.source, job.num_speakers, on_progress=lambda f: setattr(job, "percent", 80 + int(f * 19))
         )
         labels = diarization.assign_speakers([(s["start"], s["end"]) for s in data["segments"]], turns)
-    except Exception as exc:  # download, decode or model failures all leave the plain transcript
+    except diarization.DiarizationError as exc:  # written for the user; the plain transcript stays
         data["speakers_error"] = f"Speaker labels failed: {exc}"
+        return
+    except Exception:  # an unexpected failure also leaves the plain transcript
+        log.exception("Speaker labels failed")
+        data["speakers_error"] = "Speaker labels failed; see the Voxwell log."
         return
     if not any(labels):
         data["speakers_error"] = "No speakers were found in the file."
@@ -147,8 +154,9 @@ def _work(job: Job) -> None:
             job.state, job.percent, job.detected = "done", 100, t.language
         except engine.AudioError as exc:
             job.state, job.error = "error", str(exc)
-        except Exception as exc:  # surface any engine failure as a job error, without a traceback
-            job.state, job.error = "error", f"Transcription failed: {exc}"
+        except Exception:  # an unexpected failure: the details go to the log, not to the user
+            log.exception("Transcription job failed")
+            job.state, job.error = "error", "Transcription failed; see the Voxwell log."
         (job.dir / job.source).unlink(missing_ok=True)
         _save(job)
 

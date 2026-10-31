@@ -164,4 +164,4 @@ def test_model_failure_is_a_clear_error(monkeypatch):
 
     monkeypatch.setattr(direction, "complete", boom)
     r = post(text="a", preset="filler")
-    assert r.status_code == 500 and r.json()["detail"] == "The AI editor failed: out of memory"
+    assert r.status_code == 500 and r.json()["detail"] == "The AI editor failed; see the Voxwell log."

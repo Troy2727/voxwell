@@ -108,7 +108,7 @@ def test_engine_error(monkeypatch):
 
     monkeypatch.setattr(engine, "synthesize", boom)
     r = client.post("/api/voice_cloning/synthesize", json={"text": "Hi", "language": "en"})
-    assert r.status_code == 500 and "no model" in r.json()["detail"]
+    assert r.status_code == 500 and "no model" not in r.json()["detail"] and r.json()["detail"].endswith("see the Voxwell log.")
 
 
 @pytest.mark.parametrize("bad", ["..%2F..%2Fsecret", "..", "abc", "%2e%2e%2f%2e%2e%2fx"])

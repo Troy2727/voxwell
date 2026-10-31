@@ -110,7 +110,7 @@ def test_live_tts_failure_still_delivers_the_text(models, monkeypatch):
     monkeypatch.setattr(tts, "synthesize", broken)
     [turn] = [m for m in live_session({"target": "es"}, [600]) if m["type"] == "turn"]
     assert turn["translation"] == "one-es" and "audio" not in turn
-    assert turn["warning"] == "Could not speak the translation: out of memory"
+    assert turn["warning"] == "Could not speak the translation; see the Voxwell log."
 
 
 @pytest.mark.parametrize(
