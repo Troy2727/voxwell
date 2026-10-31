@@ -40,8 +40,8 @@
 
 <br/>
 
-<a href="https://github.com/Troy2727/voxwell/blob/main/docs/readme/screenshots/animated/tour.gif" title="Open this screenshot full size">
-  <img src="docs/readme/screenshots/animated/tour.gif" alt="A tour of the Voxwell dashboard: the Gallery of ready-made voices, then the Voice cloning, Dubbing, Voice agents, Live translation, Transcribe and Integrations pages." width="100%" />
+<a href="https://github.com/Troy2727/voxwell/blob/main/docs/readme/screenshots/animated/tour-v2.gif" title="Open this screenshot full size">
+  <img src="docs/readme/screenshots/animated/tour-v2.gif" alt="A tour of the Voxwell dashboard: the Gallery of ready-made voices, then the Voice cloning, Voice remix, Music, Dubbing, Voice agents, Live translation, Transcribe and Integrations pages." width="100%" />
 </a>
 <br />
 <sub>Click the screenshot to see it full size.</sub>
