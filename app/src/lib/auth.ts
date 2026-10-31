@@ -17,11 +17,24 @@ export async function googleEnabled(): Promise<boolean> {
   return res.ok && (await res.json()).external?.google === true;
 }
 
+/**
+ * Why a sign-in redirect came back refused, or '' when it wasn't. Sign-up is off, so a Google account
+ * without a Voxwell account is refused; that case gets a plain explanation instead of Supabase's wording.
+ */
+export function redirectFailure(params: URLSearchParams): string {
+  const description = params.get('error_description');
+  if (!description) return '';
+  if (params.get('error_code') === 'signup_disabled' || /signups not allowed/i.test(description)) {
+    return "This Google account doesn't have access. Sign in with the email and password you were given.";
+  }
+  return description;
+}
+
 /** Finish a sign-in from a voxwell://auth/callback link (the browser build does this itself from its URL). */
 async function finishFromLink(link: string) {
   const { searchParams, hash } = new URL(link);
   const params = new URLSearchParams([...searchParams, ...new URLSearchParams(hash.slice(1))]);
-  const failure = params.get('error_description');
+  const failure = redirectFailure(params);
   if (failure) throw new Error(failure);
   const code = params.get('code');
   if (!code) return;
