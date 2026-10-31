@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { ArrowRightLeft } from 'lucide-react';
-import { api, type Voice } from '../../api';
+import { api, apiUrl, type Voice } from '../../api';
+import { AudioResult } from '@/components/audio-result';
 import { FileDrop } from '@/components/file-drop';
 import { ErrorAlert, Field, message, Muted } from '@/components/page';
 import { VoiceSelect } from '@/components/voice-select';
 import { Button } from '@/components/ui/button';
-import { Result } from './Result';
 
 export function Convert({ voices }: { voices: Voice[] }) {
   const [file, setFile] = useState<File | null>(null);
@@ -46,7 +46,7 @@ export function Convert({ voices }: { voices: Voice[] }) {
         {busy && <Muted>The first time downloads the conversion model.</Muted>}
       </div>
       <ErrorAlert message={error} />
-      {url && <Result url={url} name="converted.wav" />}
+      {url && <AudioResult src={apiUrl(url)} download="converted.wav" />}
     </>
   );
 }

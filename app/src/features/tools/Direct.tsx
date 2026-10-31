@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Sparkles, Volume2 } from 'lucide-react';
-import { sendJson, type Voice } from '../../api';
+import { apiUrl, sendJson, type Voice } from '../../api';
+import { AudioResult } from '@/components/audio-result';
 import { ChoiceSelect } from '@/components/choice-select';
 import { ErrorAlert, Field, message, Muted } from '@/components/page';
 import { VoiceSelect } from '@/components/voice-select';
@@ -10,7 +11,6 @@ import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
 import { LANGUAGES } from '../voice_cloning/languages';
-import { Result } from './Result';
 
 const PACES = ['slow', 'normal', 'fast'] as const;
 const PACE_OPTIONS = PACES.map((p) => [p, p[0].toUpperCase() + p.slice(1)] as const);
@@ -97,7 +97,7 @@ export function Direct({ voices }: { voices: Voice[] }) {
         </Button>
       </div>
       <ErrorAlert message={error} />
-      {url && <Result url={url} name="directed.wav" />}
+      {url && <AudioResult src={apiUrl(url)} download="directed.wav" />}
     </>
   );
 }
