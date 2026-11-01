@@ -63,6 +63,7 @@ function routes(): [string | RegExp, Reply][] {
   let books: object[] = [];
   let include = [true, true];
   let rendering: (() => object) | null = null;
+  let transcribed: (() => object) | null = null;
   let watch = { enabled: false, folder: '', target_language: 'es', voice: 'original', problem: null, output_folder: 'dubbed', skipped: 0, files: [] };
   const story = job([
     { id: 'st-1', title: 'The knock', state: 'queued', step: 'Waiting', percent: 0, error: null, audio_url: '' },
@@ -142,6 +143,19 @@ function routes(): [string | RegExp, Reply][] {
     ['GET /api/dubbing/jobs/d-1', dub()],
     ['POST /api/batch/jobs', { jobs: [{ name: 'video.mp4', id: 'd-2' }], errors: [{ name: 'bad.exe', error: 'Not a video or audio file.' }] }],
     ['GET /api/dubbing/jobs/d-2', dub()],
+    ['GET /api/transcription/jobs', () => (transcribed ? [transcribed()] : [])],
+    ['POST /api/transcription/jobs', () => {
+      transcribed = job([{ ...TRANSCRIPT, state: 'running', percent: 50 }, TRANSCRIPT]);
+      return { id: 'tr-1' };
+    }],
+    ['GET /api/transcription/jobs/tr-1', { ...TRANSCRIPT, transcript: { text: SPEECH, language: 'en', segments: [{ start: 0, end: 5.9, text: SPEECH }] } }],
+    ['GET /api/transcription/edit/presets', [{ id: 'tidy', label: 'Fix punctuation and capitals', instruction: 'Fix punctuation.' }]],
+    ['POST /api/transcription/edit', { text: SPEECH.replace('seven o\'clock', '7:00'), chunks: 1, kept: 0 }],
+    ['POST /api/transcription/align', {
+      cues: [{ start: 0, end: 2.9, text: SPEECH.split('. ')[0] + '.' }, { start: 3, end: 5.9, text: SPEECH.split('. ')[1] }],
+      srt: '', vtt: '', matched: 22, total: 22, fallback: false,
+    }],
+
     ['GET /api/batch/watch', () => watch],
     ['PUT /api/batch/watch', (_url: URL, request: Request) => {
       const { enabled, folder, target_language, voice } = request.postDataJSON();
@@ -159,13 +173,15 @@ function dub() {
 }
 
 const SRT = '1\n00:00:00,000 --> 00:00:02,500\nEl rápido zorro marrón salta sobre el perro perezoso.\n';
+const SPEECH = readFileSync(path.join(__dirname, 'fixtures', 'speech.txt'), 'utf8').trim();
+const TRANSCRIPT = { id: 'tr-1', title: 'speech.wav', created: NOW, language: '', detected: 'en', state: 'done', percent: 100, error: null };
 const VIDEO = readFileSync(path.join(__dirname, 'fixtures', 'video.mp4'));
 
 /** Files the pages load directly (players, downloads) rather than as JSON. */
 function file(pathname: string): { contentType: string; body: Buffer | string } | null {
   if (pathname === TONE_URL || pathname.endsWith('.wav') || pathname.endsWith('/audio')) return { contentType: 'audio/wav', body: TONE };
   if (pathname.endsWith('/video')) return { contentType: 'video/mp4', body: VIDEO };
-  if (pathname.endsWith('/subtitles')) return { contentType: 'application/x-subrip', body: SRT };
+  if (pathname.endsWith('/subtitles') || pathname.endsWith('/export/srt')) return { contentType: 'application/x-subrip', body: SRT };
   return null;
 }
 
