@@ -481,3 +481,34 @@ def test_mcp_remix_voice(mcp, monkeypatch):
     assert "'Anna older'" in text and seen == [("an older man, deep voice", "high")]
     assert {(v.name, v.source) for v in voices.list_voices()} == {("Anna", "upload"), ("Anna older", "remix")}
     assert tool(mcp, "remix_voice", voice="anna", prompt="x", name="y", strength="huge")["isError"] is True
+
+
+def test_an_abandoned_transcription_is_skipped_when_its_turn_comes(monkeypatch, tmp_path):
+    import threading
+
+    from voxwell.features.integrations import openai_api
+
+    monkeypatch.setattr(stt, "transcribe", lambda *a, **k: pytest.fail("must not transcribe for a client that left"))
+    abandoned = threading.Event()
+    abandoned.set()
+    with pytest.raises(openai_api._Abandoned):
+        openai_api._transcribe(tmp_path / "a.audio", None, abandoned)
+
+
+def test_a_client_disconnect_is_noticed_while_waiting():
+    import threading
+
+    from voxwell.features.integrations import openai_api
+
+    class LeavingClient:
+        def __init__(self):
+            self.polls = 0
+
+        async def is_disconnected(self):
+            self.polls += 1
+            return self.polls >= 2
+
+    abandoned = threading.Event()
+    request = LeavingClient()
+    asyncio.run(asyncio.wait_for(openai_api._watch_disconnect(request, abandoned), timeout=5))
+    assert abandoned.is_set() and request.polls == 2
