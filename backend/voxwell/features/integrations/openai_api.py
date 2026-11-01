@@ -140,29 +140,32 @@ def _vtt(segments) -> str:
     return "WEBVTT\n\n" + "\n".join(cues)
 
 
-DISCONNECT_POLL_SECONDS = 1.0
-
-
 class _Abandoned(Exception):
-    """The client went away before its transcription started."""
+    """The client went away, so nobody will read the transcription."""
 
 
 def _transcribe(path: Path, language: str | None, abandoned: threading.Event):
-    """One transcription at a time on the shared Whisper model, like the Transcribe feature. A
-    request whose client has left while it waited is skipped (SDKs time out and retry, so the
-    retry would otherwise queue a second full transcription behind the first)."""
-    with transcription_jobs._one_at_a_time:
+    """One transcription at a time on the shared Whisper model, like the Transcribe feature.
+
+    Work for a client that has left stops: before it starts, and between segments while it runs.
+    SDKs time out (600 s) and retry, so each retry would otherwise queue another full
+    transcription behind one that nobody reads."""
+
+    def check(_fraction: float = 0.0) -> None:
         if abandoned.is_set():
             raise _Abandoned()
-        return stt.transcribe(path, language)
+
+    with transcription_jobs._one_at_a_time:
+        check()
+        return stt.transcribe(path, language, on_progress=check)
 
 
 async def _watch_disconnect(request: Request, abandoned: threading.Event) -> None:
-    while not abandoned.is_set():
-        if await request.is_disconnected():
-            abandoned.set()
-            return
-        await asyncio.sleep(DISCONNECT_POLL_SECONDS)
+    """Set `abandoned` when the client disconnects. The body has been read, so the next message
+    from the server is the disconnect: waiting for it costs nothing and misses nothing."""
+    while (await request.receive())["type"] != "http.disconnect":
+        pass
+    abandoned.set()
 
 
 @router.post("/audio/transcriptions")
@@ -196,6 +199,7 @@ async def transcriptions(
                 )
             finally:
                 watcher.cancel()
+                abandoned.set()  # if this handler was cancelled (server shutdown), the queued job stops too
         except _Abandoned:
             return Response(status_code=499)  # nginx's "client closed request": nobody is there to read it
         except stt.AudioError:  # transcribe() raises it only with DECODE_ERROR; never echo exception text
