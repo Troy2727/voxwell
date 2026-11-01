@@ -9,10 +9,13 @@ names ("alloy", ...) use the default voice. *`language` is a Voxwell extension (
 No API key is needed: the server only listens on 127.0.0.1.
 """
 
+import asyncio
+import contextlib
 import io
 import logging
 import os
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
@@ -26,12 +29,15 @@ from voxwell.features.dictation import engine as stt
 from voxwell.features.dubbing.ffmpeg import DubbingError, run_ffmpeg
 from voxwell.features.dubbing.fitting import build_srt, srt_time
 from voxwell.features.tools import engine as tools
+from voxwell.features.transcription import jobs as transcription_jobs
 from voxwell.features.voice_cloning.engine import LANGUAGES
 from voxwell.paths import data_dir
 
 router = APIRouter(tags=["openai-compatible"])
 
 MAX_INPUT = 4096  # OpenAI's limit for /audio/speech
+MAX_TRANSCRIPTION_BYTES = 25 * 1024 * 1024  # OpenAI's limit for /audio/transcriptions
+_TRANSCRIBER = ThreadPoolExecutor(max_workers=1, thread_name_prefix="voxwell-openai-transcribe")
 OPENAI_VOICES = {"alloy", "ash", "ballad", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer", "verse"}
 MEDIA_TYPES = {"wav": "audio/wav", "mp3": "audio/mpeg", "flac": "audio/flac", "opus": "audio/ogg", "aac": "audio/aac", "pcm": "audio/pcm"}
 EXTENSIONS = {"mp3": "mp3", "flac": "flac", "opus": "ogg", "aac": "m4a"}  # for ffmpeg, which picks the container by it
@@ -133,6 +139,12 @@ def _vtt(segments) -> str:
     return "WEBVTT\n\n" + "\n".join(cues)
 
 
+def _transcribe(path: Path, language: str | None):
+    """One transcription at a time on the shared Whisper model, like the Transcribe feature."""
+    with transcription_jobs._one_at_a_time:
+        return stt.transcribe(path, language)
+
+
 @router.post("/audio/transcriptions")
 async def transcriptions(
     file: UploadFile = File(...),
@@ -142,7 +154,9 @@ async def transcriptions(
 ):
     if response_format not in ("json", "text", "srt", "vtt", "verbose_json"):
         return _error(400, "response_format must be json, text, srt, vtt or verbose_json.", "response_format")
-    data = await file.read()
+    data = await file.read(MAX_TRANSCRIPTION_BYTES + 1)
+    if len(data) > MAX_TRANSCRIPTION_BYTES:
+        return _error(413, f"The file is too large ({MAX_TRANSCRIPTION_BYTES // (1024 * 1024)} MB max, as in OpenAI's API).", "file")
     if not data:
         return _error(400, "The file is empty.", "file")
     fd, name = tempfile.mkstemp(suffix=".audio", dir=data_dir("integrations"))
@@ -151,14 +165,21 @@ async def transcriptions(
         with os.fdopen(fd, "wb") as f:
             f.write(data)
         try:
-            t = stt.transcribe(path, (language or "").strip().lower() or None)
+            # On its own one-worker queue: the server keeps answering meanwhile, and requests
+            # waiting for the Whisper lock never tie up the shared thread pool.
+            t = await asyncio.get_running_loop().run_in_executor(
+                _TRANSCRIBER, _transcribe, path, (language or "").strip().lower() or None
+            )
         except stt.AudioError:  # transcribe() raises it only with DECODE_ERROR; never echo exception text
             return _error(400, stt.DECODE_ERROR, "file")
         except Exception:
             log.exception("Transcription failed for an OpenAI-compatible request")
             return _error(500, "Transcription failed; see the Voxwell log.")
     finally:
-        path.unlink(missing_ok=True)
+        # A cancelled request (server shutdown) can leave the worker still reading the file;
+        # Windows then refuses the delete, which must not replace the real outcome.
+        with contextlib.suppress(OSError):
+            path.unlink(missing_ok=True)
     segments = [s for s in t.segments if s.text]
     if response_format == "text":
         return PlainTextResponse(t.text)

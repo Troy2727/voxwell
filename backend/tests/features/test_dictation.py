@@ -251,3 +251,24 @@ def test_live_rejects_non_json_control():
         ws.receive_json()
         ws.send_text("not json")
         assert ws.receive_json()["type"] == "error"
+
+
+def test_transcribe_runs_off_the_event_loop_and_caps_the_upload(monkeypatch):
+    import asyncio
+
+    from voxwell.features.dictation import router as dictation_router
+
+    on_loop = []
+
+    def fake(path, language=None):
+        try:
+            asyncio.get_running_loop()
+            on_loop.append(True)
+        except RuntimeError:
+            on_loop.append(False)
+        return engine.Transcript("hi", "en", [engine.Segment(0.0, 1.0, "hi")])
+
+    monkeypatch.setattr(engine, "transcribe", fake)
+    assert _post().status_code == 200 and on_loop == [False]  # a worker thread: the server keeps answering
+    monkeypatch.setattr(dictation_router, "MAX_UPLOAD", 4)
+    assert _post(b"12345").status_code == 413

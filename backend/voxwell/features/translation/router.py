@@ -1,5 +1,6 @@
 """Speech translation: live (speak and hear the translation turn by turn) and one-off (text or a recording)."""
 
+import asyncio
 import importlib.util
 import logging
 import os
@@ -105,7 +106,8 @@ async def translate_file(
         with os.fdopen(fd, "wb") as f:
             f.write(data)
         try:
-            heard = stt.transcribe(path, source or None)
+            # In a worker thread, so the server (live audio included) keeps answering meanwhile.
+            heard = await asyncio.to_thread(stt.transcribe, path, source or None)
         except stt.AudioError as exc:
             raise HTTPException(422, str(exc))
         except Exception as exc:
