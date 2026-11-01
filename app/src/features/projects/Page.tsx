@@ -108,7 +108,7 @@ export default function Page() {
         </EmptyState>
       )}
       {!!items?.length && (
-        <div className="grid items-start gap-4 @4xl:grid-cols-2">
+        <div className="grid grid-cols-1 items-start gap-4 @4xl:grid-cols-2">
           {items.map((item) => (
             <ProjectCard key={`${item.kind}-${item.id}`} item={item} onChanged={refresh} onError={(e) => setError(message(e))} />
           ))}
