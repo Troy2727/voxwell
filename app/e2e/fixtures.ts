@@ -40,11 +40,12 @@ export async function pickVoice(page: Page, name: string, scope = page.locator('
   await page.getByRole('option', { name: new RegExp(name) }).first().click();
 }
 
-/** An AudioResult that loaded real audio: its <audio> element reports a duration. */
+/** The newest AudioResult on the page holds real audio: its file decodes to at least `minSeconds`. */
 export async function expectAudio(page: Page, minSeconds = 0.5) {
-  const download = page.getByRole('link', { name: 'Download' }).last();
-  await expect(download).toBeVisible();
-  const src = await download.getAttribute('href');
+  // A result's Download link, or the player's own <audio> once it has loaded (results without a download).
+  const result = page.locator('a[aria-label="Download"], audio[src]').last();
+  await expect(result).toBeAttached();
+  const src = (await result.getAttribute('href')) ?? (await result.getAttribute('src'));
   expect(src).toBeTruthy();
   const seconds = await page.evaluate(async (url) => {
     const ctx = new AudioContext();
