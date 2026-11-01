@@ -15,10 +15,11 @@ import io
 import logging
 import os
 import tempfile
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse, PlainTextResponse, Response
 from pydantic import BaseModel
 
@@ -139,14 +140,37 @@ def _vtt(segments) -> str:
     return "WEBVTT\n\n" + "\n".join(cues)
 
 
-def _transcribe(path: Path, language: str | None):
-    """One transcription at a time on the shared Whisper model, like the Transcribe feature."""
+class _Abandoned(Exception):
+    """The client went away, so nobody will read the transcription."""
+
+
+def _transcribe(path: Path, language: str | None, abandoned: threading.Event):
+    """One transcription at a time on the shared Whisper model, like the Transcribe feature.
+
+    Work for a client that has left stops: before it starts, and between segments while it runs.
+    SDKs time out (600 s) and retry, so each retry would otherwise queue another full
+    transcription behind one that nobody reads."""
+
+    def check(_fraction: float = 0.0) -> None:
+        if abandoned.is_set():
+            raise _Abandoned()
+
     with transcription_jobs._one_at_a_time:
-        return stt.transcribe(path, language)
+        check()
+        return stt.transcribe(path, language, on_progress=check)
+
+
+async def _watch_disconnect(request: Request, abandoned: threading.Event) -> None:
+    """Set `abandoned` when the client disconnects. The body has been read, so the next message
+    from the server is the disconnect: waiting for it costs nothing and misses nothing."""
+    while (await request.receive())["type"] != "http.disconnect":
+        pass
+    abandoned.set()
 
 
 @router.post("/audio/transcriptions")
 async def transcriptions(
+    request: Request,
     file: UploadFile = File(...),
     model: str = Form("whisper-1"),
     language: str | None = Form(None),
@@ -167,9 +191,17 @@ async def transcriptions(
         try:
             # On its own one-worker queue: the server keeps answering meanwhile, and requests
             # waiting for the Whisper lock never tie up the shared thread pool.
-            t = await asyncio.get_running_loop().run_in_executor(
-                _TRANSCRIBER, _transcribe, path, (language or "").strip().lower() or None
-            )
+            abandoned = threading.Event()
+            watcher = asyncio.create_task(_watch_disconnect(request, abandoned))
+            try:
+                t = await asyncio.get_running_loop().run_in_executor(
+                    _TRANSCRIBER, _transcribe, path, (language or "").strip().lower() or None, abandoned
+                )
+            finally:
+                watcher.cancel()
+                abandoned.set()  # if this handler was cancelled (server shutdown), the queued job stops too
+        except _Abandoned:
+            return Response(status_code=499)  # nginx's "client closed request": nobody is there to read it
         except stt.AudioError:  # transcribe() raises it only with DECODE_ERROR; never echo exception text
             return _error(400, stt.DECODE_ERROR, "file")
         except Exception:

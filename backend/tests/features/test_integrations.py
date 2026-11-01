@@ -481,3 +481,72 @@ def test_mcp_remix_voice(mcp, monkeypatch):
     assert "'Anna older'" in text and seen == [("an older man, deep voice", "high")]
     assert {(v.name, v.source) for v in voices.list_voices()} == {("Anna", "upload"), ("Anna older", "remix")}
     assert tool(mcp, "remix_voice", voice="anna", prompt="x", name="y", strength="huge")["isError"] is True
+
+
+def test_an_abandoned_transcription_is_skipped_when_its_turn_comes(monkeypatch, tmp_path):
+    import threading
+
+    from voxwell.features.integrations import openai_api
+
+    monkeypatch.setattr(stt, "transcribe", lambda *a, **k: pytest.fail("must not transcribe for a client that left"))
+    abandoned = threading.Event()
+    abandoned.set()
+    with pytest.raises(openai_api._Abandoned):
+        openai_api._transcribe(tmp_path / "a.audio", None, abandoned)
+
+
+def test_a_transcription_stops_between_segments_once_its_client_left(monkeypatch, tmp_path):
+    import threading
+
+    from voxwell.features.integrations import openai_api
+
+    abandoned, segments_done = threading.Event(), []
+
+    def slow(path, language=None, on_progress=None):
+        for fraction in (0.25, 0.5, 0.75, 1.0):
+            segments_done.append(fraction)
+            if fraction == 0.25:
+                abandoned.set()  # the client times out during the first segment
+            on_progress(fraction)
+        return Transcript("done", "en", [])
+
+    monkeypatch.setattr(stt, "transcribe", slow)
+    with pytest.raises(openai_api._Abandoned):
+        openai_api._transcribe(tmp_path / "a.audio", None, abandoned)
+    assert segments_done == [0.25]
+
+
+def test_a_client_disconnect_is_noticed_while_waiting():
+    import threading
+
+    from voxwell.features.integrations import openai_api
+
+    messages = [{"type": "http.request", "body": b"", "more_body": False}, {"type": "http.disconnect"}]
+
+    class Client:
+        async def receive(self):
+            return messages.pop(0)
+
+    abandoned = threading.Event()
+    asyncio.run(asyncio.wait_for(openai_api._watch_disconnect(Client(), abandoned), timeout=5))
+    assert abandoned.is_set() and messages == []
+
+
+def test_a_skipped_transcription_answers_499_and_cleans_up(monkeypatch, isolated_data_dir):
+    """The endpoint's wiring: a client gone before its turn gets 499, Whisper never runs, no file is left."""
+    from voxwell.features.integrations import openai_api
+
+    async def gone(request, abandoned):
+        abandoned.set()
+
+    monkeypatch.setattr(openai_api, "_watch_disconnect", gone)
+    monkeypatch.setattr(stt, "transcribe", lambda *a, **k: pytest.fail("must not transcribe for a client that left"))
+    real = openai_api._transcribe
+
+    def after_the_watcher(path, language, abandoned):
+        abandoned.wait(5)  # the request reaches the front of the queue after its client left
+        return real(path, language, abandoned)
+
+    monkeypatch.setattr(openai_api, "_transcribe", after_the_watcher)
+    assert transcribe().status_code == 499
+    assert not list((isolated_data_dir / "integrations").glob("*.audio"))
