@@ -3,9 +3,9 @@ import path from 'node:path';
 import type { Page, Request } from '@playwright/test';
 
 const BACKEND = 'http://127.0.0.1:8765';
-const TONE = readFileSync(path.join(__dirname, 'fixtures', 'tone-1s.wav'));
+const TONE = readFileSync(path.join(__dirname, 'fixtures', 'tone.wav'));
 
-/** Every faked audio result points here; the route below serves the 1 s tone for it. */
+/** Every faked audio result points here; the route below serves a 2 s tone for it (longer than any minimum the tests ask for). */
 export const TONE_URL = '/mock/tone.wav';
 
 type Reply = unknown | ((url: URL, request: Request) => unknown);

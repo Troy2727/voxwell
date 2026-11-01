@@ -54,9 +54,13 @@ test('compare voices: the same sentence in two voices', async ({ app: page, mode
   await panel.getByLabel('Text').fill('Welcome back. Here is the news.');
   await panel.getByRole('button', { name: 'Add a voice' }).click();
   await panel.locator('button[role=combobox][aria-haspopup=dialog]').last().click();
-  await page.getByRole('option', { name: new RegExp(mode === 'mock' ? 'Narrator' : voice) }).first().click();
+  const second = mode === 'mock' ? 'Narrator' : voice;
+  await page.getByRole('option', { name: new RegExp(second) }).first().click();
   await panel.getByRole('button', { name: 'Compare' }).click();
-  await expect(panel.locator('audio[src]')).toHaveCount(2);
+  // One result per voice, each labelled with its voice (the pickers' own preview players don't count).
+  for (const name of ['Default voice', second]) {
+    await expect(panel.locator(`div[aria-label="${name}"] audio[src]`)).toHaveCount(1);
+  }
 });
 
 test('fit length: stretch audio to an exact length', async ({ app: page, mode }) => {
