@@ -58,7 +58,7 @@ export default function Page() {
         </EmptyState>
       )}
       {!!shown?.length && (
-        <div className="grid items-start gap-4 @4xl:grid-cols-2">
+        <div className="grid grid-cols-1 items-start gap-4 @4xl:grid-cols-2">
           {shown.map((v) => (
             <VoiceCard key={v.id} voice={v} collections={collections} onChanged={refresh} onError={(e) => setError(message(e))} />
           ))}
