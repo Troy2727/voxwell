@@ -55,13 +55,14 @@ def _to_wav(data: bytes) -> bytes:
     import soundfile as sf
 
     try:
-        audio, rate = sf.read(io.BytesIO(data), dtype="int16")
+        # Read as float: libsndfile does not scale float WAVs to int16, so they would arrive silent.
+        audio, rate = sf.read(io.BytesIO(data), dtype="float32")
     except (RuntimeError, TypeError, ValueError) as exc:  # libsndfile errors are RuntimeErrors
         raise ValueError("undecodable audio") from exc
     if len(audio) == 0:
         raise ValueError("empty audio")
     buf = io.BytesIO()
-    sf.write(buf, audio, rate, format="WAV", subtype="PCM_16")
+    sf.write(buf, audio.clip(-1, 1), rate, format="WAV", subtype="PCM_16")
     return buf.getvalue()
 
 

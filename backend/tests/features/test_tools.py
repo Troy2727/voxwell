@@ -159,6 +159,25 @@ def test_isolate_returns_voice_and_background(monkeypatch):
         assert duration(client.get(body[part]["url"]).content) == 1.0
 
 
+def test_isolate_keeps_the_level_of_a_float_wav(monkeypatch):
+    # Music apps, Voxwell's own music engine included, write 32-bit float WAVs; they must not arrive silent.
+    sf = pytest.importorskip("soundfile")
+    np = pytest.importorskip("numpy")
+    peaks = []
+
+    def fake_isolate(source, voice_out, background_out):
+        peaks.append(int(np.abs(sf.read(str(source), dtype="int16")[0]).max()))
+        voice_out.write_bytes(wav_bytes(1.0))
+        background_out.write_bytes(wav_bytes(1.0))
+        return 1.0
+
+    monkeypatch.setattr(isolation, "isolate", fake_isolate)
+    buf = io.BytesIO()
+    sf.write(buf, 0.5 * np.sin(np.linspace(0, 2000, 16000)), 16000, format="WAV", subtype="FLOAT")
+    assert client.post("/api/tools/isolate", files={"file": ("song.wav", buf.getvalue())}).status_code == 200
+    assert 16000 < peaks[0] < 16500  # half of full scale, as sent
+
+
 def test_isolate_rejects_bad_input(monkeypatch):
     monkeypatch.setattr(isolation, "isolate", lambda *a: pytest.fail("must not run"))
     assert client.post("/api/tools/isolate", files={"file": ("a.wav", b"nope")}).status_code == 422
