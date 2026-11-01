@@ -104,7 +104,7 @@ export function HomePage({ name, online, onOpen }: { name?: string; online: bool
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <Section
           className="lg:col-span-2"
           title="Recent projects"
