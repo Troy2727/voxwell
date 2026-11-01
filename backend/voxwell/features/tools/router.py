@@ -54,13 +54,14 @@ async def _read_audio(file: UploadFile) -> tuple[bytes, float]:
     if len(data) > MAX_UPLOAD:
         raise HTTPException(413, "The file is too large (50 MB max).")
     try:
-        audio, rate = sf.read(io.BytesIO(data), dtype="int16")
+        # Read as float: libsndfile does not scale float WAVs to int16, so they would arrive silent.
+        audio, rate = sf.read(io.BytesIO(data), dtype="float32")
     except (RuntimeError, TypeError, ValueError):  # libsndfile errors are RuntimeErrors
         raise HTTPException(422, "Could not read the file as audio. Use WAV, MP3, FLAC or OGG.")
     if len(audio) == 0:
         raise HTTPException(422, "The audio is empty.")
     buf = io.BytesIO()
-    sf.write(buf, audio, rate, format="WAV", subtype="PCM_16")
+    sf.write(buf, audio.clip(-1, 1), rate, format="WAV", subtype="PCM_16")
     return buf.getvalue(), len(audio) / rate
 
 

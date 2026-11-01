@@ -66,6 +66,19 @@ def test_upload_converts_other_formats_to_wav(fmt):
     assert stored[:4] == b"RIFF" and stored[8:12] == b"WAVE"
 
 
+def test_upload_keeps_the_level_of_a_float_wav():
+    sf = pytest.importorskip("soundfile")
+    np = pytest.importorskip("numpy")
+    from voxwell import voices
+
+    buf = io.BytesIO()
+    sf.write(buf, 0.5 * np.sin(np.linspace(0, 2000, 16000)), 16000, format="WAV", subtype="FLOAT")
+    r = upload(data=buf.getvalue())
+    assert r.status_code == 200
+    stored, _ = sf.read(str(voices.voice_audio_path(r.json()["id"])), dtype="int16")
+    assert 16000 < np.abs(stored).max() < 16500  # half of full scale, as sent, not silence
+
+
 def test_upload_rejects_non_audio_and_blank_name():
     assert upload(data=b"not audio").status_code == 422
     assert upload(name="  ").status_code == 422
