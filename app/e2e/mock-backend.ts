@@ -64,6 +64,8 @@ function routes(): [string | RegExp, Reply][] {
   let include = [true, true];
   let rendering: (() => object) | null = null;
   let transcribed: (() => object) | null = null;
+  let entries: object[] = [];
+  let agents: object[] = [];
   let watch = { enabled: false, folder: '', target_language: 'es', voice: 'original', problem: null, output_folder: 'dubbed', skipped: 0, files: [] };
   const story = job([
     { id: 'st-1', title: 'The knock', state: 'queued', step: 'Waiting', percent: 0, error: null, audio_url: '' },
@@ -156,6 +158,54 @@ function routes(): [string | RegExp, Reply][] {
       srt: '', vtt: '', matched: 22, total: 22, fallback: false,
     }],
 
+    ['POST /api/tools/convert', { url: TONE_URL }],
+    ['POST /api/tools/isolate', { voice: { url: '/mock/voice.wav' }, background: { url: '/mock/background.wav' }, seconds: 10 }],
+    ['POST /api/tools/direction/interpret', { intensity: 0.2, pace: 'slow', summary: 'quiet, sad, slow' }],
+    ['POST /api/tools/direction/speak', { url: TONE_URL }],
+    ['POST /api/tools/speak', { url: TONE_URL }],
+    ['POST /api/tools/fit', { url: TONE_URL, original_seconds: 5.92 }],
+    ['POST /api/tools/probe', {
+      format: 'QuickTime / MOV', duration: 5.92, size: 67855, bit_rate: 91700,
+      streams: [
+        { type: 'video', codec: 'H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10', width: 640, height: 360, fps: 25.0 },
+        { type: 'audio', codec: 'AAC (Advanced Audio Coding)', sample_rate: 24000, channels: 1 },
+      ],
+    }],
+
+    ['GET /api/pronunciation/entries', () => entries],
+    ['POST /api/pronunciation/entries', (_url: URL, request: Request) => {
+      const { word, respelling, case_sensitive, whole_word } = request.postDataJSON();
+      entries = [{ id: 'pr-1', word, respelling, case_sensitive, whole_word }];
+      return entries[0];
+    }],
+    [/^DELETE \/api\/pronunciation\/entries\/[^/]+$/, () => {
+      entries = [];
+      return {};
+    }],
+    ['POST /api/pronunciation/preview', { text: 'Ask Ms. win about it.' }],
+
+    ['GET /api/projects/items', [
+      { kind: 'speech', id: 'sp-1', title: 'A project for the end to end test.', created: NOW, language: 'en', voice: 'default', text: 'A project for the end to end test.', audio_url: TONE_URL },
+      { kind: 'transcript', id: 'tr-1', title: 'speech.wav', created: NOW - 60, language: 'en', voice: '', state: 'done', step: '', percent: 100, error: null, text: SPEECH,
+        exports: { txt: '/mock/export/txt', srt: '/mock/export/srt', vtt: '/mock/export/vtt' } },
+    ]],
+    [/^(PATCH|DELETE) \/api\/projects\/items\/[^/]+\/[^/]+$/, {}],
+
+    ['GET /api/agents/status', {
+      ready: true,
+      tools: [{ name: 'current_time', description: 'The current local date and time.' }, { name: 'calculator', description: 'Exact arithmetic.' }],
+      languages: ['en', 'es'],
+    }],
+    ['GET /api/agents/agents', () => agents],
+    ['POST /api/agents/agents', (_url: URL, request: Request) => {
+      agents = [{ id: 'ag-1', ...request.postDataJSON() }];
+      return agents[0];
+    }],
+    ['POST /api/agents/agents/ag-1/chat', { reply: '17 times 23 is 391.', tool_calls: [{ tool: 'calculator', arguments: { expression: '17*23' }, result: '391' }], audio: TONE_URL }],
+
+    ['GET /api/translation/status', { ready: true, sources: ['en', 'es'], targets: ['en', 'es'] }],
+    ['POST /api/dictation/transcribe', { text: SPEECH, language: 'en' }],
+
     ['GET /api/batch/watch', () => watch],
     ['PUT /api/batch/watch', (_url: URL, request: Request) => {
       const { enabled, folder, target_language, voice } = request.postDataJSON();
@@ -185,7 +235,33 @@ function file(pathname: string): { contentType: string; body: Buffer | string } 
   return null;
 }
 
+/**
+ * The live endpoints (dictation, translation): after the start message the server says "ready";
+ * once about a second of microphone audio has arrived it reports one finished turn; "end" closes it.
+ */
+async function installLiveSocket(page: Page) {
+  await page.routeWebSocket(/\/api\/(dictation|translation)\/live$/, (ws) => {
+    const translation = ws.url().includes('translation');
+    let chunks = 0;
+    ws.onMessage((message) => {
+      if (typeof message === 'string') {
+        const m = JSON.parse(message);
+        if (m.type === 'start') ws.send(JSON.stringify({ type: 'ready' }));
+        if (m.type === 'end') ws.send(JSON.stringify({ type: 'done' }));
+        return;
+      }
+      if (++chunks !== 10) return; // 100 ms per chunk
+      ws.send(JSON.stringify({ type: 'speaking' }));
+      ws.send(JSON.stringify({ type: 'turn_end', index: 0 }));
+      ws.send(JSON.stringify(translation
+        ? { type: 'turn', index: 0, transcript: SPEECH, source: 'en', translation: 'El rápido zorro marrón salta sobre el perro perezoso.', audio: TONE.toString('base64') }
+        : { type: 'turn', index: 0, text: SPEECH }));
+    });
+  });
+}
+
 export async function installMockBackend(page: Page) {
+  await installLiveSocket(page);
   const table = routes();
   await page.route(`${BACKEND}/**`, async (route) => {
     const request = route.request();

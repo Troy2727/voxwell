@@ -1,15 +1,4 @@
-import { readFileSync } from 'node:fs';
-import { dropFile, expect, fixture, openFeature, test } from './fixtures';
-
-const SCRIPT = readFileSync(fixture('speech.txt'), 'utf8').trim();
-const words = (s: string) => s.toLowerCase().replace(/[^a-z' ]/g, ' ').split(/\s+/).filter(Boolean);
-
-/** Share of the script's words that appear in `heard`, in any order: a forgiving accuracy check. */
-function recall(heard: string) {
-  const got = new Set(words(heard));
-  const want = words(SCRIPT);
-  return want.filter((w) => got.has(w)).length / want.length;
-}
+import { dropFile, expect, openFeature, recall, SCRIPT, test } from './fixtures';
 
 test('transcribe: the transcript matches what was said; export and AI clean-up work', async ({ app: page }) => {
   await openFeature(page, 'Transcribe');

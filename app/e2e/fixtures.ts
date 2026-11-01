@@ -22,6 +22,18 @@ export const test = base.extend<{ mode: Mode; app: Page }>({
 
 export { expect };
 
+/** What the speech fixtures (speech.wav, mic.wav) say. */
+export const SCRIPT = readFileSync(fixture('speech.txt'), 'utf8').trim();
+
+const words = (s: string) => s.toLowerCase().replace(/[^a-z' ]/g, ' ').split(/\s+/).filter(Boolean);
+
+/** Share of the script's words that appear in `heard`, in any order: a forgiving accuracy check. */
+export function recall(heard: string) {
+  const got = new Set(words(heard));
+  const want = words(SCRIPT);
+  return want.filter((w) => got.has(w)).length / want.length;
+}
+
 /** Open a feature from the sidebar by its title. */
 export async function openFeature(page: Page, title: string) {
   await page.locator('[data-sidebar="menu-button"]', { hasText: new RegExp(`^${title}$`) }).click();
