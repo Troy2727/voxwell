@@ -28,9 +28,9 @@ export async function openFeature(page: Page, title: string) {
   await expect(page.getByRole('heading', { level: 1, name: title })).toBeVisible();
 }
 
-/** Pick a file through a FileDrop: its hidden input sits inside the drop button. */
-export async function dropFile(page: Page, file: string, scope = page.locator('body')) {
-  await scope.locator('input[type=file]').first().setInputFiles(fixture(file));
+/** Pick files through a FileDrop: its hidden input sits inside the drop button. */
+export async function dropFile(page: Page, file: string | string[], scope = page.locator('body')) {
+  await scope.locator('input[type=file]').first().setInputFiles([file].flat().map(fixture));
 }
 
 /** Choose an entry in a VoicePicker (the "Choose a voice" combobox). */

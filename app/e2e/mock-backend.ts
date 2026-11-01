@@ -63,6 +63,7 @@ function routes(): [string | RegExp, Reply][] {
   let books: object[] = [];
   let include = [true, true];
   let rendering: (() => object) | null = null;
+  let watch = { enabled: false, folder: '', target_language: 'es', voice: 'original', problem: null, output_folder: 'dubbed', skipped: 0, files: [] };
   const story = job([
     { id: 'st-1', title: 'The knock', state: 'queued', step: 'Waiting', percent: 0, error: null, audio_url: '' },
     { id: 'st-1', title: 'The knock', state: 'running', step: 'Line 2 of 4', percent: 50, error: null, audio_url: '' },
@@ -136,7 +137,36 @@ function routes(): [string | RegExp, Reply][] {
       rendering = job([book('running', false, include), book('done', true, include)]);
       return {};
     }],
+
+    ['POST /api/dubbing/jobs', { id: 'd-1' }],
+    ['GET /api/dubbing/jobs/d-1', dub()],
+    ['POST /api/batch/jobs', { jobs: [{ name: 'video.mp4', id: 'd-2' }], errors: [{ name: 'bad.exe', error: 'Not a video or audio file.' }] }],
+    ['GET /api/dubbing/jobs/d-2', dub()],
+    ['GET /api/batch/watch', () => watch],
+    ['PUT /api/batch/watch', (_url: URL, request: Request) => {
+      const { enabled, folder, target_language, voice } = request.postDataJSON();
+      watch = { ...watch, enabled, folder, target_language, voice };
+      return watch;
+    }],
   ];
+}
+
+function dub() {
+  return job([
+    { id: 'd', state: 'running', step: 'Translating', percent: 50, error: null },
+    { id: 'd', state: 'done', step: '', percent: 100, error: null },
+  ]);
+}
+
+const SRT = '1\n00:00:00,000 --> 00:00:02,500\nEl rápido zorro marrón salta sobre el perro perezoso.\n';
+const VIDEO = readFileSync(path.join(__dirname, 'fixtures', 'video.mp4'));
+
+/** Files the pages load directly (players, downloads) rather than as JSON. */
+function file(pathname: string): { contentType: string; body: Buffer | string } | null {
+  if (pathname === TONE_URL || pathname.endsWith('.wav') || pathname.endsWith('/audio')) return { contentType: 'audio/wav', body: TONE };
+  if (pathname.endsWith('/video')) return { contentType: 'video/mp4', body: VIDEO };
+  if (pathname.endsWith('/subtitles')) return { contentType: 'application/x-subrip', body: SRT };
+  return null;
 }
 
 export async function installMockBackend(page: Page) {
@@ -145,9 +175,8 @@ export async function installMockBackend(page: Page) {
     const request = route.request();
     const url = new URL(request.url());
     const method = request.method();
-    if (method === 'GET' && (url.pathname === TONE_URL || url.pathname.endsWith('.wav') || url.pathname.endsWith('/audio'))) {
-      return route.fulfill({ status: 200, contentType: 'audio/wav', body: TONE });
-    }
+    const served = method === 'GET' ? file(url.pathname) : null;
+    if (served) return route.fulfill({ status: 200, ...served });
     const key = `${method} ${url.pathname}`;
     const reply = table.find(([match]) => (typeof match === 'string' ? match === key : match.test(key)))?.[1];
     if (reply === undefined) {
