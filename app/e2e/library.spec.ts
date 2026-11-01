@@ -39,7 +39,11 @@ test('saved voices: make a collection, file a voice in it, rename and delete', a
 
 test('gallery: listen to a preset, then add it to my voices', async ({ app: page }) => {
   await openFeature(page, 'Gallery');
-  const card = page.locator('[data-slot=card]').first();
+  // A preset nobody has listened to yet (earlier runs leave theirs ready), held by its title
+  // because the Listen button goes away once it is.
+  const fresh = page.locator('[data-slot=card]').filter({ has: page.getByRole('button', { name: 'Listen' }) }).first();
+  const title = await fresh.locator('[data-slot=card-title]').innerText();
+  const card = page.locator('[data-slot=card]').filter({ has: page.getByText(title, { exact: true }) });
   await card.getByRole('button', { name: 'Listen' }).click();
   await expect(card.getByRole('button', { name: 'Add to my voices' })).toBeVisible();
   await card.getByRole('button', { name: 'Add to my voices' }).click();
