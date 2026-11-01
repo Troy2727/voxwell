@@ -340,6 +340,30 @@ def test_a_broken_source_download_leaves_no_half_installed_folder(monkeypatch):
     assert not runtime.source_dir().exists()
 
 
+def test_installing_packages_never_syncs_voxwells_own_environment(monkeypatch):
+    # uv picks UV_PROJECT_ENVIRONMENT over the project's .venv; when it pointed at Voxwell's environment,
+    # syncing ACE-Step's lock removed Voxwell's own packages.
+    monkeypatch.setenv("UV_PROJECT_ENVIRONMENT", "/voxwell/env")
+    monkeypatch.setenv("VIRTUAL_ENV", "/voxwell/env")
+    monkeypatch.setattr(runtime.shutil, "which", lambda name: "uv")
+    seen = {}
+
+    class FakeProc:
+        def __init__(self, args, cwd, env, **kwargs):
+            self.stdout: list[str] = []
+            seen.update(cwd=cwd, env=env)
+
+        def wait(self):
+            return 0
+
+    monkeypatch.setattr(runtime.subprocess, "Popen", FakeProc)
+    runtime._sync_packages()
+    assert seen["cwd"] == runtime.source_dir()
+    assert seen["env"]["UV_PROJECT_ENVIRONMENT"] == str(runtime.source_dir() / ".venv")
+    assert runtime._python().parent.parent == runtime.source_dir() / ".venv"  # where the engine is run from
+    assert "VIRTUAL_ENV" not in seen["env"]
+
+
 class FakeInstallClient:
     def __init__(self, states):
         self.states, self.posted = list(states), []

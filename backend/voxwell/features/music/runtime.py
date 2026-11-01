@@ -199,8 +199,14 @@ def _sync_packages() -> None:
     if not uv:
         raise EngineError("Installing the music engine needs uv on your PATH (https://docs.astral.sh/uv/).")
     _set(step="Installing packages (about 6 GB)", percent=5)
-    env = {**os.environ, "UV_SYSTEM_CERTS": os.environ.get("UV_SYSTEM_CERTS", "1")}
-    env.pop("VIRTUAL_ENV", None)  # Voxwell's own environment must not be the one synced
+    env = {
+        **os.environ,
+        "UV_SYSTEM_CERTS": os.environ.get("UV_SYSTEM_CERTS", "1"),
+        # Voxwell's own environment must not be the one synced: uv prefers UV_PROJECT_ENVIRONMENT
+        # (set by some Voxwell setups) over the project's .venv, which is where _python() runs from.
+        "UV_PROJECT_ENVIRONMENT": str(source_dir() / ".venv"),
+    }
+    env.pop("VIRTUAL_ENV", None)
     proc = subprocess.Popen(
         [uv, "sync", "--frozen", "--no-progress"],
         cwd=source_dir(),
