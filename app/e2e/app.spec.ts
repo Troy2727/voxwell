@@ -18,11 +18,16 @@ test('every page opens without an error and fits phone, tablet and desktop width
   test.setTimeout(5 * 60_000);
   for (const width of [390, 768, 1024, 1440]) {
     await page.setViewportSize({ width, height: 900 });
-    for (const title of PAGES) {
+    for (const title of ['Home', ...PAGES]) {
       if (width < 768) {
         await page.getByRole('button', { name: 'Toggle Sidebar' }).first().click(); // the menu is a sheet on a phone
       }
-      await openFeature(page, title);
+      if (title === 'Home') {
+        await page.locator('[data-sidebar="menu-button"]', { hasText: /^Home$/ }).click(); // its heading is a greeting
+        await expect(page.getByText('Recent projects')).toBeVisible();
+      } else {
+        await openFeature(page, title);
+      }
       await page.waitForLoadState('networkidle');
       await expect.soft(page.getByRole('main').locator('[data-slot=alert][role=alert]').filter({ hasText: /\S/ }), `${title} at ${width}px`).toHaveCount(0);
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);

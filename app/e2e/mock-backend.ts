@@ -189,7 +189,8 @@ function routes(): [string | RegExp, Reply][] {
     ['POST /api/pronunciation/preview', { text: 'Ask Ms. win about it.' }],
 
     ['GET /api/projects/items', [
-      { kind: 'speech', id: 'sp-1', title: 'A project for the end to end test.', created: NOW, language: 'en', voice: 'default', text: 'A project for the end to end test.', audio_url: TONE_URL },
+      // A long title: lists that show it must still fit a phone.
+      { kind: 'speech', id: 'sp-1', title: 'A project for the end to end test. Its title is long enough to need truncating on a phone.', created: NOW, language: 'en', voice: 'default', text: 'A project for the end to end test.', audio_url: TONE_URL },
       { kind: 'transcript', id: 'tr-1', title: 'speech.wav', created: NOW - 60, language: 'en', voice: '', state: 'done', step: '', percent: 100, error: null, text: SPEECH,
         exports: { txt: '/mock/export/txt', srt: '/mock/export/srt', vtt: '/mock/export/vtt' } },
     ]],
