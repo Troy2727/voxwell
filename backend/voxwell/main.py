@@ -14,6 +14,7 @@ from voxwell.features import FEATURES
 from voxwell.features.integrations import openai_api
 from voxwell.origins import APP_HOSTS, APP_ORIGINS
 from voxwell.paths import data_dir
+from voxwell.upload_limits import UploadLimit
 
 # Model downloads must work behind TLS-inspecting proxies and antivirus, whose certificates
 # live in the OS store, not in Python's bundled one. huggingface_hub does not fall back to the
@@ -30,6 +31,8 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(title="Voxwell", lifespan=lifespan)
+# Added first so it runs inside CORS: its early 413 still carries the CORS headers the page needs.
+app.add_middleware(UploadLimit)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=list(APP_ORIGINS),
