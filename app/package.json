@@ -8,6 +8,8 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
+    "e2e": "playwright test --project=mock",
+    "e2e:real": "playwright test --project=real",
     "electron": "electron ."
   },
   "dependencies": {

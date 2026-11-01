@@ -65,6 +65,10 @@ function routes(): [string | RegExp, Reply][] {
   let rendering: (() => object) | null = null;
   let transcribed: (() => object) | null = null;
   let entries: object[] = [];
+  let phone = {
+    enabled: false, public_url: '', auth_token_set: false, greeting_text: '', voice_id: '', language: 'en', greeting_ready: false,
+    gateway: 'stopped', gateway_running: false, webhook_url: '', calls: [],
+  };
   let agents: object[] = [];
   let watch = { enabled: false, folder: '', target_language: 'es', voice: 'original', problem: null, output_folder: 'dubbed', skipped: 0, files: [] };
   const story = job([
@@ -202,6 +206,21 @@ function routes(): [string | RegExp, Reply][] {
       return agents[0];
     }],
     ['POST /api/agents/agents/ag-1/chat', { reply: '17 times 23 is 391.', tool_calls: [{ tool: 'calculator', arguments: { expression: '17*23' }, result: '391' }], audio: TONE_URL }],
+
+    ['GET /api/integrations/info', {
+      api_base: `${BACKEND}/v1`, cli: 'voxwell', skill: { claude: false, codex: false },
+      mcp: { command: 'uv', args: ['run', '--directory', '<voxwell>/backend', 'voxwell-mcp'], env: {} },
+    }],
+    ['GET /api/integrations/phone', () => phone],
+    ['PUT /api/integrations/phone', (_url: URL, request: Request) => {
+      const { public_url, greeting_text, voice_id, language, enabled } = request.postDataJSON();
+      phone = { ...phone, public_url, greeting_text, voice_id, language, enabled };
+      return phone;
+    }],
+    ['POST /api/integrations/phone/greeting', () => {
+      phone = { ...phone, greeting_ready: true };
+      return phone;
+    }],
 
     ['GET /api/translation/status', { ready: true, sources: ['en', 'es'], targets: ['en', 'es'] }],
     ['POST /api/dictation/transcribe', { text: SPEECH, language: 'en' }],
