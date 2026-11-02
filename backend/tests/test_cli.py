@@ -232,7 +232,7 @@ def test_chat_with_an_agent(capsys, monkeypatch):
     from voxwell.features.agents import conversation, store
 
     seen = []
-    monkeypatch.setattr(conversation, "_chat", lambda messages: seen.append(messages) or "Hello!")
+    monkeypatch.setattr(conversation, "_chat", lambda messages, tools=None: seen.append(messages) or "Hello!")
     store.create(name="Guide", system_prompt="Be brief.", voice="", language="en", tools=[])
     code, out, _ = run(capsys, "chat", "guide", "Hi there", "--json")
     result = json.loads(out)
