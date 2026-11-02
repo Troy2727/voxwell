@@ -42,9 +42,6 @@ test('projects: what you made is listed; rename and delete it', async ({ app: pa
 });
 
 test('voice agents: make an agent with the calculator and ask it a sum', async ({ app: page, mode }) => {
-  // Found by this test (2026-11-01): the local model answers "401" and never calls the calculator.
-  // Remove this line once the agent uses its tools; the run then reports it as passing unexpectedly.
-  test.fail(mode === 'real', 'Known bug: the agent does not call the calculator and gets the sum wrong.');
   await openFeature(page, 'Voice agents');
   await page.getByRole('button', { name: 'New agent' }).click();
   await page.getByLabel('Name', { exact: true }).fill('E2E maths helper');

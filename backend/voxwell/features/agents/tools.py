@@ -105,8 +105,8 @@ def list_saved_voices() -> str:
 @dataclass(frozen=True)
 class Tool:
     name: str
-    description: str  # for the model's instructions and the UI
-    arguments: str  # how to call it, shown to the model
+    description: str  # for the model and the UI
+    parameters: dict  # JSON Schema of its arguments, given to the model
     run: Callable[[dict], str]
 
 
@@ -114,15 +114,25 @@ def _no_arguments(fn: Callable[[], str]) -> Callable[[dict], str]:
     return lambda args: fn()
 
 
+NO_ARGUMENTS = {"type": "object", "properties": {}}
+
 TOOLS = {
     t.name: t
     for t in (
-        Tool("current_time", "The current local date and time.", "{}", _no_arguments(current_time)),
-        Tool("calculator", "Exact arithmetic (+ - * / // % ** and parentheses).", '{"expression": "12 * (3 + 4)"}',
+        Tool("current_time", "The current local date and time.", NO_ARGUMENTS, _no_arguments(current_time)),
+        Tool("calculator", "Exact arithmetic (+ - * / // % ** and parentheses).",
+             {"type": "object", "properties": {"expression": {"type": "string", "description": "For example 12 * (3 + 4)"}},
+              "required": ["expression"]},
              lambda args: calculate(args.get("expression", ""))),
-        Tool("list_voices", "The names of the voices saved in Voxwell.", "{}", _no_arguments(list_saved_voices)),
+        Tool("list_voices", "The names of the voices saved in Voxwell.", NO_ARGUMENTS, _no_arguments(list_saved_voices)),
     )
 }
+
+
+def schemas(enabled: list[str]) -> list[dict] | None:
+    """The enabled tools as chat-template function definitions; None when there are none."""
+    listed = [TOOLS[name] for name in enabled if name in TOOLS]
+    return [{"type": "function", "function": {"name": t.name, "description": t.description, "parameters": t.parameters}} for t in listed] or None
 
 
 def run(name: str, arguments, enabled: list[str]) -> str:

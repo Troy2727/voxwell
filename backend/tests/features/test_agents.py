@@ -37,13 +37,15 @@ def llm(monkeypatch):
     class Fake:
         replies: list[str] = []
         seen: list[list[dict]] = []
+        offered: list = []
 
-        def __call__(self, messages):
+        def __call__(self, messages, tools=None):
             self.seen.append([dict(m) for m in messages])
+            self.offered.append(tools)
             return self.replies.pop(0) if self.replies else "Done."
 
     fake = Fake()
-    fake.replies, fake.seen = [], []
+    fake.replies, fake.seen, fake.offered = [], [], []
     monkeypatch.setattr(conversation, "_chat", fake)
     monkeypatch.setattr(tts, "synthesize", lambda text, language, reference=None, **k: wav_bytes())
     return fake
@@ -107,6 +109,9 @@ def test_ids_are_checked():
         ('{"tool": "lookup", "arguments": {"filter": {"tags": ["a", {"b": [1, 2]}]}, "text": "a } brace"}}',
          {"tool": "lookup", "arguments": {"filter": {"tags": ["a", {"b": [1, 2]}]}, "text": "a } brace"}}),
         ('{"note": {"x": 1}} then {"tool": "current_time"}', {"tool": "current_time", "arguments": {}}),
+        # The model's own format (Qwen2.5): a <tool_call> block naming the tool with "name".
+        ('<tool_call>\n{"name": "calculator", "arguments": {"expression": "17 * 23"}}\n</tool_call>',
+         {"tool": "calculator", "arguments": {"expression": "17 * 23"}}),
     ],
 )
 def test_tool_calls_are_found(reply, call):
@@ -116,6 +121,7 @@ def test_tool_calls_are_found(reply, call):
 def test_plain_answers_are_not_tool_calls():
     assert conversation.parse_tool_call("It is sunny. {not json} Have a nice day.") == (None, None)
     assert conversation.parse_tool_call('Here is data: {"a": 1}') == (None, None)
+    assert conversation.parse_tool_call('My cat: {"name": "Tom"}') == (None, None)
 
 
 @pytest.mark.parametrize("reply", ['{"tool": "calculator", "arguments": {"expression": "2+2"}', '{"tool": 5}'])
@@ -157,8 +163,19 @@ def test_tool_call_then_answer(llm):
     body = chat(agent["id"], "What is six times seven?").json()
     assert body["reply"] == "It is 42." and base64.b64decode(body["audio"])[:4] == b"RIFF"
     assert body["tool_calls"] == [{"tool": "calculator", "arguments": {"expression": "6 * 7"}, "result": "42"}]
-    assert llm.seen[1][-1] == {"role": "user", "content": "[tool] Result of calculator: 42"}
-    assert "calculator" in llm.seen[0][0]["content"] and "You help." in llm.seen[0][0]["content"]
+    assert llm.seen[1][-1] == {"role": "tool", "content": "42"}
+    assert "You help." in llm.seen[0][0]["content"]
+
+
+def test_tools_are_offered_in_the_models_own_format(llm):
+    # Qwen2.5 follows tools passed to its chat template. A protocol described in the prompt was
+    # ignored: asked 17 x 23, it answered "401" without calling the calculator.
+    chat(make_agent(tools=["calculator"])["id"], "What is 17 times 23?", speak=False)
+    (calculator,) = llm.offered[0]
+    assert calculator["type"] == "function" and calculator["function"]["name"] == "calculator"
+    assert calculator["function"]["parameters"]["required"] == ["expression"]
+    chat(make_agent(name="No tools", tools=[])["id"], "hi", speak=False)
+    assert llm.offered[-1] is None
 
 
 def test_unknown_or_disabled_tool_is_fed_back(llm):
