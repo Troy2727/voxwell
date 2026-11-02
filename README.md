@@ -39,11 +39,11 @@
 
 <br/>
 
-<a href="https://github.com/Troy2727/voxwell/blob/main/docs/readme/screenshots/animated/tour-v2.gif" title="Open this screenshot full size">
-  <img src="docs/readme/screenshots/animated/tour-v2.gif" alt="A tour of the Voxwell dashboard: the Gallery of ready-made voices, then the Voice cloning, Voice remix, Music, Dubbing, Voice agents, Live translation, Transcribe and Integrations pages." width="100%" />
+<a href="https://github.com/Troy2727/voxwell/blob/main/docs/readme/voxwell-hero-demo.mp4" title="Watch the full demo with sound">
+  <img src="docs/readme/screenshots/animated/hero-demo.gif" alt="Clips from the Voxwell demo video: designing a voice, cloning a voice, composing music, dubbing a video and transcribing audio. Click to watch the full 90-second demo with sound." width="100%" />
 </a>
 <br />
-<sub>Click the screenshot to see it full size.</sub>
+<sub>Click to watch the full demo with sound.</sub>
 
 </div>
 
@@ -60,6 +60,10 @@ Voxwell is **MIT licensed**, and every model it runs allows commercial use ([one
 <br/>
 
 ## <img src="docs/readme/icons/layout-dashboard.svg" width="24" height="24" alt="" /> Take a look
+
+<a href="https://github.com/Troy2727/voxwell/blob/main/docs/readme/screenshots/animated/tour-v2.gif" title="Open this screenshot full size">
+  <img src="docs/readme/screenshots/animated/tour-v2.gif" alt="A tour of the Voxwell dashboard: the Gallery of ready-made voices, then the Voice cloning, Voice remix, Music, Dubbing, Voice agents, Live translation, Transcribe and Integrations pages." width="100%" />
+</a>
 
 <table>
   <tr>
