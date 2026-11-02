@@ -66,10 +66,15 @@ function Install-Voxwell {
 
     $bin = (uv tool dir --bin | Out-String).Trim()
     New-Item -ItemType Directory -Force -Path $bin | Out-Null
-    $oem = [Text.Encoding]::GetEncoding([Globalization.CultureInfo]::CurrentCulture.TextInfo.OEMCodePage)
+    # Copies of uv's launchers, which hold the full path to the environment. A .cmd would not do: MCP
+    # clients start the command directly, and only a shell can run one. An unchanged copy is left in
+    # place, because Windows refuses to overwrite a program that is running.
     foreach ($name in 'voxwell', 'voxwell-mcp') {
-        $target = Join-Path $app "backend\.venv\Scripts\$name.exe"
-        [IO.File]::WriteAllText((Join-Path $bin "$name.cmd"), "@`"$target`" %*`r`n", $oem)
+        $source = Join-Path $app "backend\.venv\Scripts\$name.exe"
+        $target = Join-Path $bin "$name.exe"
+        if (-not (Test-Path $target) -or (Get-FileHash $source).Hash -ne (Get-FileHash $target).Hash) {
+            Copy-Item $source $target -Force
+        }
     }
     if (-not $env:UV_NO_MODIFY_PATH) { uv tool update-shell }
 

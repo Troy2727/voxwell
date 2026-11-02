@@ -220,7 +220,7 @@ Each new clip is sped up if it runs long, then trimmed to the gap before the nex
 
 ## <img src="docs/readme/icons/rocket.svg" width="24" height="24" alt="" /> Quick start
 
-**Command line and MCP server.** One command installs both. It needs [git](https://git-scm.com/downloads), sets up uv and Python 3.11 for you, and downloads several GB the first time. Run it again to update.
+**Command line and MCP server.** One command installs both. It needs [git](https://git-scm.com/downloads) and sets up uv and Python 3.11 for you. On Windows the first run downloads about 6 GB and uses about 11 GB of disk, before any model weights. Run it again to update.
 
 ```sh
 # macOS and Linux
