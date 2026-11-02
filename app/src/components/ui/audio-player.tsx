@@ -278,6 +278,7 @@ export function AudioPlayerProvider<TData = unknown>({
 }
 
 export const AudioPlayerProgress = ({
+  "aria-label": ariaLabel = "Playback position",
   ...otherProps
 }: Omit<
   ComponentProps<typeof SliderPrimitive.Root>,
@@ -334,6 +335,7 @@ export const AudioPlayerProgress = ({
         <SliderPrimitive.Range className="bg-primary absolute h-full" />
       </SliderPrimitive.Track>
       <SliderPrimitive.Thumb
+        aria-label={ariaLabel}
         className="relative flex h-0 w-0 items-center justify-center opacity-0 group-hover/player:opacity-100 focus-visible:opacity-100 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50"
         data-slot="slider-thumb"
       >

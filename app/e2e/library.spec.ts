@@ -53,7 +53,7 @@ test('gallery: listen to a preset, then add it to my voices', async ({ app: page
 test('audio effects: add reverb and distance to a recording', async ({ app: page }) => {
   await openFeature(page, 'Audio effects');
   await dropFile(page, 'speech.wav');
-  const reverb = page.getByLabel('Reverb', { exact: true }).getByRole('slider');
+  const reverb = page.getByRole('slider', { name: 'Reverb', exact: true });
   await reverb.focus();
   for (let i = 0; i < 8; i++) await page.keyboard.press('ArrowRight');
   await expect(page.getByText('Reverb: 40%')).toBeVisible();

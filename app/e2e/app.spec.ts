@@ -36,6 +36,16 @@ test('every page opens without an error and fits phone, tablet and desktop width
   }
 });
 
+test('every slider has a name a screen reader can announce', async ({ app: page }) => {
+  for (const title of PAGES) {
+    await openFeature(page, title);
+    await page.waitForLoadState('networkidle');
+    for (const slider of await page.getByRole('main').getByRole('slider').all()) {
+      await expect.soft(slider, `a slider on ${title}`).toHaveAccessibleName(/\S/);
+    }
+  }
+});
+
 test('integrations: shows the local API and records a phone greeting', async ({ app: page }) => {
   await openFeature(page, 'Integrations');
   await expect(page.getByText(`${BACKEND}/v1`).first()).toBeVisible();
