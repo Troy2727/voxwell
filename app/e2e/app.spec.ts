@@ -63,7 +63,8 @@ test.describe('errors the user can see', () => {
     await installMockBackend(page); // not the app fixture: health must fail before the first load
     await page.route(`${BACKEND}/api/health`, (route) => route.abort('connectionrefused'));
     await page.goto('/');
-    await expect(page.getByText("Voxwell isn't running on this computer").first()).toBeVisible();
+    await expect(page.getByText("Voxwell isn't running on this computer")).toBeVisible(); // the Home status line
+    await expect(page.getByRole('alert')).toHaveCount(0); // no banner above every page
     await page.unroute(`${BACKEND}/api/health`);
     await expect(page.getByText('Running on this computer', { exact: true })).toBeVisible({ timeout: 15_000 });
   });
