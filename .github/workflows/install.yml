@@ -1,0 +1,64 @@
+name: Install
+
+# Runs the real install scripts on a clean machine, downloads included, so only when they could change.
+on:
+  pull_request:
+    paths:
+      - install.sh
+      - install.ps1
+      - .github/workflows/install.yml
+      - backend/pyproject.toml
+      - backend/uv.lock
+
+permissions:
+  contents: read
+
+concurrency:
+  group: install-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  install:
+    name: Install (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      VOXWELL_REF: ${{ github.head_ref }}
+      VOXWELL_PORT: "8796"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+        with:
+          persist-credentials: false
+      - if: runner.os != 'Windows'
+        run: sh install.sh
+      - if: runner.os == 'Windows'
+        shell: powershell
+        run: ./install.ps1
+      - name: Run the installed commands
+        shell: bash
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          mcp="$HOME/.voxwell/app/backend/.venv/bin/voxwell-mcp"
+          if [ "$RUNNER_OS" = Windows ]; then
+            voxwell() { voxwell.cmd "$@"; }
+            mcp="$HOME/.voxwell/app/backend/.venv/Scripts/voxwell-mcp.exe"
+          fi
+          voxwell --help
+          voxwell serve > server.log 2>&1 &
+          for _ in $(seq 1 60); do voxwell status && break; sleep 5; done
+          voxwell status
+          voxwell voices
+          printf '%s\n' \
+            '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' \
+            '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
+            '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"list_voices"}}' \
+            | "$mcp" | tee mcp.txt
+          grep -q '"name": "speak"' mcp.txt
+          grep -q 'No saved voices yet' mcp.txt
+      - name: Show the server log
+        if: failure()
+        shell: bash
+        run: cat server.log || true

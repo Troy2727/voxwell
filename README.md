@@ -220,15 +220,29 @@ Each new clip is sped up if it runs long, then trimmed to the gap before the nex
 
 ## <img src="docs/readme/icons/rocket.svg" width="24" height="24" alt="" /> Quick start
 
-**Requirements:** [uv](https://docs.astral.sh/uv/) (it installs Python 3.11 for you), [Node.js](https://nodejs.org/) and [ffmpeg](https://ffmpeg.org/) on your `PATH`. ffmpeg is used for dubbing and some tools.
+**Command line and MCP server.** One command installs both. It needs [git](https://git-scm.com/downloads) and sets up uv and Python 3.11 for you. On Windows the first run downloads about 6 GB and uses about 11 GB of disk, before any model weights. Run it again to update.
+
+```sh
+# macOS and Linux
+curl -LsSf https://raw.githubusercontent.com/Troy2727/voxwell/main/install.sh | sh
+```
+
+```powershell
+# Windows (PowerShell)
+irm https://raw.githubusercontent.com/Troy2727/voxwell/main/install.ps1 | iex
+```
+
+Then open a new terminal and run `voxwell serve`. It stays running, so use another terminal for `voxwell --help`. The installer prints the full path of the MCP server for your AI assistant's settings. Dubbing and some tools also need [ffmpeg](https://ffmpeg.org/) on your `PATH`.
+
+**The app, from source.** This needs [uv](https://docs.astral.sh/uv/), [Node.js](https://nodejs.org/) and ffmpeg. Run each line from the repo folder, in its own terminal:
 
 ```sh
 git clone https://github.com/Troy2727/voxwell.git && cd voxwell
 
-cd backend && uv sync && uv run pytest     # backend + tests
-cd app && npm install && npm run dev       # UI on http://localhost:5173
-cd app && VOXWELL_DEV=1 npm run electron   # desktop shell (starts the backend)
-cd backend && uv run voxwell --help        # the CLI; its commands need the backend running
+(cd backend && uv sync && uv run pytest)     # backend + tests
+(cd app && npm install && npm run dev)       # UI on http://localhost:5173
+(cd app && VOXWELL_DEV=1 npm run electron)   # desktop shell (starts the backend)
+(cd backend && uv run voxwell --help)        # the CLI; its commands need the backend running
 ```
 
 Model weights download on first use of each feature.
