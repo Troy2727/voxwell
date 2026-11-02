@@ -1,7 +1,8 @@
-"""One agent turn: the local language model, a JSON tool-call protocol and the spoken reply.
+"""One agent turn: the local language model, its tool calls and the spoken reply.
 
-The model is the one AI direction loads (Qwen2.5-1.5B-Instruct, Apache-2.0). To use a tool it
-replies with only {"tool": "<name>", "arguments": {...}}; the result comes back as the next message.
+The model is the one AI direction loads (Qwen2.5-1.5B-Instruct, Apache-2.0). The enabled tools go
+to its chat template as function definitions, the format it was trained on; it calls one with
+<tool_call>{"name": ..., "arguments": {...}}</tool_call> and the result comes back as a tool message.
 """
 
 import base64
@@ -25,14 +26,14 @@ MAX_REPLY_TOKENS = 200
 FALLBACK_REPLY = "Sorry, I could not finish that."
 
 
-def _chat(messages: list[dict]) -> str:
+def _chat(messages: list[dict], tools: list[dict] | None = None) -> str:
     """The model's reply to a chat, from the model AI direction loads (one at a time)."""
     import torch
 
     from voxwell.features.tools import direction
 
     model, tokenizer = direction._load()
-    prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+    prompt = tokenizer.apply_chat_template(messages, tools=tools, tokenize=False, add_generation_prompt=True)
     inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
     with direction._lock, torch.inference_mode():
         out = model.generate(**inputs, max_new_tokens=MAX_REPLY_TOKENS, do_sample=False, pad_token_id=tokenizer.eos_token_id)
@@ -40,27 +41,20 @@ def _chat(messages: list[dict]) -> str:
 
 
 def instructions(agent: Agent) -> str:
-    text = (agent.system_prompt.strip() or "You are a helpful assistant.") + (
-        f"\n\nYour replies are spoken aloud: answer in {LANGUAGES[agent.language]}, in short plain sentences, "
-        "without markdown, lists or emoji."
+    # The tools themselves reach the model through its chat template (see respond). Asking here for
+    # "short plain sentences" made the model answer sums from memory instead of calling the calculator.
+    return (agent.system_prompt.strip() or "You are a helpful assistant.") + (
+        f"\n\nYour replies are spoken aloud, so never use markdown, lists or emoji. Answer in {LANGUAGES[agent.language]}."
     )
-    enabled = [tools.TOOLS[name] for name in agent.tools if name in tools.TOOLS]
-    if enabled:
-        listed = "\n".join(f"- {t.name}: {t.description} Arguments: {t.arguments}" for t in enabled)
-        text += (
-            f"\n\nYou can use these tools:\n{listed}\n"
-            'To use one, reply with only a JSON object such as {"tool": "calculator", "arguments": {"expression": "2 + 2"}}. '
-            "The result comes back in the next message. Otherwise just answer."
-        )
-    return text
 
 
 def parse_tool_call(reply: str) -> tuple[dict | None, str | None]:
     """The tool call in a model reply.
 
     Returns (call, None) for a call, (None, problem) for a call that cannot be read, and
-    (None, None) for an ordinary answer. The first JSON object with a "tool" key counts, with
-    any nesting in its arguments and any text around it.
+    (None, None) for an ordinary answer. The first JSON object that names a tool counts, with
+    any nesting in its arguments and any text around it: the model's own form
+    {"name": ..., "arguments": ...} (inside <tool_call> tags) or {"tool": ...}.
     """
     decoder = json.JSONDecoder()
     for brace in re.finditer(r"\{", reply):
@@ -68,8 +62,11 @@ def parse_tool_call(reply: str) -> tuple[dict | None, str | None]:
             value, _ = decoder.raw_decode(reply, brace.start())
         except json.JSONDecodeError:
             continue
-        if isinstance(value, dict) and "tool" in value:
-            name, arguments = value["tool"], value.get("arguments")
+        if not isinstance(value, dict):
+            continue
+        key = "tool" if "tool" in value else "name" if "name" in value and "arguments" in value else None
+        if key:
+            name, arguments = value[key], value.get("arguments")
             if not isinstance(name, str):
                 return None, '"tool" must be the name of a tool.'
             return {"tool": name, "arguments": {} if arguments is None else arguments}, None
@@ -100,9 +97,10 @@ def respond(agent: Agent, history: list[dict], message: str) -> dict:
         *clean_history(history),
         {"role": "user", "content": message[:MAX_MESSAGE]},
     ]
+    offered = tools.schemas(agent.tools)
     calls: list[dict] = []
     for round_ in range(MAX_TOOL_ROUNDS + 1):
-        reply = _chat(messages).strip()
+        reply = _chat(messages, offered).strip()
         call, problem = parse_tool_call(reply)
         if call is None and problem is None:
             return {"reply": reply or FALLBACK_REPLY, "tool_calls": calls}
@@ -120,10 +118,10 @@ def respond(agent: Agent, history: list[dict], message: str) -> dict:
                 log.exception("Agent tool %s failed", call["tool"])
                 entry["error"] = "The tool failed."
         calls.append(entry)
-        feedback = f"Result of {entry['tool']}: {entry['result']}" if "result" in entry else f"Error: {entry['error']}"
+        feedback = entry["result"] if "result" in entry else f"Error: {entry['error']}"
         if round_ == MAX_TOOL_ROUNDS - 1:
             feedback += "\nNo more tools now: answer the user."
-        messages += [{"role": "assistant", "content": reply}, {"role": "user", "content": f"[tool] {feedback}"}]
+        messages += [{"role": "assistant", "content": reply}, {"role": "tool", "content": feedback}]
     return {"reply": FALLBACK_REPLY, "tool_calls": calls}
 
 

@@ -381,7 +381,7 @@ def test_mcp_chat_with_agent(mcp, monkeypatch):
     from voxwell.features.agents import conversation, store
 
     replies = iter(['{"tool": "calculator", "arguments": {"expression": "2 + 2"}}', "Four."])
-    monkeypatch.setattr(conversation, "_chat", lambda messages: next(replies))
+    monkeypatch.setattr(conversation, "_chat", lambda messages, tools=None: next(replies))
     store.create(name="Maths", system_prompt="", voice="", language="en", tools=["calculator"])
     result = tool(mcp, "chat_with_agent", agent="maths", message="2+2?")
     assert result["isError"] is False and result["content"][0]["text"] == "[calculator: 4]\nFour."
