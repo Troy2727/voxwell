@@ -56,8 +56,9 @@ main() {
   echo "Voxwell is installed. Open a new terminal, then:"
   echo "  voxwell serve     start the server (keep it running; models download on first use)"
   echo "  voxwell --help    every command, in another terminal"
-  echo "  voxwell-mcp       the MCP server, for your AI assistant's settings"
-  echo "The commands are in $bin"
+  echo
+  echo "For the MCP server, put this full path in your AI assistant's settings:"
+  echo "  $app/backend/.venv/bin/voxwell-mcp"
 }
 
 main "$@"

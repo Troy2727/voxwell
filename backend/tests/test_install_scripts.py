@@ -121,13 +121,14 @@ def test_fresh_install_clones_syncs_from_the_lockfile_and_adds_both_commands(ins
     assert any(c.startswith("uv sync") and "--frozen" in c and "--no-dev" in c for c in commands)
     assert any(c.startswith("uv tool update-shell") for c in commands)
     for name in ("voxwell", "voxwell-mcp"):
-        # A real program on Windows: MCP clients start the command directly, and only a shell can run a .cmd.
-        command = install.bin / f"{name}{EXE}"
-        assert command.exists()
         expected = install.app / "backend" / ".venv" / BIN_FOLDER / f"{name}{EXE}"
-        assert WINDOWS or command.resolve() == expected.resolve()
-    assert not list(install.bin.glob("*.cmd"))
+        shim = install.bin / (f"{name}.cmd" if WINDOWS else name)
+        assert str(expected) in shim.read_text() if WINDOWS else shim.resolve() == expected.resolve()
     assert "voxwell serve" in result.stdout
+    # MCP clients start the command directly, and only a shell can run a .cmd, so they get the real program.
+    assert str(install.app / "backend" / ".venv" / BIN_FOLDER / f"voxwell-mcp{EXE}").replace("\\", "/") in (
+        result.stdout.replace("\\", "/").replace("\n", "")
+    )
 
 
 def test_running_it_again_updates_instead_of_cloning(install):
@@ -210,19 +211,7 @@ def test_windows_retries_a_sync_that_antivirus_interrupted(install):
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert len([c for c in install.commands() if c.startswith("uv sync")]) == 2
-    assert (install.bin / "voxwell.exe").exists()
-
-
-@pytest.mark.skipif(not WINDOWS, reason="Windows locks a running program's file; a symlink has no such problem")
-def test_windows_update_works_while_voxwell_is_running(install):
-    fake_all(install)
-    assert install.run().returncode == 0
-
-    with open(install.bin / "voxwell.exe", "rb"):  # stands in for the running server holding its file
-        (install.app / ".git").mkdir(exist_ok=True)
-        result = install.run()
-
-    assert result.returncode == 0, result.stdout + result.stderr
+    assert (install.bin / "voxwell.cmd").exists()
 
 
 def test_a_failed_sync_stops_before_adding_commands(install):

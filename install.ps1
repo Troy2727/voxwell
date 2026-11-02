@@ -66,15 +66,12 @@ function Install-Voxwell {
 
     $bin = (uv tool dir --bin | Out-String).Trim()
     New-Item -ItemType Directory -Force -Path $bin | Out-Null
-    # Copies of uv's launchers, which hold the full path to the environment. A .cmd would not do: MCP
-    # clients start the command directly, and only a shell can run one. An unchanged copy is left in
-    # place, because Windows refuses to overwrite a program that is running.
+    # Small .cmd files for terminals. Copies of uv's .exe launchers do not work: one failed with "uv
+    # trampoline failed to canonicalize script path", and antivirus removed others.
+    $oem = [Text.Encoding]::GetEncoding([Globalization.CultureInfo]::CurrentCulture.TextInfo.OEMCodePage)
+    $scripts = Join-Path $app 'backend\.venv\Scripts'
     foreach ($name in 'voxwell', 'voxwell-mcp') {
-        $source = Join-Path $app "backend\.venv\Scripts\$name.exe"
-        $target = Join-Path $bin "$name.exe"
-        if (-not (Test-Path $target) -or (Get-FileHash $source).Hash -ne (Get-FileHash $target).Hash) {
-            Copy-Item $source $target -Force
-        }
+        [IO.File]::WriteAllText((Join-Path $bin "$name.cmd"), "@`"$scripts\$name.exe`" %*`r`n", $oem)
     }
     if (-not $env:UV_NO_MODIFY_PATH) { uv tool update-shell }
 
@@ -82,8 +79,9 @@ function Install-Voxwell {
     Write-Host 'Voxwell is installed. Open a new terminal, then:'
     Write-Host '  voxwell serve     start the server (keep it running; models download on first use)'
     Write-Host '  voxwell --help    every command, in another terminal'
-    Write-Host '  voxwell-mcp       the MCP server, for your AI assistant''s settings'
-    Write-Host "The commands are in $bin"
+    Write-Host ''
+    Write-Host 'For the MCP server, put this full path in your AI assistant''s settings:'
+    Write-Host "  $scripts\voxwell-mcp.exe"
 }
 
 Install-Voxwell

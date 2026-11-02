@@ -232,7 +232,7 @@ curl -LsSf https://raw.githubusercontent.com/Troy2727/voxwell/main/install.sh | 
 irm https://raw.githubusercontent.com/Troy2727/voxwell/main/install.ps1 | iex
 ```
 
-Then open a new terminal and run `voxwell serve`. It stays running, so use another terminal for `voxwell --help`. Dubbing and some tools also need [ffmpeg](https://ffmpeg.org/) on your `PATH`.
+Then open a new terminal and run `voxwell serve`. It stays running, so use another terminal for `voxwell --help`. The installer prints the full path of the MCP server for your AI assistant's settings. Dubbing and some tools also need [ffmpeg](https://ffmpeg.org/) on your `PATH`.
 
 **The app, from source.** This needs [uv](https://docs.astral.sh/uv/), [Node.js](https://nodejs.org/) and ffmpeg. Run each line from the repo folder, in its own terminal:
 
