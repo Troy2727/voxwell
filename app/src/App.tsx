@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
-import { House, LogOut, Moon, PlugZap, Sun } from 'lucide-react';
+import { House, LogOut, Moon, Sun } from 'lucide-react';
 import { api } from './api';
 import { AuthPage } from './auth/AuthPage';
 import { FEATURES } from './features';
 import { HomePage } from './home/Page';
 import { LogoMark } from '@/components/logo';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
   Sidebar,
@@ -59,22 +58,6 @@ function Account({ user }: { user: User }) {
         <LogOut />
       </Button>
     </div>
-  );
-}
-
-function BackendOffline() {
-  return (
-    <Alert className="mx-auto mb-6 max-w-4xl">
-      <PlugZap />
-      <AlertTitle>Voxwell isn't running on this computer</AlertTitle>
-      <AlertDescription>
-        <p>
-          Everything Voxwell does happens on your own computer: this page only shows the controls. Start Voxwell (the
-          desktop app, or <code>uv run voxwell</code> in the <code>backend</code> folder) and this page connects by itself.
-        </p>
-        <p>If your browser asks whether this site may connect to apps on your device, choose Allow.</p>
-      </AlertDescription>
-    </Alert>
   );
 }
 
@@ -192,7 +175,6 @@ function Shell({ user }: { user?: User }) {
           )}
         </header>
         <main className="flex-1 p-4 sm:p-6 md:p-8">
-          {online === false && <BackendOffline />}
           {feature ? (
             <feature.Page key={`${feature.id}-${connection}`} />
           ) : (
