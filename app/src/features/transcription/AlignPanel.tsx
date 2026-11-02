@@ -78,8 +78,8 @@ export function AlignPanel() {
       description="Already have the words? Add the recording and paste the script: every word is timed against the audio."
     >
       <FileDrop file={file} onFile={setFile} accept="audio/*,video/*,.mkv" disabled={busy} />
-      <Field label="Script" hint="Plain text, exactly as spoken or close to it. Punctuation and capitals are kept in the subtitles.">
-        <Textarea value={script} onChange={(e) => setScript(e.target.value)} rows={6} disabled={busy} placeholder="Paste the script here…" />
+      <Field label="Script" htmlFor="align-script" hint="Plain text, exactly as spoken or close to it. Punctuation and capitals are kept in the subtitles.">
+        <Textarea id="align-script" value={script} onChange={(e) => setScript(e.target.value)} rows={6} disabled={busy} placeholder="Paste the script here…" />
       </Field>
       <div className="flex flex-wrap items-end gap-4">
         <Field label="Language" className="w-full sm:w-48">

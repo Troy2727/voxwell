@@ -24,7 +24,7 @@ test('subtitles from a script: every word is timed against the recording', async
   await openFeature(page, 'Transcribe');
   const align = page.locator('[data-slot=card]').filter({ hasText: 'Subtitles from a script' });
   await dropFile(page, 'speech.wav', align);
-  await align.getByRole('textbox').fill(SCRIPT); // its label is not tied to the box (no htmlFor)
+  await align.getByLabel('Script').fill(SCRIPT);
   await align.getByRole('button', { name: 'Align' }).click();
   const badge = align.getByText(/^\d+ of \d+ words matched$/);
   await expect(badge).toBeVisible();
