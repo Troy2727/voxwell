@@ -51,7 +51,15 @@ function Install-Voxwell {
     if (-not $env:UV_LINK_MODE) { $env:UV_LINK_MODE = 'copy' }     # hardlinks fail on OneDrive folders
     Push-Location (Join-Path $app 'backend')
     try {
-        Invoke-Checked 'uv sync' { uv sync --frozen --no-dev }
+        # Real-time antivirus can hold a file uv just wrote, and uv then stops with "Access is denied".
+        # uv keeps what finished, so trying again carries on from there.
+        for ($attempt = 1; $true; $attempt++) {
+            uv sync --frozen --no-dev
+            if ($LASTEXITCODE -eq 0) { break }
+            if ($attempt -ge 5) { throw "uv sync failed (exit code $LASTEXITCODE). Run this installer again to continue." }
+            Write-Host "uv sync stopped (exit code $LASTEXITCODE). Trying again ($($attempt + 1) of 5)..."
+            Start-Sleep -Seconds 2
+        }
     } finally {
         Pop-Location
     }

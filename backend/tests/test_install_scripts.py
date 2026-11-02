@@ -189,6 +189,28 @@ def test_uv_no_modify_path_leaves_path_alone(install, monkeypatch):
     assert not any(c.startswith("uv tool update-shell") for c in install.commands())
 
 
+@pytest.mark.skipif(not WINDOWS, reason="antivirus holding a new file is a Windows failure")
+def test_windows_retries_a_sync_that_antivirus_interrupted(install):
+    install.fake("git", FAKE_GIT)
+    install.fake("ffmpeg", FAKE_FFMPEG)
+    install.fake(
+        "uv",
+        {
+            "nt": FAKE_UV["nt"].replace(
+                'if "%1"=="sync" (',
+                'if "%1"=="sync" if not exist "%FAKE_LOG%.failed" (\n  type nul > "%FAKE_LOG%.failed"\n  exit /b 2\n)\n'
+                'if "%1"=="sync" (',
+            )
+        },
+    )
+
+    result = install.run()
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert len([c for c in install.commands() if c.startswith("uv sync")]) == 2
+    assert (install.bin / "voxwell.cmd").exists()
+
+
 def test_a_failed_sync_stops_before_adding_commands(install):
     install.fake("git", FAKE_GIT)
     install.fake("ffmpeg", FAKE_FFMPEG)
