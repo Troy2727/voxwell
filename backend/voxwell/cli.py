@@ -8,6 +8,7 @@ stderr (or a JSON {"error": ...} object) with exit code 1.
 """
 
 import argparse
+import http.client
 import json
 import mimetypes
 import os
@@ -44,6 +45,8 @@ class Client:
             raise CliError(_error_message(exc.read(), str(exc))) from exc
         except urllib.error.URLError as exc:
             raise CliError("Voxwell is not running. Open the Voxwell app, or run `voxwell serve` in another terminal.") from exc
+        except (OSError, http.client.HTTPException) as exc:  # urlopen wraps only connecting; these come after that
+            raise CliError(f"Lost the connection to Voxwell before it finished ({exc!r}). Try again.") from exc
 
     def get_json(self, path: str):
         return json.loads(self.request("GET", path))

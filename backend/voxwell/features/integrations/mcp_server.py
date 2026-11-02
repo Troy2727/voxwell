@@ -9,6 +9,7 @@ local HTTP API, so models are loaded only once, in the app. Written with the sta
 import argparse
 import json
 import sys
+import traceback
 
 from voxwell import cli
 
@@ -394,11 +395,15 @@ HANDLERS = {
 }
 
 
-def handle(message: dict) -> dict | None:
+def handle(message) -> dict | None:
     """One JSON-RPC message in, the response out (None for notifications)."""
+    if not isinstance(message, dict):
+        return {"jsonrpc": "2.0", "id": None, "error": {"code": -32600, "message": "Invalid request"}}
     method, msg_id, params = message.get("method"), message.get("id"), message.get("params") or {}
     if msg_id is None:  # notifications (e.g. notifications/initialized) get no reply
         return None
+    if not isinstance(params, dict):
+        return {"jsonrpc": "2.0", "id": msg_id, "error": {"code": -32602, "message": "params must be an object"}}
     if method == "initialize":
         result = {
             "protocolVersion": params.get("protocolVersion", PROTOCOL_VERSION),
@@ -410,13 +415,17 @@ def handle(message: dict) -> dict | None:
     elif method == "tools/list":
         result = {"tools": TOOLS}
     elif method == "tools/call":
-        handler = HANDLERS.get(params.get("name"))
+        name = params.get("name")
+        handler = HANDLERS.get(name) if isinstance(name, str) else None
         if handler is None:
-            return {"jsonrpc": "2.0", "id": msg_id, "error": {"code": -32602, "message": f"Unknown tool: {params.get('name')}"}}
+            return {"jsonrpc": "2.0", "id": msg_id, "error": {"code": -32602, "message": f"Unknown tool: {name}"}}
         try:
             result = {"content": [{"type": "text", "text": handler(params.get("arguments") or {})}], "isError": False}
         except (ToolError, cli.CliError) as exc:
             result = {"content": [{"type": "text", "text": str(exc)}], "isError": True}
+        except Exception as exc:  # one bad call must not end the server: the assistant would lose every tool
+            traceback.print_exc(file=sys.stderr)
+            result = {"content": [{"type": "text", "text": f"The {name} tool failed: {exc!r}"}], "isError": True}
     else:
         return {"jsonrpc": "2.0", "id": msg_id, "error": {"code": -32601, "message": f"Method not found: {method}"}}
     return {"jsonrpc": "2.0", "id": msg_id, "result": result}

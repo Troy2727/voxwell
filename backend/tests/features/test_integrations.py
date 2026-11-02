@@ -1,4 +1,5 @@
 import asyncio
+import http.client
 import io
 import json
 import re
@@ -419,6 +420,73 @@ def test_mcp_when_voxwell_is_closed(monkeypatch):
     monkeypatch.setattr(cli.urllib.request, "urlopen", refuse)
     result = mcp_server.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "list_voices"}})
     assert result["result"]["isError"] and "not running" in result["result"]["content"][0]["text"]
+
+
+def test_mcp_unexpected_errors_are_reported_and_the_server_keeps_running(mcp, tmp_path, capsys):
+    audio = tmp_path / "a.wav"
+    audio.write_bytes(b"RIFF")
+
+    result = tool(mcp, "transcribe", file_path=str(audio), label_speakers=True, num_speakers="two")
+
+    assert result["isError"] is True
+    assert "two" in result["content"][0]["text"]
+    assert "ValueError" in capsys.readouterr().err  # the traceback goes to stderr; stdout is the protocol stream
+    assert mcp("ping")["result"] == {}
+
+
+def test_mcp_malformed_messages_do_not_stop_the_server(mcp, monkeypatch, capsys):
+    lines = [
+        "[]",
+        "5",
+        '{"id": 1, "method": "tools/call", "params": 5}',
+        '{"id": 2, "method": "tools/call", "params": {"name": ["speak"]}}',
+        '{"id": 3, "method": "tools/call", "params": {"name": "speak", "arguments": 5}}',
+        '{"id": 4, "method": "ping"}',
+    ]
+    monkeypatch.setattr(mcp_server.sys, "stdin", io.StringIO("\n".join(lines)))
+
+    mcp_server.main()
+
+    replies = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+    assert [r["error"]["code"] for r in replies[:2]] == [-32600, -32600]
+    assert replies[2]["id"] == 1 and replies[2]["error"]["code"] == -32602
+    assert replies[3]["id"] == 2 and replies[3]["error"]["code"] == -32602
+    assert replies[4]["id"] == 3 and replies[4]["result"]["isError"] is True
+    assert replies[5] == {"jsonrpc": "2.0", "id": 4, "result": {}}
+
+
+class _Response:
+    """What urlopen returns, with a body that fails partway through."""
+
+    def __init__(self, error):
+        self.error = error
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc_info):
+        return False
+
+    def read(self):
+        raise self.error
+
+
+@pytest.mark.parametrize("error", [ConnectionResetError(10054, "reset"), http.client.IncompleteRead(b""), TimeoutError()])
+def test_cli_reports_a_connection_lost_mid_response(monkeypatch, error):
+    monkeypatch.setattr(cli.urllib.request, "urlopen", lambda *a, **k: _Response(error))
+
+    with pytest.raises(cli.CliError, match="Lost the connection"):
+        cli.Client().request("GET", "/api/anything")
+
+
+def test_cli_reports_a_connection_lost_before_the_response(monkeypatch):
+    def disconnected(*a, **k):
+        raise http.client.RemoteDisconnected("closed")
+
+    monkeypatch.setattr(cli.urllib.request, "urlopen", disconnected)
+
+    with pytest.raises(cli.CliError, match="Lost the connection"):
+        cli.Client().request("GET", "/api/anything")
 
 
 def test_mcp_stdio_loop(monkeypatch, capsys):
