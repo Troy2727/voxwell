@@ -52,8 +52,8 @@ test('compare voices: the same sentence in two voices', async ({ app: page, mode
   const voice = await ensureVoice(page, mode);
   const panel = await openTool(page, 'Compare voices');
   await panel.getByLabel('Text').fill('Welcome back. Here is the news.');
-  await panel.getByRole('button', { name: 'Add a voice' }).click();
-  await panel.locator('button[role=combobox][aria-haspopup=dialog]').last().click();
+  // The panel starts with two default voices: set the second one, so each voice has one result.
+  await panel.locator('button[role=combobox][aria-haspopup=dialog]').nth(1).click();
   const second = mode === 'mock' ? 'Narrator' : voice;
   await page.getByRole('option', { name: new RegExp(second) }).first().click();
   await panel.getByRole('button', { name: 'Compare' }).click();
