@@ -39,7 +39,7 @@
 
 <br/>
 
-<a href="https://github.com/Troy2727/voxwell/blob/main/docs/readme/voxwell-hero-demo.mp4" title="Watch the full demo with sound">
+<a href="https://cdn.jsdelivr.net/gh/Troy2727/voxwell@da483eed2edd541563628456128b11d6e47ce77d/docs/readme/voxwell-hero-demo.mp4" title="Watch the full demo with sound">
   <img src="docs/readme/screenshots/animated/hero-demo.gif" alt="Clips from the Voxwell demo video: designing a voice, cloning a voice, composing music, dubbing a video and transcribing audio. Click to watch the full 90-second demo with sound." width="100%" />
 </a>
 <br />
