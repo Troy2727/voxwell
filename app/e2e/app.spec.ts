@@ -120,6 +120,16 @@ test.describe('errors the user can see', () => {
         await page.getByRole('button', { name: 'Apply effects' }).click();
         await expect(page.getByRole('alert').filter({ hasText: advice })).toBeVisible();
       });
+
+      test(`Home with no backend on ${device} says what that device can do`, async ({ page }) => {
+        await installMockBackend(page);
+        await page.route(`${BACKEND}/api/health`, (route) => route.abort('connectionrefused'));
+        await page.addInitScript((points) => Object.defineProperty(navigator, 'maxTouchPoints', { value: points }), touchPoints);
+        await page.goto('/');
+        const isComputer = touchPoints === 0;
+        await expect(page.getByText(isComputer ? "Voxwell isn't running on this computer" : 'Voxwell runs on a computer, not a phone or tablet')).toBeVisible();
+        await expect(page.getByRole('link', { name: 'Install it' })).toHaveCount(isComputer ? 1 : 0);
+      });
     });
   }
 
