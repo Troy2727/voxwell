@@ -79,13 +79,15 @@ async function main() {
   const centreOff = Math.abs(st.bounds.x + st.bounds.width / 2 - (st.workArea.x + st.workArea.width / 2));
   const bottomGap = st.workArea.y + st.workArea.height - (st.bounds.y + st.bounds.height);
   check('bottom centre', centreOff <= 1 && bottomGap >= 0 && bottomGap <= 60, { centreOff, bottomGap });
-  check('waveform drawn', await overlay.evaluate(() => {
+  // Keeps looking, since a slow machine may not have painted yet. Silent bars count: macOS test
+  // machines give the fake microphone no signal, so this can't check that the bars react to sound.
+  check('waveform drawn', await overlay.waitForFunction(() => {
     const c = document.querySelector('canvas');
     if (!c) return false;
     const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
     for (let i = 3; i < d.length; i += 4) if (d[i] > 0) return true;
     return false;
-  }));
+  }, null, { timeout: 10000, polling: 250 }).then(() => true, () => false));
   await overlay.screenshot({ path: path.join(OUT, `${process.platform}-pill-recording.png`) });
   screen('recording');
 
