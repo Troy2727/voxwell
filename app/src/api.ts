@@ -23,11 +23,16 @@ export async function errorMessage(res: Response): Promise<string> {
   return text || `Request failed (${res.status}).`;
 }
 
+/** Voxwell can't run on a phone or tablet. iPads report themselves as Macs, so touch gives them away. */
+const onPhoneOrTablet = () =>
+  /Android|iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+
 /** What to tell the user when fetch rejects, which only happens when the backend can't be reached. */
-export const backendUnreachable = () =>
-  window.voxwell
-    ? "Voxwell's engine isn't responding. Restart the app and try again."
-    : "Can't reach Voxwell on this computer. Start the Voxwell app or run voxwell serve, allow local network access if your browser asks, then try again.";
+export const backendUnreachable = () => {
+  if (window.voxwell) return "Voxwell's engine isn't responding. Restart the app and try again.";
+  if (onPhoneOrTablet()) return "Voxwell runs on a computer, not a phone or tablet. Open this page on the computer where it's installed.";
+  return "Can't reach Voxwell on this computer. Start the Voxwell app or run voxwell serve, allow local network access if your browser asks, then try again.";
+};
 
 /** Fetch JSON from the backend; throws with the server's message on a non-2xx status. */
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {

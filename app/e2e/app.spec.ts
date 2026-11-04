@@ -101,6 +101,28 @@ test.describe('errors the user can see', () => {
     await expect(page.getByText('Failed to fetch')).toHaveCount(0);
   });
 
+  const MAC = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15';
+  const BROWSERS = [
+    { device: 'an iPhone', userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1', touchPoints: 5, advice: /Voxwell runs on a computer/ },
+    { device: 'an Android phone', userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36', touchPoints: 5, advice: /Voxwell runs on a computer/ },
+    { device: 'an iPad, which reports itself as a Mac', userAgent: MAC, touchPoints: 5, advice: /Voxwell runs on a computer/ },
+    { device: 'a Mac', userAgent: MAC, touchPoints: 0, advice: /Start the Voxwell app or run voxwell serve/ },
+  ];
+  for (const { device, userAgent, touchPoints, advice } of BROWSERS) {
+    test.describe(() => {
+      test.use({ userAgent });
+
+      test(`an action with no backend on ${device} gives advice that device can follow`, async ({ app: page }) => {
+        await page.evaluate((points) => Object.defineProperty(navigator, 'maxTouchPoints', { value: points }), touchPoints);
+        await page.route(`${BACKEND}/api/audio_effects/apply`, (route) => route.abort('connectionrefused'));
+        await openFeature(page, 'Audio effects');
+        await dropFile(page, 'speech.wav');
+        await page.getByRole('button', { name: 'Apply effects' }).click();
+        await expect(page.getByRole('alert').filter({ hasText: advice })).toBeVisible();
+      });
+    });
+  }
+
   test('a file that is too large: the server message is shown', async ({ app: page }) => {
     await page.route(`${BACKEND}/api/voice_cloning/voices`, (route) =>
       route.fulfill({ status: 413, contentType: 'application/json', body: JSON.stringify({ detail: 'The file is too large. The limit is 50 MB.' }) }));
