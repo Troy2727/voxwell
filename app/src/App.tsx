@@ -192,7 +192,9 @@ export default function App() {
   const { session, recovering, endRecovery } = useSession();
   return (
     <TooltipProvider>
-      {session === undefined ? null : supabase && (!session || recovering) ? (
+      {session === undefined ? (
+        <p className="p-8 text-center">Loading Voxwell… If this doesn't go away, check your connection and reload the page.</p>
+      ) : supabase && (!session || recovering) ? (
         <AuthPage recovering={recovering} onRecovered={endRecovery} />
       ) : (
         <Shell user={session?.user} />

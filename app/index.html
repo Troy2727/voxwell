@@ -7,7 +7,8 @@
     <title>Voxwell</title>
   </head>
   <body>
-    <div id="root"></div>
+    <!-- Plain text, so a script that can't load (a tab left over from before an update) doesn't leave a blank screen. The app replaces it. -->
+    <div id="root"><p style="font-family: system-ui, sans-serif; padding: 2rem; text-align: center">Loading Voxwell… If this doesn't go away, check your connection and reload the page.</p></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

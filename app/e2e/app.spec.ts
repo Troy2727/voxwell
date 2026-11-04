@@ -133,6 +133,22 @@ test.describe('errors the user can see', () => {
     });
   }
 
+  test('a script that cannot load: the page says so, not a blank screen', async ({ page }) => {
+    await page.route('**/src/main.tsx', (route) => route.abort());
+    await page.goto('/');
+    await expect(page.getByText("Loading Voxwell… If this doesn't go away, check your connection and reload the page.")).toBeVisible();
+  });
+
+  test('a page that crashes: it says so and offers a reload, not a blank screen', async ({ page }) => {
+    await installMockBackend(page);
+    await page.route(`${BACKEND}/api/projects/items`, (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ length: 1 }) }));
+    await page.goto('/');
+    await expect(page.getByRole('alert').filter({ hasText: 'Something went wrong' })).toBeVisible();
+    await page.unroute(`${BACKEND}/api/projects/items`);
+    await page.getByRole('button', { name: 'Reload' }).click();
+    await expect(page.getByText('Running on this computer', { exact: true })).toBeVisible();
+  });
+
   test('a file that is too large: the server message is shown', async ({ app: page }) => {
     await page.route(`${BACKEND}/api/voice_cloning/voices`, (route) =>
       route.fulfill({ status: 413, contentType: 'application/json', body: JSON.stringify({ detail: 'The file is too large. The limit is 50 MB.' }) }));
