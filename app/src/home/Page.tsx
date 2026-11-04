@@ -7,6 +7,7 @@ import { EmptyState, Section } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { INSTALL_URL } from '@/lib/links';
 import { cn } from '@/lib/utils';
 
 interface Project {
@@ -70,7 +71,7 @@ export function HomePage({ name, online, onOpen }: { name?: string; online: bool
             </span>
             {online === null ? 'Connecting…' : online ? 'Running on this computer' : "Voxwell isn't running on this computer"}
             {online === false && !window.voxwell && (
-              <a className="text-foreground underline" href="https://github.com/Troy2727/voxwell#-quick-start" target="_blank" rel="noreferrer">Install it</a>
+              <a className="text-foreground underline" href={INSTALL_URL} target="_blank" rel="noreferrer">Install it</a>
             )}
           </p>
         </div>
