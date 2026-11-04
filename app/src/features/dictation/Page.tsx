@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Copy, Mic, Square } from 'lucide-react';
+import { Copy, Mic, Square, Trash2 } from 'lucide-react';
 import { ChoiceSelect } from '@/components/choice-select';
 import { ErrorAlert, Field, Muted, Page as PageLayout, Section } from '@/components/page';
 import { Button } from '@/components/ui/button';
@@ -136,6 +136,12 @@ export default function Page() {
     }
   };
 
+  /** The current result is always the top of Recent, so deleting that line clears both. */
+  const remove = (index: number) => {
+    setHistory((h) => h.filter((_, i) => i !== index));
+    if (index === 0) setText('');
+  };
+
   const recording = phase === 'recording';
   const tabs = (
     <Tabs value={mode} onValueChange={(v) => setMode(v as Mode)}>
@@ -196,9 +202,12 @@ export default function Page() {
         {text ? (
           <>
             <p className="leading-relaxed">{text}</p>
-            <div>
+            <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={() => copy(text)}>
                 <Copy /> {copied ? 'Copied' : 'Copy'}
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => remove(0)}>
+                <Trash2 /> Delete
               </Button>
             </div>
           </>
@@ -217,6 +226,9 @@ export default function Page() {
                 <span className="flex-1">{h}</span>
                 <Button variant="ghost" size="sm" onClick={() => copy(h)}>
                   <Copy /> Copy
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => remove(i)}>
+                  <Trash2 /> Delete
                 </Button>
               </div>
             ))}

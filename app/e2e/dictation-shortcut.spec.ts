@@ -175,6 +175,46 @@ test('a backend that stays away gets a plain message in the desktop app', async 
   expect(status.message).toBe("Voxwell's engine isn't responding. Restart the app and try again.");
 });
 
+test('dictated text can be deleted from Result and from Recent', async ({ app: page }) => {
+  await openFeature(page, 'Dictation');
+  const main = page.getByRole('main');
+  const result = main.locator('[data-slot=card]').filter({ hasText: 'Result' });
+  const recent = main.locator('[data-slot=card]').filter({ hasText: 'Recent' });
+  await page.evaluate(() => {
+    for (const text of ['Line one', 'Line two', 'Line three']) window.dispatchEvent(new CustomEvent('voxwell:dictated', { detail: text }));
+  });
+  await expect(result.getByText('Line three')).toBeVisible();
+
+  // An older line goes from Recent and leaves the current result alone.
+  await recent.locator('div', { hasText: /^Line two/ }).last().getByRole('button', { name: 'Delete' }).click();
+  await expect(recent.getByText('Line two')).toHaveCount(0);
+  await expect(result.getByText('Line three')).toBeVisible();
+
+  // The current result is the same text as the top of Recent, so it goes from both.
+  await result.getByRole('button', { name: 'Delete' }).click();
+  await expect(main.getByText('Line three')).toHaveCount(0);
+  await expect(result.getByText('Nothing yet. Press Record and speak.')).toBeVisible();
+  await expect(recent.getByText('Line one')).toBeVisible();
+
+  await recent.getByRole('button', { name: 'Delete' }).click();
+  await expect(recent.getByText('No transcripts yet.')).toBeVisible();
+});
+
+test('deleting the top of Recent also clears the current result', async ({ app: page }) => {
+  await openFeature(page, 'Dictation');
+  const main = page.getByRole('main');
+  const result = main.locator('[data-slot=card]').filter({ hasText: 'Result' });
+  const recent = main.locator('[data-slot=card]').filter({ hasText: 'Recent' });
+  await page.evaluate(() => {
+    for (const text of ['Older line', 'Newest line']) window.dispatchEvent(new CustomEvent('voxwell:dictated', { detail: text }));
+  });
+  await expect(result.getByText('Newest line')).toBeVisible();
+  await recent.getByRole('button', { name: 'Delete' }).first().click();
+  await expect(main.getByText('Newest line')).toHaveCount(0);
+  await expect(result.getByText('Nothing yet. Press Record and speak.')).toBeVisible();
+  await expect(recent.getByText('Older line')).toBeVisible();
+});
+
 test('in a browser with no backend, the Dictation page says what to do', async ({ app: page }) => {
   await page.route('**/api/dictation/transcribe', (route) => route.abort('connectionrefused'));
   await openFeature(page, 'Dictation');
