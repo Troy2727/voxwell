@@ -15,7 +15,7 @@ client = TestClient(app, base_url="http://127.0.0.1")
 
 
 def _fake(calls):
-    def fake(path, language=None):
+    def fake(path, language=None, speech_only=False):
         calls.append((path, language, path.read_bytes()))
         return engine.Transcript("hello world", language or "en", [engine.Segment(0.0, 1.0, "hello world")])
 
@@ -55,7 +55,7 @@ def test_empty_file(monkeypatch):
 
 
 def test_undecodable_audio(monkeypatch):
-    def boom(path, language=None):
+    def boom(path, language=None, speech_only=False):
         raise engine.AudioError("Could not decode the audio.")
 
     monkeypatch.setattr(engine, "transcribe", boom)
@@ -63,7 +63,7 @@ def test_undecodable_audio(monkeypatch):
 
 
 def test_engine_error_and_cleanup(monkeypatch):
-    def boom(path, language=None):
+    def boom(path, language=None, speech_only=False):
         raise RuntimeError("model exploded")
 
     monkeypatch.setattr(engine, "transcribe", boom)
@@ -71,6 +71,20 @@ def test_engine_error_and_cleanup(monkeypatch):
     assert r.status_code == 500
     assert "model exploded" not in r.json()["detail"] and r.json()["detail"].endswith("see the Voxwell log.")
     assert list(data_dir("dictation").iterdir()) == []
+
+
+def test_a_recording_with_no_speech_comes_back_empty(monkeypatch):
+    """Whisper invents text for silence or noise, which would end up on the user's clipboard."""
+    seen = []
+
+    def fake(path, language=None, speech_only=False):
+        seen.append(speech_only)
+        return engine.Transcript("", "en", [])
+
+    monkeypatch.setattr(engine, "transcribe", fake)
+    r = _post()
+    assert r.status_code == 200 and r.json()["text"] == ""
+    assert seen == [True]
 
 
 def test_temp_file_cleanup_on_success(monkeypatch):
@@ -87,12 +101,18 @@ def test_engine_transcribe_with_fake_model(monkeypatch, tmp_path):
         language = "en"
 
     class Model:
-        def transcribe(self, path, language=None):
+        vad_filter = None
+
+        def transcribe(self, path, language=None, vad_filter=False):
+            Model.vad_filter = vad_filter
             return iter([Seg()]), Info()
 
     monkeypatch.setattr(engine, "_load_model", lambda: Model())
     t = engine.transcribe(tmp_path / "a.wav")
     assert t.text == "hi there" and t.language == "en" and t.segments[0].end == 1.5
+    assert Model.vad_filter is False  # dubbing and file transcription keep all of their audio
+    engine.transcribe(tmp_path / "a.wav", speech_only=True)
+    assert Model.vad_filter is True
 
 
 def test_status_reports_ready_when_faster_whisper_is_installed():
@@ -260,7 +280,7 @@ def test_transcribe_runs_off_the_event_loop_and_caps_the_upload(monkeypatch):
 
     on_loop = []
 
-    def fake(path, language=None):
+    def fake(path, language=None, speech_only=False):
         try:
             asyncio.get_running_loop()
             on_loop.append(True)

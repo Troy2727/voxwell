@@ -40,7 +40,7 @@ async def transcribe(file: UploadFile = File(...), language: str | None = Form(N
             f.write(data)
         try:
             # In a worker thread, so the server (live audio included) keeps answering meanwhile.
-            result = await asyncio.to_thread(engine.transcribe, path, language or None)
+            result = await asyncio.to_thread(engine.transcribe, path, language or None, speech_only=True)
         except engine.AudioError as exc:
             raise HTTPException(422, str(exc))
         except Exception as exc:

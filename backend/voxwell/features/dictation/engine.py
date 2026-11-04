@@ -53,15 +53,21 @@ def _load_model():
 
 
 def transcribe(
-    audio_path: Path, language: str | None = None, on_progress: Callable[[float], None] | None = None
+    audio_path: Path,
+    language: str | None = None,
+    on_progress: Callable[[float], None] | None = None,
+    *,
+    speech_only: bool = False,
 ) -> Transcript:
     """Transcribe an audio file; detect the language when `language` is None.
 
     `on_progress`, if given, receives the fraction of the audio done (0..1) after each segment.
+    `speech_only` skips what a voice detector doesn't hear as speech, so silence or noise gives empty
+    text instead of words Whisper invented. It can also skip singing, so it's off unless asked for.
     """
     model = _load_model()
     try:
-        segments, info = model.transcribe(str(audio_path), language=language or None)
+        segments, info = model.transcribe(str(audio_path), language=language or None, vad_filter=speech_only)
         parts = []
         for s in segments:  # a generator: decoding happens as it is consumed
             parts.append(Segment(start=s.start, end=s.end, text=s.text.strip()))
