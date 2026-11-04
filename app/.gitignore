@@ -2,3 +2,4 @@
 supabase/.temp/
 test-results/
 playwright-report/
+overlay-smoke/

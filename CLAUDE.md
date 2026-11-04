@@ -47,4 +47,4 @@ Live features can be driven with Chromium's `--use-fake-device-for-media-stream 
 
 ## Pull requests
 
-One PR per change, using the `pr` body template. Merge with a merge commit once CI is green: backend tests on Windows, macOS and Linux, plus the frontend typecheck and build. No review bots run on this repo.
+One PR per change, using the `pr` body template. Merge with a merge commit once CI is green: backend tests on Windows, macOS and Linux, the frontend typecheck, build and end-to-end tests, plus the desktop overlay check on macOS and Linux. No review bots run on this repo.

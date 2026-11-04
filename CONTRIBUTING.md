@@ -31,6 +31,8 @@ Models must allow commercial use for both **code and weights** (MIT, Apache-2.0,
 - Mock the model in feature tests; they must not download weights or need a GPU.
 - `backend/tests/test_model_api_contracts.py` checks engine calls against the installed libraries' real signatures. Extend it when you call a new model API.
 
+- `app/e2e-electron/overlay-smoke.cjs` runs the built desktop app on macOS and Linux in CI, with a fake backend and microphone. Extend it when you change the dictation overlay's window.
+
 ## Frontend
 
 - React function components in TypeScript. Talk to the backend through `app/src/api.ts`.
