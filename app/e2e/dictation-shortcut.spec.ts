@@ -144,3 +144,43 @@ test('the overlay shows each state in its small window', async ({ page }) => {
   await fire(page, 'status', null);
   await expect(page.getByText('No speech detected.')).toHaveCount(0);
 });
+
+test('a backend that comes back mid-transcription keeps the recording', async ({ app: page }) => {
+  await openWithBridge(page);
+  let refused = 0;
+  await page.route('**/api/dictation/transcribe', (route) => {
+    if (refused++ < 2) return route.abort('connectionrefused');
+    return route.fallback();
+  });
+  await fire(page, 'toggle');
+  await expect.poll(() => lastPhase(page)).toBe('recording');
+  await fire(page, 'toggle');
+  await expect.poll(() => lastPhase(page), { timeout: 15_000 }).toBe('done');
+  expect(refused).toBe(3);
+  expect(await page.evaluate(() => window.fakeBridge.delivered)).toHaveLength(1);
+});
+
+test('a backend that stays away gets a plain message in the desktop app', async ({ app: page }) => {
+  await page.clock.install();
+  await openWithBridge(page);
+  await page.route('**/api/dictation/transcribe', (route) => route.abort('connectionrefused'));
+  await fire(page, 'toggle');
+  await expect.poll(() => lastPhase(page)).toBe('recording');
+  await fire(page, 'toggle');
+  await expect.poll(async () => {
+    await page.clock.fastForward(5_000);
+    return lastPhase(page);
+  }).toBe('error');
+  const status = await page.evaluate(() => window.fakeBridge.statuses.at(-1) as unknown as { message: string });
+  expect(status.message).toBe("Voxwell's engine isn't responding. Restart the app and try again.");
+});
+
+test('in a browser with no backend, the Dictation page says what to do', async ({ app: page }) => {
+  await page.route('**/api/dictation/transcribe', (route) => route.abort('connectionrefused'));
+  await openFeature(page, 'Dictation');
+  const main = page.getByRole('main');
+  await main.getByRole('button', { name: 'Record' }).click();
+  await main.getByRole('button', { name: 'Stop' }).click();
+  await expect(main.getByText(/Start the Voxwell app or run voxwell serve/)).toBeVisible();
+  await expect(main.getByText('Failed to fetch')).toHaveCount(0);
+});
