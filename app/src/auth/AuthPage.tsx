@@ -6,6 +6,7 @@ import { ErrorAlert, Field, message } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { googleEnabled, redirectFailure, redirectTo, supabase } from '@/lib/auth';
+import { INSTALL_URL } from '@/lib/links';
 import { WaveStage } from './wave-stage';
 
 const TOOLS = [
@@ -108,6 +109,11 @@ function AccountForm() {
         <ErrorAlert message={error} />
       </div>
       <p className="text-muted-foreground mt-6 text-center text-sm">Accounts are by invitation only.</p>
+      {!window.voxwell && (
+        <p className="text-muted-foreground mt-2 text-center text-sm">
+          New here? <a className="text-foreground underline" href={INSTALL_URL} target="_blank" rel="noreferrer">Install Voxwell</a> on your computer. It's free and needs no account.
+        </p>
+      )}
       <p className="text-muted-foreground mt-8 flex items-center justify-center gap-2 text-xs">
         <Lock className="size-3.5" />
         Your voices stay on your device.
