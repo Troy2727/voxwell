@@ -104,11 +104,24 @@ def test_faster_whisper_calls_match_installed_api(monkeypatch, tmp_path):
     transcript = engine.transcribe(tmp_path / "clip.wav", "en")
     assert (transcript.text, transcript.language) == ("hello", "en")
 
+    whisper.return_value.transcribe.return_value = (iter([segment]), mock.Mock(language="en"))
+    engine.transcribe(tmp_path / "clip.wav", "en", speech_only=True)
+    assert whisper.return_value.transcribe.call_args.kwargs["vad_filter"] is True
+
     word = mock.Mock(start=0.0, end=0.5, word=" hello")
     segment = mock.Mock(start=0.0, end=1.0, words=[word])
     whisper.return_value.transcribe.return_value = (iter([segment]), mock.Mock(language="en"))
     timings = engine.transcribe_words(tmp_path / "clip.wav", "en")
     assert [(w.start, w.end, w.text) for w in timings.words] == [(0.0, 0.5, "hello")]
+
+
+def test_bundled_speech_detection_hears_nothing_in_silence_or_noise():
+    vad = pytest.importorskip("faster_whisper.vad")
+    import numpy as np
+
+    noise = np.random.default_rng(7).normal(0, 0.1, 16000 * 3).astype(np.float32)
+    for audio in (np.zeros(16000 * 3, dtype=np.float32), noise):
+        assert vad.get_speech_timestamps(audio, vad.VadOptions()) == []
 
 
 def test_translation_source_languages_match_installed_whisper():
