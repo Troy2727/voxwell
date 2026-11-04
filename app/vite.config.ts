@@ -11,7 +11,7 @@ export default defineConfig({
   server: { port: 5173, strictPort: true },
   build: {
     rollupOptions: {
-      input: { main: path.resolve(__dirname, 'index.html'), overlay: path.resolve(__dirname, 'overlay.html') },
+      input: { index: path.resolve(__dirname, 'index.html'), overlay: path.resolve(__dirname, 'overlay.html') },
     },
   },
 });
