@@ -1,0 +1,3 @@
+#!/bin/sh
+# Stands in for uv, so the test needs no models: main.cjs runs `uv run voxwell`.
+exec node "$(dirname "$0")/../fake-backend.cjs"
