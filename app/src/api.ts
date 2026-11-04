@@ -24,7 +24,7 @@ export async function errorMessage(res: Response): Promise<string> {
 }
 
 /** Voxwell can't run on a phone or tablet. iPads report themselves as Macs, so touch gives them away. */
-const onPhoneOrTablet = () =>
+export const onPhoneOrTablet = () =>
   /Android|iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
 
 /** What to tell the user when fetch rejects, which only happens when the backend can't be reached. */

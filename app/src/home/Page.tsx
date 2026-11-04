@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ArrowRight, FolderOpen, Languages, LayoutGrid } from 'lucide-react';
-import { api } from '../api';
+import { api, onPhoneOrTablet } from '../api';
 import { WaveStage } from '../auth/wave-stage';
 import { FEATURES } from '../features';
 import { EmptyState, Section } from '@/components/page';
@@ -69,8 +69,8 @@ export function HomePage({ name, online, onOpen }: { name?: string; online: bool
               {online && <span className="bg-success absolute inset-0 animate-ping rounded-full opacity-60 [animation-duration:2s] motion-reduce:hidden" />}
               <span className={cn('relative size-2 rounded-full', online === null ? 'bg-muted-foreground' : online ? 'bg-success' : 'bg-destructive')} />
             </span>
-            {online === null ? 'Connecting…' : online ? 'Running on this computer' : "Voxwell isn't running on this computer"}
-            {online === false && !window.voxwell && (
+            {online === null ? 'Connecting…' : online ? 'Running on this computer' : onPhoneOrTablet() ? 'Voxwell runs on a computer, not a phone or tablet' : "Voxwell isn't running on this computer"}
+            {online === false && !window.voxwell && !onPhoneOrTablet() && (
               <a className="text-foreground underline" href={INSTALL_URL} target="_blank" rel="noreferrer">Install it</a>
             )}
           </p>
