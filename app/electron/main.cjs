@@ -95,7 +95,10 @@ app.whenReady().then(() => {
   if (!primary) return;
   protocol.handle(APP_SCHEME, serveDist);
   startBackend();
-  dictation.register(createWindow());
+  dictation.register(
+    createWindow(),
+    process.env.VOXWELL_DEV ? 'http://localhost:5173/overlay.html' : `${APP_SCHEME}://voxwell/overlay.html`,
+  );
   const url = authUrlIn(process.argv);
   if (url) deliverAuthUrl(url);
 });

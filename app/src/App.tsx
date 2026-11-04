@@ -4,6 +4,7 @@ import { House, LogOut, Moon, Sun } from 'lucide-react';
 import { api } from './api';
 import { AuthPage } from './auth/AuthPage';
 import { FEATURES } from './features';
+import { useShortcutDictation } from './features/dictation/useShortcutDictation';
 import { HomePage } from './home/Page';
 import { LogoMark } from '@/components/logo';
 import { Button } from '@/components/ui/button';
@@ -112,6 +113,7 @@ function FeatureMenu({ active, onSelect }: { active: string; onSelect: (id: stri
 }
 
 function Shell({ user }: { user?: User }) {
+  useShortcutDictation();
   const [active, setActive] = useState(HOME);
   const [online, setOnline] = useState<boolean | null>(null);
   // Bumped when the backend comes back, so the open page reloads its data.

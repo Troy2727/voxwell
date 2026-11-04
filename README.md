@@ -162,7 +162,7 @@ Voxwell is **MIT licensed**, and every model it runs allows commercial use ([one
 
 | Feature | What it does |
 | --- | --- |
-| **Dictation** | Record and transcribe, or go live: each turn is transcribed when you pause. |
+| **Dictation** | Record and transcribe, or go live: each turn is transcribed when you pause. In the desktop app, press Ctrl/Cmd+Shift+Space anywhere: a small overlay shows it's listening, and the text is copied for you to paste. |
 | **Transcribe** | TXT, SRT or VTT, with optional speaker labels ("Speaker 1", "Speaker 2"). |
 | **Transcript clean-up** | A local AI model removes filler words, fixes punctuation or makes the text formal. |
 | **Subtitles from a script** | Paste a script you already have, add the recording, and every word is timed against the audio. |

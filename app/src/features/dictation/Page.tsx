@@ -1,18 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Copy, Mic, Square } from 'lucide-react';
-import { apiUrl, errorMessage } from '../../api';
 import { ChoiceSelect } from '@/components/choice-select';
 import { ErrorAlert, Field, Muted, Page as PageLayout, Section } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { LiveWaveform } from '@/components/ui/live-waveform';
 import { MicSelector } from '@/components/ui/mic-selector';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { DICTATED_EVENT, dictationChoices, openMicrophone, transcribeRecording } from './capture';
 import LiveDictation from './LiveDictation';
-
-interface TranscribeResult {
-  text: string;
-  language: string;
-}
 
 const LANGUAGES: [string, string][] = [
   ['auto', 'Auto-detect'], ['en', 'English'], ['es', 'Spanish'], ['fr', 'French'], ['de', 'German'],
@@ -28,8 +23,8 @@ const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '
 export default function Page() {
   const [phase, setPhase] = useState<Phase>('idle');
   const [elapsed, setElapsed] = useState(0);
-  const [language, setLanguage] = useState('auto');
-  const [device, setDevice] = useState('');
+  const [language, setLanguage] = useState(dictationChoices.language);
+  const [device, setDevice] = useState(dictationChoices.device);
   const [muted, setMuted] = useState(false);
   const [text, setText] = useState('');
   const [history, setHistory] = useState<string[]>([]);
@@ -40,33 +35,22 @@ export default function Page() {
 
   const recorder = useRef<MediaRecorder | null>(null);
   const timer = useRef<number | undefined>(undefined);
-  const viaShortcut = useRef(false);
   const phaseRef = useRef<Phase>('idle');
-  const languageRef = useRef(language);
-  languageRef.current = language;
-  const deviceRef = useRef(device);
-  deviceRef.current = device;
-  const modeRef = useRef(mode);
-  modeRef.current = mode;
+  dictationChoices.language = language;
+  dictationChoices.device = device;
 
   const setPhaseBoth = (p: Phase) => {
     phaseRef.current = p;
     setPhase(p);
   };
 
-  const transcribe = useCallback(async (blob: Blob, deliver: boolean) => {
+  const transcribe = useCallback(async (blob: Blob) => {
     setPhaseBoth('transcribing');
     try {
-      const form = new FormData();
-      form.append('file', blob, 'recording.webm');
-      if (languageRef.current !== 'auto') form.append('language', languageRef.current);
-      const res = await fetch(apiUrl('/api/dictation/transcribe'), { method: 'POST', body: form });
-      if (!res.ok) throw new Error(await errorMessage(res));
-      const result = (await res.json()) as TranscribeResult;
-      setText(result.text);
-      if (result.text) {
-        setHistory((h) => [result.text, ...h].slice(0, 20));
-        if (deliver) await window.voxwell?.dictation.deliver(result.text);
+      const result = await transcribeRecording(blob, dictationChoices.language);
+      setText(result);
+      if (result) {
+        setHistory((h) => [result, ...h].slice(0, 20));
       } else {
         setError('No speech detected.');
       }
@@ -78,22 +62,14 @@ export default function Page() {
   }, []);
 
   const start = useCallback(
-    async (fromShortcut: boolean) => {
+    async () => {
       setError('');
       setCopied(false);
-      viaShortcut.current = fromShortcut;
       let stream: MediaStream;
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ audio: deviceRef.current ? { deviceId: { exact: deviceRef.current } } : true });
+        stream = await openMicrophone(dictationChoices.device);
       } catch (e) {
-        const name = e instanceof DOMException ? e.name : '';
-        setError(
-          name === 'NotAllowedError'
-            ? 'Microphone access was denied. Allow it in your system or browser settings and try again.'
-            : name === 'NotFoundError'
-              ? 'No microphone found.'
-              : `Could not open the microphone: ${e instanceof Error ? e.message : String(e)}`,
-        );
+        setError(e instanceof Error ? e.message : String(e));
         return;
       }
       const chunks: Blob[] = [];
@@ -104,7 +80,7 @@ export default function Page() {
       rec.onstop = () => {
         stream.getTracks().forEach((t) => t.stop());
         window.clearInterval(timer.current);
-        void transcribe(new Blob(chunks, { type: rec.mimeType || 'audio/webm' }), viaShortcut.current);
+        void transcribe(new Blob(chunks, { type: rec.mimeType || 'audio/webm' }));
       };
       recorder.current = rec;
       rec.start();
@@ -116,18 +92,28 @@ export default function Page() {
   );
 
   const toggle = useCallback(
-    (fromShortcut: boolean) => {
-      if (modeRef.current === 'live') return; // the shortcut records; live mode has its own Start button
+    () => {
       if (phaseRef.current === 'recording') {
         if (recorder.current?.state === 'recording') recorder.current.stop();
       } else if (phaseRef.current === 'idle') {
-        void start(fromShortcut);
+        void start();
       }
     },
     [start],
   );
 
-  useEffect(() => window.voxwell?.dictation.onToggle(() => toggle(true)), [toggle]);
+  // The shortcut records in the app shell; show its text here when this page is open.
+  useEffect(() => {
+    const show = (event: Event) => {
+      const dictated = (event as CustomEvent<string>).detail;
+      setError('');
+      setCopied(false);
+      setText(dictated);
+      setHistory((h) => [dictated, ...h].slice(0, 20));
+    };
+    window.addEventListener(DICTATED_EVENT, show);
+    return () => window.removeEventListener(DICTATED_EVENT, show);
+  }, []);
   useEffect(
     () => () => {
       window.clearInterval(timer.current);
@@ -187,7 +173,7 @@ export default function Page() {
               variant={recording ? 'destructive' : 'default'}
               className="rounded-full px-6"
               disabled={phase === 'transcribing' || muted}
-              onClick={() => toggle(false)}
+              onClick={toggle}
             >
               {recording ? <Square /> : <Mic />} {recording ? 'Stop' : 'Record'}
             </Button>

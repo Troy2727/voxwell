@@ -9,4 +9,9 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: { alias: { '@': path.resolve(__dirname, 'src') } },
   server: { port: 5173, strictPort: true },
+  build: {
+    rollupOptions: {
+      input: { main: path.resolve(__dirname, 'index.html'), overlay: path.resolve(__dirname, 'overlay.html') },
+    },
+  },
 });
