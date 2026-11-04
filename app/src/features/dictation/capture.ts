@@ -1,4 +1,4 @@
-import { apiUrl, errorMessage } from '../../api';
+import { apiUrl, backendUnreachable, errorMessage } from '../../api';
 
 /** The Dictation page's microphone and language, which the global shortcut uses too. */
 export const dictationChoices = { language: 'auto', device: '' };
@@ -31,19 +31,12 @@ const BACKEND_RETRY_MS = 1_000;
  * to wait for unless the user starts one.
  */
 async function postRecording(form: FormData): Promise<Response> {
-  const desktop = Boolean(window.voxwell);
-  const deadline = Date.now() + (desktop ? BACKEND_WAIT_MS : 0);
+  const deadline = Date.now() + (window.voxwell ? BACKEND_WAIT_MS : 0);
   for (;;) {
     try {
       return await fetch(apiUrl('/api/dictation/transcribe'), { method: 'POST', body: form });
     } catch {
-      if (Date.now() >= deadline) {
-        throw new Error(
-          desktop
-            ? "Voxwell's engine isn't responding. Restart the app and try again."
-            : "Can't reach Voxwell on this computer. Start the Voxwell app or run voxwell serve, allow local network access if your browser asks, then try again.",
-        );
-      }
+      if (Date.now() >= deadline) throw new Error(backendUnreachable());
       await new Promise((resolve) => window.setTimeout(resolve, BACKEND_RETRY_MS));
     }
   }
