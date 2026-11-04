@@ -23,9 +23,17 @@ export async function errorMessage(res: Response): Promise<string> {
   return text || `Request failed (${res.status}).`;
 }
 
+/** What to tell the user when fetch rejects, which only happens when the backend can't be reached. */
+export const backendUnreachable = () =>
+  window.voxwell
+    ? "Voxwell's engine isn't responding. Restart the app and try again."
+    : "Can't reach Voxwell on this computer. Start the Voxwell app or run voxwell serve, allow local network access if your browser asks, then try again.";
+
 /** Fetch JSON from the backend; throws with the server's message on a non-2xx status. */
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(apiUrl(path), init);
+  const res = await fetch(apiUrl(path), init).catch(() => {
+    throw new Error(backendUnreachable());
+  });
   if (!res.ok) throw new Error(await errorMessage(res));
   return (await res.json()) as T;
 }

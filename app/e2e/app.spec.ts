@@ -69,6 +69,38 @@ test.describe('errors the user can see', () => {
     await expect(page.getByText('Running on this computer', { exact: true })).toBeVisible({ timeout: 15_000 });
   });
 
+  test('backend offline on the website: Home links to the install steps', async ({ page }) => {
+    await installMockBackend(page);
+    await page.route(`${BACKEND}/api/health`, (route) => route.abort('connectionrefused'));
+    await page.goto('/');
+    await expect(page.getByRole('link', { name: 'Install it' })).toHaveAttribute('href', 'https://github.com/Troy2727/voxwell#-quick-start');
+    await expect(page.getByRole('alert')).toHaveCount(0); // still no banner
+    await page.unroute(`${BACKEND}/api/health`);
+    await expect(page.getByText('Running on this computer', { exact: true })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole('link', { name: 'Install it' })).toHaveCount(0);
+  });
+
+  test('backend offline in the desktop app: Home offers no install link', async ({ page }) => {
+    await installMockBackend(page);
+    await page.route(`${BACKEND}/api/health`, (route) => route.abort('connectionrefused'));
+    await page.addInitScript(() => {
+      const off = () => () => {};
+      Object.assign(window, { voxwell: { backendUrl: 'http://127.0.0.1:8765', dictation: { onToggle: off, onCancel: off }, auth: { onCallback: off } } });
+    });
+    await page.goto('/');
+    await expect(page.getByText("Voxwell isn't running on this computer")).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Install it' })).toHaveCount(0);
+  });
+
+  test('an action with no backend says what to do, not "Failed to fetch"', async ({ app: page }) => {
+    await page.route(`${BACKEND}/api/audio_effects/apply`, (route) => route.abort('connectionrefused'));
+    await openFeature(page, 'Audio effects');
+    await dropFile(page, 'speech.wav');
+    await page.getByRole('button', { name: 'Apply effects' }).click();
+    await expect(page.getByRole('alert').filter({ hasText: 'Start the Voxwell app or run voxwell serve' })).toBeVisible();
+    await expect(page.getByText('Failed to fetch')).toHaveCount(0);
+  });
+
   test('a file that is too large: the server message is shown', async ({ app: page }) => {
     await page.route(`${BACKEND}/api/voice_cloning/voices`, (route) =>
       route.fulfill({ status: 413, contentType: 'application/json', body: JSON.stringify({ detail: 'The file is too large. The limit is 50 MB.' }) }));

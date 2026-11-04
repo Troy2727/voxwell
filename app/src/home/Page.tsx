@@ -62,13 +62,16 @@ export function HomePage({ name, online, onOpen }: { name?: string; online: bool
               Dub a video
             </Button>
           </div>
-          <p className="text-muted-foreground flex items-center gap-2 text-sm">
+          <p className="text-muted-foreground flex flex-wrap items-center gap-2 text-sm">
             <span className="relative flex size-2 shrink-0">
               {/* A soft "live" ripple while connected; still when offline or with reduced motion. */}
               {online && <span className="bg-success absolute inset-0 animate-ping rounded-full opacity-60 [animation-duration:2s] motion-reduce:hidden" />}
               <span className={cn('relative size-2 rounded-full', online === null ? 'bg-muted-foreground' : online ? 'bg-success' : 'bg-destructive')} />
             </span>
             {online === null ? 'Connecting…' : online ? 'Running on this computer' : "Voxwell isn't running on this computer"}
+            {online === false && !window.voxwell && (
+              <a className="text-foreground underline" href="https://github.com/Troy2727/voxwell#-quick-start" target="_blank" rel="noreferrer">Install it</a>
+            )}
           </p>
         </div>
         <div className="hidden p-6 sm:block md:p-8 md:pl-0">
