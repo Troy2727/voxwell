@@ -1,9 +1,9 @@
-"""Audio effects for generated speech: reverb, distance, background noise and stereo pan.
+"""Audio effects for generated speech: speed, pitch, reverb, distance, background noise and stereo pan.
 
-Plain numpy/scipy DSP, no models. Everything is deterministic (fixed noise seeds), so the same
-settings always give the same audio. Neutral settings return the input untouched, and the result
-is peak-limited so it never goes above 0 dBFS. numpy and scipy are imported inside functions so
-the server starts fast.
+Plain numpy/scipy/librosa DSP, no models. Everything is deterministic (fixed noise seeds), so the
+same settings always give the same audio. Neutral settings return the input untouched, and the
+result is peak-limited so it never goes above 0 dBFS. These libraries are imported inside functions
+so the server starts fast.
 """
 
 import io
@@ -30,10 +30,12 @@ class Effects(BaseModel):
     noise: float = Field(0.0, ge=0, le=1, description="Background noise level, from faint to as loud as -10 dB under the voice.")
     noise_color: Literal["pink", "brown"] = "pink"
     pan: float = Field(0.0, ge=-1, le=1, description="-1 = left, 1 = right. The output is stereo when this is not 0.")
+    speed: float = Field(1.0, ge=0.5, le=2, description="Playback speed, 2 = twice as fast. The pitch stays the same.")
+    pitch: float = Field(0.0, ge=-6, le=6, description="Pitch shift in semitones. The length stays the same.")
 
     @property
     def is_neutral(self) -> bool:
-        return self.reverb == 0 and self.distance == 0 and self.noise == 0 and self.pan == 0
+        return self.reverb == 0 and self.distance == 0 and self.noise == 0 and self.pan == 0 and self.speed == 1 and self.pitch == 0
 
 
 def _impulse_response(rate: int):
@@ -97,6 +99,18 @@ def _room(x, rate: int, fx: Effects):
     return out + wet * wet_gain * wet_amount
 
 
+def _retime(x, rate: int, fx: Effects):
+    """Pitch and speed, on (n,) or (n, channels) audio. These come first so the reverb tail isn't stretched too."""
+    import librosa
+
+    y = x.T  # librosa wants time on the last axis
+    if fx.pitch:
+        y = librosa.effects.pitch_shift(y, sr=rate, n_steps=fx.pitch)
+    if fx.speed != 1:
+        y = librosa.effects.time_stretch(y, rate=fx.speed)
+    return y.T
+
+
 def process(samples, rate: int, fx: Effects):
     """Apply `fx` to float audio in [-1, 1]: shape (n,) mono or (n, channels).
 
@@ -108,6 +122,8 @@ def process(samples, rate: int, fx: Effects):
     if fx.is_neutral:
         return samples
     x = np.asarray(samples, dtype=np.float64)
+    if fx.speed != 1 or fx.pitch:
+        x = _retime(x, rate, fx)
     if fx.pan != 0 and x.ndim == 2:
         x = x.mean(axis=1)
     if fx.reverb or fx.distance:

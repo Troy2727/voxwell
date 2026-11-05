@@ -131,3 +131,64 @@ def test_audio_traversal(bad):
 
 def test_audio_unknown_id():
     assert client.get("/api/voice_cloning/audio/" + "0" * 32).status_code == 404
+
+
+class FakeModel:
+    """Half a second of a constant level per generate call, at the model's real interface."""
+
+    sr = 24000
+
+    def __init__(self):
+        self.texts = []
+
+    def generate(self, text, **kwargs):
+        import numpy as np
+
+        self.texts.append(text)
+        return np.full(self.sr // 2, 0.5, dtype=np.float32)
+
+
+@pytest.fixture
+def fake_model(monkeypatch):
+    model = FakeModel()
+    monkeypatch.setattr(engine, "_load_model", lambda: model)
+    return model
+
+
+def wav_seconds(wav: bytes) -> float:
+    with wave.open(io.BytesIO(wav)) as w:
+        return w.getnframes() / w.getframerate()
+
+
+def test_text_is_split_at_pause_tags():
+    assert engine.split_pauses("Hello there.") == ["Hello there."]
+    assert engine.split_pauses("One. [pause 2] Two.") == ["One.", 2.0, "Two."]
+    assert engine.split_pauses("[PAUSE 1.5]Go[pause]") == [1.5, "Go", engine.DEFAULT_PAUSE]
+    assert engine.split_pauses("Wait [pause 999] up") == ["Wait", engine.MAX_PAUSE, "up"]
+    assert engine.split_pauses("Only. [pause] .") == ["Only.", engine.DEFAULT_PAUSE], "lone punctuation isn't spoken"
+    assert engine.split_pauses("Keep [laughter] and [pause-ish] as text") == ["Keep [laughter] and [pause-ish] as text"]
+
+
+def test_a_pause_tag_becomes_silence_and_is_never_spoken(fake_model):
+    wav = engine.synthesize("First part. [pause 2] Second part.", "en")
+    assert fake_model.texts == ["First part.", "Second part."]
+    assert wav_seconds(wav) == pytest.approx(0.5 + 2 + 0.5)
+    with wave.open(io.BytesIO(wav)) as w:
+        w.setpos(int(w.getframerate() * 1.5))  # the middle of the pause
+        assert set(w.readframes(100)) == {0}
+
+
+def test_text_with_only_pauses_gives_silence_without_generating(fake_model):
+    assert wav_seconds(engine.synthesize("[pause 1]", "en")) == pytest.approx(1)
+    assert fake_model.texts == []
+
+
+def test_pronunciation_cannot_break_a_pause_tag(fake_model, monkeypatch):
+    monkeypatch.setattr(engine.pronunciation, "apply", lambda text, language: text.replace("pause", "stop"))
+    engine.synthesize("A pause here. [pause 1] Done.", "en")
+    assert fake_model.texts == ["A stop here.", "Done."]
+
+
+def test_without_tags_the_text_is_generated_once(fake_model):
+    assert wav_seconds(engine.synthesize("Just one line.", "en")) == pytest.approx(0.5)
+    assert fake_model.texts == ["Just one line."]

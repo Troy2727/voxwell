@@ -1,25 +1,33 @@
 import { useEffect, useState } from 'react';
-import { Check, Headphones, Plus } from 'lucide-react';
+import { Check, Headphones, Plus, Search } from 'lucide-react';
 import { api, apiUrl, sendJson, type Voice } from '../../api';
 import { AudioResult } from '@/components/audio-result';
-import { ErrorAlert, message, Page as PageLayout } from '@/components/page';
+import { ChoiceSelect } from '@/components/choice-select';
+import { EmptyState, ErrorAlert, Field, message, Page as PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface Preset {
   id: string;
   name: string;
   category: string;
+  gender: string;
   description: string;
   sample: string;
   ready: boolean;
   audio_url: string | null;
 }
 
+const GENDERS: [string, string][] = [['all', 'All voices'], ['Female', 'Female'], ['Male', 'Male']];
+
 export default function Page() {
   const [presets, setPresets] = useState<Preset[] | null>(null);
   const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
+  const [category, setCategory] = useState('all');
+  const [gender, setGender] = useState('all');
 
   useEffect(() => {
     api<Preset[]>('/api/gallery/presets').then(setPresets, (e) => {
@@ -30,6 +38,18 @@ export default function Page() {
 
   const replace = (p: Preset) => setPresets((list) => list?.map((x) => (x.id === p.id ? p : x)) ?? null);
   const categories = [...new Set(presets?.map((p) => p.category))];
+  const words = search.trim().toLowerCase();
+  const visible = presets?.filter(
+    (p) =>
+      (category === 'all' || p.category === category) &&
+      (gender === 'all' || p.gender === gender) &&
+      `${p.name} ${p.category} ${p.description}`.toLowerCase().includes(words),
+  );
+  const clearFilters = () => {
+    setSearch('');
+    setCategory('all');
+    setGender('all');
+  };
 
   return (
     <PageLayout
@@ -39,11 +59,36 @@ export default function Page() {
     >
       <ErrorAlert message={error} />
       {presets === null && <Skeleton className="h-40 w-full" />}
-      {categories.map((category) => (
-        <div key={category} className="flex flex-col gap-3">
-          <h2 className="text-muted-foreground text-sm font-medium tracking-wide uppercase">{category}</h2>
+      {!!presets?.length && (
+        <div className="grid gap-4 sm:grid-cols-[2fr_1fr_1fr]">
+          <Field label="Search" htmlFor="gallery-search">
+            <div className="relative">
+              <Search className="text-muted-foreground pointer-events-none absolute top-2.5 left-3 size-4" />
+              <Input id="gallery-search" type="search" className="pl-9" aria-label="Search voices" placeholder="Warm, deep, narrator…" value={search} onChange={(e) => setSearch(e.target.value)} />
+            </div>
+          </Field>
+          <Field label="Category" htmlFor="gallery-category">
+            <ChoiceSelect id="gallery-category" options={[['all', 'All categories'], ...categories.map((c): [string, string] => [c, c])]} value={category} onChange={setCategory} />
+          </Field>
+          <Field label="Gender" htmlFor="gallery-gender">
+            <ChoiceSelect id="gallery-gender" options={GENDERS} value={gender} onChange={setGender} />
+          </Field>
+        </div>
+      )}
+      {!!presets?.length && (
+        <p aria-live="polite" className="text-muted-foreground text-sm">{visible?.length} {visible?.length === 1 ? 'voice' : 'voices'}</p>
+      )}
+      {!!presets?.length && visible?.length === 0 && (
+        <div className="flex flex-col items-center gap-3">
+          <EmptyState icon={Search} title="No voices match.">Try another word, or a different category.</EmptyState>
+          <Button variant="outline" onClick={clearFilters}>Clear filters</Button>
+        </div>
+      )}
+      {categories.filter((c) => visible?.some((p) => p.category === c)).map((c) => (
+        <div key={c} className="flex flex-col gap-3">
+          <h2 className="text-muted-foreground text-sm font-medium tracking-wide uppercase">{c}</h2>
           <div className="grid gap-4 @2xl:grid-cols-2 @5xl:grid-cols-3 @7xl:grid-cols-4">
-            {presets?.filter((p) => p.category === category).map((p) => (
+            {visible?.filter((p) => p.category === c).map((p) => (
               <PresetCard key={p.id} preset={p} onUpdated={replace} />
             ))}
           </div>

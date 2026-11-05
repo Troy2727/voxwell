@@ -1,20 +1,22 @@
 import importlib.util
 import re
+from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from voxwell import voices
 from voxwell.features.audio_effects.dsp import Effects
-from voxwell.features.stories import jobs
-from voxwell.features.stories.script import ScriptError, parse, speakers
+from voxwell.features.stories import jobs, subtitles
+from voxwell.features.stories.script import NARRATOR, ScriptError, parse, speakers
 from voxwell.features.voice_cloning.engine import LANGUAGES
 from voxwell.paths import download_name
 
 router = APIRouter(tags=["stories"])
 
 MAX_TITLE = 100
+MAX_SUBTITLE_BYTES = 2 * 1024 * 1024
 _JOB_ID = re.compile(r"^[0-9a-f]{12}$")
 
 
@@ -78,6 +80,33 @@ def create_job(req: StoryRequest):
         cast[speaker] = voice
     title = req.title.strip()[:MAX_TITLE] or lines[0].text[:60]
     job = jobs.create(title, req.language, req.script, cast, req.effects.model_dump() if req.effects else None)
+    jobs.start(job)
+    return {"id": job.id}
+
+
+@router.post("/subtitles")
+async def create_from_subtitles(file: UploadFile = File(...), language: str = Form("en"), voice_id: str = Form(""), title: str = Form("")):
+    """Speak a subtitle file in one voice, each cue at its time."""
+    data = await file.read(MAX_SUBTITLE_BYTES + 1)
+    if len(data) > MAX_SUBTITLE_BYTES:
+        raise HTTPException(413, "The subtitle file is too large (2 MB max).")
+    if language not in LANGUAGES:
+        raise HTTPException(422, f"Unsupported language '{language}'.")
+    if voice_id:
+        try:
+            voices.voice_audio_path(voice_id)
+        except KeyError:
+            raise HTTPException(422, "Unknown voice.")
+    try:
+        text = data.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        text = data.decode("cp1252", errors="replace")  # common for older Windows subtitle files
+    try:
+        cues = subtitles.parse(text)
+    except ScriptError as exc:
+        raise HTTPException(422, str(exc))
+    name = title.strip()[:MAX_TITLE] or Path(file.filename or "").stem.strip()[:MAX_TITLE] or cues[0].text[:60]
+    job = jobs.create(name, language, text, {NARRATOR: voice_id or jobs.DEFAULT_VOICE}, timed=True)
     jobs.start(job)
     return {"id": job.id}
 

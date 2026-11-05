@@ -1,3 +1,4 @@
+import asyncio
 import importlib.util
 import io
 import logging
@@ -79,7 +80,8 @@ async def import_upload(file: UploadFile = File(...)):
         raise HTTPException(413, "The book is too large (50 MB max).")
     name = Path(file.filename or "")
     try:
-        title, chapters = import_book(data, name.stem, name.suffix.lower())
+        # In a worker thread: a long PDF takes a while, and the server must keep answering meanwhile.
+        title, chapters = await asyncio.to_thread(import_book, data, name.stem, name.suffix.lower())
     except ImportError_ as exc:
         raise HTTPException(422, str(exc))
     return summary(books.create(title[:MAX_TITLE], chapters))

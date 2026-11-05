@@ -97,11 +97,12 @@ function routes(): [string | RegExp, Reply][] {
     ['POST /api/voice_remix/save', { id: 'v-new2', name: 'Narrator (remix)', source: 'remix' }],
 
     ['GET /api/gallery/presets', [
-      { id: 'calm', name: 'Calm Narrator', category: 'Narration', description: 'A calm, warm voice.', sample: 'It was late.', ready: false, audio_url: null },
-      { id: 'bright', name: 'Bright Storyteller', category: 'Narration', description: 'A bright voice.', sample: 'Once upon a time.', ready: true, audio_url: TONE_URL },
+      { id: 'calm', name: 'Calm Narrator', category: 'Narration', gender: 'Male', description: 'A calm, warm voice.', sample: 'It was late.', ready: false, audio_url: null },
+      { id: 'bright', name: 'Bright Storyteller', category: 'Narration', gender: 'Female', description: 'A bright voice.', sample: 'Once upon a time.', ready: true, audio_url: TONE_URL },
+      { id: 'meditation-guide', name: 'Meditation Guide', category: 'Wellness', gender: 'Female', description: 'A very soft voice, slow and airy.', sample: 'Let your shoulders fall.', ready: false, audio_url: null },
     ]],
     [/^POST \/api\/gallery\/presets\/[^/]+\/sample$/, (url: URL) => ({
-      id: url.pathname.split('/')[4], name: 'Calm Narrator', category: 'Narration', description: 'A calm, warm voice.', sample: 'It was late.', ready: true, audio_url: TONE_URL,
+      id: url.pathname.split('/')[4], name: 'Calm Narrator', category: 'Narration', gender: 'Male', description: 'A calm, warm voice.', sample: 'It was late.', ready: true, audio_url: TONE_URL,
     })],
     [/^POST \/api\/gallery\/presets\/[^/]+\/add$/, { id: 'v-gallery', name: 'Calm Narrator', source: 'design' }],
 
@@ -126,6 +127,7 @@ function routes(): [string | RegExp, Reply][] {
       return { speakers, lines: lines.length };
     }],
     ['POST /api/stories/jobs', { id: 'st-1' }],
+    ['POST /api/stories/subtitles', { id: 'st-1' }],
     ['GET /api/stories/jobs/st-1', story],
 
     ['GET /api/audiobook/books', () => (rendering ? [rendering()] : books)],

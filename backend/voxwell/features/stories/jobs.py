@@ -1,4 +1,5 @@
-"""Story jobs: speak every line of a script in its speaker's voice and join them into one WAV.
+"""Story jobs: speak every line of a script in its speaker's voice and join them into one WAV,
+or, for a subtitle file (`timed`), put each spoken cue at its time.
 
 Jobs run on background threads, one at a time, and are polled for progress. Each job keeps
 job.json (script, cast, state) and, once done, story.wav in its folder.
@@ -18,7 +19,8 @@ from pathlib import Path
 from voxwell import voices
 from voxwell.errors import user_message
 from voxwell.features.audio_effects.dsp import Effects, apply_to_wav
-from voxwell.features.stories.script import parse
+from voxwell.features.stories import subtitles
+from voxwell.features.stories.script import NARRATOR, parse
 from voxwell.features.voice_cloning import engine
 from voxwell.paths import child_path, data_dir
 
@@ -45,6 +47,7 @@ class Job:
     percent: int = 0
     error: str | None = None
     effects: dict | None = None  # Effects settings applied to the finished story
+    timed: bool = False  # `script` is a subtitle file
 
 
 _jobs: dict[str, Job] = {}
@@ -72,11 +75,11 @@ def _load(folder: Path) -> Job | None:
     return job
 
 
-def create(title: str, language: str, script: str, cast: dict[str, str], effects: dict | None = None) -> Job:
+def create(title: str, language: str, script: str, cast: dict[str, str], effects: dict | None = None, *, timed: bool = False) -> Job:
     job_id = uuid.uuid4().hex[:12]
     folder = _root() / job_id
     folder.mkdir(parents=True)
-    job = Job(job_id, folder, title, language, script, cast, time.time(), effects=effects)
+    job = Job(job_id, folder, title, language, script, cast, time.time(), effects=effects, timed=timed)
     with _lock:
         _jobs[job_id] = job
     return job
@@ -139,18 +142,32 @@ def _join(clips: list[bytes]) -> bytes:
     return buf.getvalue()
 
 
+def _speak_subtitles(job: Job) -> bytes:
+    cues = subtitles.parse(job.script)
+    reference = _reference(job.cast[NARRATOR])
+    clips = []
+    for i, cue in enumerate(cues):
+        job.step, job.percent = f"Speaking subtitle {i + 1} of {len(cues)}", int(99 * i / len(cues))
+        clips.append(engine.synthesize(cue.text, job.language, reference))
+    return subtitles.place(cues, clips)
+
+
+def _speak_script(job: Job) -> bytes:
+    lines = parse(job.script)
+    refs = {speaker: _reference(voice) for speaker, voice in job.cast.items()}
+    clips = []
+    for i, line in enumerate(lines):
+        job.step, job.percent = f"Speaking line {i + 1} of {len(lines)}", int(99 * i / len(lines))
+        clips.append(engine.synthesize(line.text, job.language, refs.get(line.speaker)))
+    return _join(clips)
+
+
 def _work(job: Job) -> None:
     with _one_at_a_time:
         job.state = "running"
         _save(job)
         try:
-            lines = parse(job.script)
-            refs = {speaker: _reference(voice) for speaker, voice in job.cast.items()}
-            clips = []
-            for i, line in enumerate(lines):
-                job.step, job.percent = f"Speaking line {i + 1} of {len(lines)}", int(99 * i / len(lines))
-                clips.append(engine.synthesize(line.text, job.language, refs.get(line.speaker)))
-            story = _join(clips)
+            story = _speak_subtitles(job) if job.timed else _speak_script(job)
             if job.effects:
                 story = apply_to_wav(story, Effects(**job.effects))
             audio_path(job).write_bytes(story)

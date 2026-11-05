@@ -27,6 +27,21 @@ test('stories: cast a two-speaker script and generate it', async ({ app: page })
   await expectAudio(page, 1);
 });
 
+test('stories: speak a subtitle file in a chosen language', async ({ app: page, mode }) => {
+  test.skip(mode === 'real', 'Checks the request, so it only runs against the mock backend.');
+  await openFeature(page, 'Stories');
+  await expect(page.getByRole('button', { name: 'Generate from subtitles' })).toBeDisabled();
+  await dropFile(page, 'subtitles.srt');
+  await expect(page.getByText('subtitles.srt')).toBeVisible();
+  const sent = page.waitForRequest('**/api/stories/subtitles');
+  await page.getByRole('button', { name: 'Generate from subtitles' }).click();
+  // The browser leaves the file's bytes out of what a test can read; the backend tests cover the upload itself.
+  const body = (await sent).postData();
+  expect(body).toContain('filename="subtitles.srt"');
+  expect(body).toMatch(/name="language"\s+en/);
+  await expectAudio(page, 1);
+});
+
 test('audiobook: import a book, preview a chapter, render the rest', async ({ app: page }) => {
   await openFeature(page, 'Audiobook');
   await dropFile(page, 'book.txt');

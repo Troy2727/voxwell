@@ -30,7 +30,24 @@ def test_presets_are_listed_and_unique():
     assert len(found) == len(PRESETS) >= 8
     assert len({p["id"] for p in found}) == len(found)
     assert all(p["ready"] is False and p["audio_url"] is None for p in found)
-    assert {p["category"] for p in found} == {"Narration", "Media", "Characters", "Assistants"}
+    assert {p["category"] for p in found} == {"Narration", "Media", "Characters", "Assistants", "Learning", "Wellness"}
+    assert {p["gender"] for p in found} == {"Female", "Male"}
+
+
+def test_there_is_a_real_choice_of_distinct_voices_for_each_gender():
+    assert len(PRESETS) >= 36
+    assert len({p.description for p in PRESETS}) == len(PRESETS), "each voice has its own description"
+    assert len({p.name for p in PRESETS}) == len(PRESETS)
+    for gender in ("Female", "Male"):
+        assert sum(p.gender == gender for p in PRESETS) >= 15
+
+
+def test_a_preset_description_says_the_gender_it_is_filed_under():
+    for p in PRESETS:
+        words = p.description.lower()
+        female = "female" in words or "woman" in words
+        male = " male " in words or " man " in words
+        assert (female and not male) if p.gender == "Female" else (male and not female), p.name
 
 
 def test_listening_generates_once_and_caches(fake):
