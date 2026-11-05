@@ -15,6 +15,113 @@ test('home: shows the backend is running and opens a feature', async ({ app: pag
   await expect(page.getByRole('heading', { level: 1, name: 'Voice cloning' })).toBeVisible();
 });
 
+test.describe('home', () => {
+  test.skip(({ mode }) => mode === 'real', 'These fake the backend state, so they only run against the mock backend.');
+  const status = (page: Page) => page.locator('[role=status].sr-only');
+
+  test('offline: does not look like lost work, and Check again reconnects', async ({ page }) => {
+    await installMockBackend(page);
+    await page.route(`${BACKEND}/api/health`, (route) => route.abort('connectionrefused'));
+    await page.goto('/');
+    await expect(page.getByText("Can't reach your projects")).toBeVisible();
+    await expect(page.getByText('Nothing here yet')).toHaveCount(0);
+    await expect(page.getByText('These need Voxwell running on a computer.')).toBeVisible();
+    await expect(status(page)).toHaveText('Not connected to Voxwell');
+    await page.getByRole('button', { name: 'Check again' }).click(); // still down
+    await expect(page.getByText("Still can't reach Voxwell.")).toBeVisible();
+    await page.unroute(`${BACKEND}/api/health`);
+    await page.getByRole('button', { name: 'Check again' }).click();
+    await expect(page.getByText('Running on this computer', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: /speech\.wav/ })).toBeVisible();
+    await expect(status(page)).toHaveText('Connected to Voxwell');
+  });
+
+  test('a failed load says so instead of showing an empty library, and can retry', async ({ page }) => {
+    await installMockBackend(page);
+    await page.route(`${BACKEND}/api/projects/items`, (route) => route.fulfill({ status: 500, body: '{}' }));
+    await page.route(`${BACKEND}/api/voices`, (route) => route.fulfill({ status: 500, body: '{}' }));
+    await page.goto('/');
+    await expect(page.getByText("Couldn't load your projects")).toBeVisible();
+    await expect(page.getByText("Couldn't load your voices.")).toBeVisible();
+    await expect(page.getByText('Nothing here yet')).toHaveCount(0);
+    await page.unroute(`${BACKEND}/api/projects/items`);
+    await page.unroute(`${BACKEND}/api/voices`);
+    await page.getByRole('button', { name: 'Try again' }).first().click();
+    await expect(page.getByRole('button', { name: /speech\.wav/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Play Narrator' })).toBeVisible();
+  });
+
+  test('a truly empty library still says so', async ({ page }) => {
+    await installMockBackend(page);
+    await page.route(`${BACKEND}/api/projects/items`, (route) => route.fulfill({ json: [] }));
+    await page.route(`${BACKEND}/api/voices`, (route) => route.fulfill({ json: [] }));
+    await page.goto('/');
+    await expect(page.getByText('Nothing here yet')).toBeVisible();
+    await expect(page.getByText('No saved voices yet.')).toBeVisible();
+  });
+
+  test('a recent project opens that project', async ({ app: page }) => {
+    await page.getByRole('button', { name: /speech\.wav/ }).click();
+    await expect(page.getByRole('heading', { level: 1, name: 'Projects' })).toBeVisible();
+    await expect(page.locator('#project-transcript-tr-1')).toBeFocused();
+    await expect(page.locator('#project-transcript-tr-1')).toBeInViewport();
+    expect(new URL(page.url()).hash).toBe('');
+  });
+
+  test('saved voices and finished clips play from Home, one at a time', async ({ app: page }) => {
+    await page.getByRole('button', { name: 'Play Narrator' }).click();
+    await expect(page.getByRole('button', { name: 'Pause Narrator' })).toBeVisible();
+    await page.getByRole('button', { name: /^Play A project/ }).click();
+    await expect(page.getByRole('button', { name: /^Pause A project/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Play Narrator' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Play speech\.wav/ })).toHaveCount(0); // a transcript has no audio
+  });
+
+  test('recent work shows a relative date', async ({ page }) => {
+    await installMockBackend(page);
+    await page.route(`${BACKEND}/api/projects/items`, (route) =>
+      route.fulfill({ json: [{ kind: 'speech', id: 'sp-1', title: 'Just made', created: Date.now() / 1000, language: 'en', voice: 'default', text: 'x', audio_url: '/mock/tone.wav' }] }));
+    await page.goto('/');
+    await expect(page.getByRole('button', { name: 'speech Just made today' })).toBeVisible();
+  });
+
+  test('recent projects line up with the heading and each other, with or without a play button', async ({ app: page }) => {
+    const left = async (selector: ReturnType<typeof page.locator>) => (await selector.boundingBox())!.x;
+    const right = async (selector: ReturnType<typeof page.locator>) => {
+      const box = (await selector.boundingBox())!;
+      return box.x + box.width;
+    };
+    const playable = page.getByRole('button', { name: /^speech A project/ });
+    const silent = page.getByRole('button', { name: /^transcript speech\.wav/ });
+    await expect(silent).toBeVisible();
+    expect(await right(playable.locator('span').last())).toBeCloseTo(await right(silent.locator('span').last()), 0);
+    expect(await left(playable.locator('span').first())).toBeCloseTo(await left(page.getByText('Recent projects')), 0);
+  });
+
+  test('a clip that will not load says so', async ({ app: page }) => {
+    await page.route(`${BACKEND}/api/voices/v-upload/audio`, (route) => route.fulfill({ status: 404, body: '' }));
+    await page.getByRole('button', { name: 'Play Narrator' }).click();
+    await expect(page.getByText("Couldn't play that clip.")).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Play Narrator' })).toBeVisible();
+  });
+
+  test('the hero tools are not repeated in the tiles', async ({ app: page }) => {
+    const main = page.getByRole('main');
+    await expect(main.getByRole('button', { name: /^Voice design/ })).toBeVisible();
+    await expect(main.getByRole('button', { name: /^Voice cloning/ })).toHaveCount(0);
+    await expect(main.getByRole('button', { name: /^Dubbing/ })).toHaveCount(0);
+  });
+
+  test('keyboard users can skip the sidebar', async ({ app: page }) => {
+    await expect(page.getByText('Recent projects')).toBeVisible();
+    await page.keyboard.press('Tab');
+    await expect(page.getByRole('link', { name: 'Skip to content' })).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('#main')).toBeFocused();
+    expect(new URL(page.url()).hash).toBe('');
+  });
+});
+
 test('every page opens without an error and fits phone, tablet and desktop widths', async ({ app: page }) => {
   test.setTimeout(5 * 60_000);
   for (const width of [390, 768, 1024, 1440]) {

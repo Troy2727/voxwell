@@ -138,14 +138,16 @@ function Shell({ user }: { user?: User }) {
     return () => window.clearTimeout(timer);
   }, []);
 
+  const recheck = () =>
+    api('/api/health').then(() => {
+      setOnline(true);
+      setConnection((n) => n + 1);
+      return true;
+    }, () => false);
+
   useEffect(() => {
     if (online !== false) return;
-    const timer = window.setInterval(() => {
-      api('/api/health').then(() => {
-        setOnline(true);
-        setConnection((n) => n + 1);
-      }, () => {});
-    }, 5000);
+    const timer = window.setInterval(() => void recheck(), 5000);
     return () => window.clearInterval(timer);
   }, [online]);
 
@@ -153,6 +155,18 @@ function Shell({ user }: { user?: User }) {
 
   return (
     <SidebarProvider>
+      <a
+        href="#main"
+        className="focus:bg-background focus:ring-ring/50 sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:border focus:px-3 focus:py-2 focus:text-sm focus:ring-[3px] focus:outline-none"
+        onClick={(e) => {
+          e.preventDefault();
+          document.getElementById('main')?.focus();
+        }}
+      >
+        Skip to content
+      </a>
+      {/* Tells screen readers when the connection changes, on every page. */}
+      <span role="status" className="sr-only">{online === null ? '' : online ? 'Connected to Voxwell' : 'Not connected to Voxwell'}</span>
       <Sidebar collapsible="icon">
         <SidebarHeader>
           <div className="flex items-center gap-2.5 px-1 py-1.5">
@@ -191,11 +205,11 @@ function Shell({ user }: { user?: User }) {
             <span className="text-sm font-medium">Home</span>
           )}
         </header>
-        <main className="flex-1 p-4 sm:p-6 md:p-8">
+        <main id="main" tabIndex={-1} className="flex-1 p-4 outline-none sm:p-6 md:p-8">
           {feature ? (
             <feature.Page key={`${feature.id}-${connection}`} />
           ) : (
-            <HomePage key={connection} name={user?.user_metadata.full_name || user?.email} online={online} onOpen={setActive} />
+            <HomePage key={connection} name={user?.user_metadata.full_name || user?.email} online={online} onOpen={setActive} onRetry={recheck} />
           )}
         </main>
       </SidebarInset>
