@@ -4,26 +4,27 @@ import { toast } from 'sonner';
 import { api, apiUrl, listVoices, Voice } from '../../api';
 import { AudioResult } from '@/components/audio-result';
 import { ChoiceSelect } from '@/components/choice-select';
-import { EffectsControls, EffectsSettings, isNeutral, NO_EFFECTS } from '@/components/effects-controls';
+import { EffectsControls, isNeutral, NO_EFFECTS, reviveEffects } from '@/components/effects-controls';
 import { FileDrop } from '@/components/file-drop';
 import { ErrorAlert, Field, message, Page as PageLayout, Section } from '@/components/page';
 import { VoiceSelect } from '@/components/voice-select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { usePersisted } from '@/lib/persisted';
 import { LANGUAGES } from './languages';
 
 const PAUSES: [string, number][] = [['Short', 0.5], ['Medium', 1], ['Long', 2]];
 
 export default function Page() {
   const [voices, setVoices] = useState<Voice[] | null>(null);
-  const [voiceId, setVoiceId] = useState('');
+  const [voiceId, setVoiceId] = usePersisted('voxwell.voice_cloning.voice', '');
   const [name, setName] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [text, setText] = useState('');
-  const [language, setLanguage] = useState('en');
-  const [fx, setFx] = useState<EffectsSettings>(NO_EFFECTS);
+  const [language, setLanguage] = usePersisted('voxwell.voice_cloning.language', 'en');
+  const [fx, setFx] = usePersisted('voxwell.voice_cloning.effects', NO_EFFECTS, reviveEffects);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [audioUrl, setAudioUrl] = useState('');
@@ -37,6 +38,12 @@ export default function Page() {
   useEffect(() => {
     void refresh();
   }, []);
+
+  // A remembered voice may have been deleted since.
+  useEffect(() => {
+    if (voices && voiceId && !voices.some((v) => v.id === voiceId)) setVoiceId('');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [voices]);
 
   function insertPause(seconds: number) {
     const start = textBox.current?.selectionStart ?? text.length;
@@ -111,8 +118,8 @@ export default function Page() {
           <Field label="Voice" hint={voices !== null && voices.length === 0 ? 'No saved voices yet. Upload one above.' : undefined}>
             <VoiceSelect voices={voices} value={voiceId} onChange={setVoiceId} disabled={voices === null} />
           </Field>
-          <Field label="Language">
-            <ChoiceSelect options={LANGUAGES} value={language} onChange={setLanguage} />
+          <Field label="Language" htmlFor="clone-language">
+            <ChoiceSelect id="clone-language" options={LANGUAGES} value={language} onChange={setLanguage} />
           </Field>
         </div>
         <Field label="Text" htmlFor="clone-text" hint={`${text.length} / 2000. Type [pause 2] anywhere for two seconds of silence, up to 10.`}>
@@ -125,7 +132,7 @@ export default function Page() {
             </Button>
           ))}
         </div>
-        <EffectsControls value={fx} onChange={setFx} disabled={busy} />
+        <EffectsControls value={fx} onChange={setFx} disabled={busy} resettable />
         <div>
           <Button disabled={busy || !text.trim()} onClick={generate}>
             <Volume2 /> {busy ? 'Generating…' : 'Generate'}

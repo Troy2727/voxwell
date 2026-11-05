@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Download } from 'lucide-react';
+import { toast } from 'sonner';
+import { apiUrl, backendUnreachable, errorMessage } from '@/api';
 import {
   AudioPlayerButton,
   AudioPlayerDuration,
@@ -51,7 +53,24 @@ function usePeaks(src: string | null) {
   return peaks;
 }
 
+/** Convert a WAV result on the backend and save it. WAV stays the plain link, as it needs no conversion. */
+async function saveAsMp3(src: string, name: string) {
+  const form = new FormData();
+  form.append('file', await (await fetch(src)).blob(), name);
+  const res = await fetch(apiUrl('/api/audio_effects/mp3'), { method: 'POST', body: form }).catch(() => {
+    throw new Error(backendUnreachable());
+  });
+  if (!res.ok) throw new Error(await errorMessage(res));
+  const url = URL.createObjectURL(await res.blob());
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = name.replace(/\.wav$/i, '.mp3');
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 function Player({ src, download, autoPlay, lazy }: Props) {
+  const [converting, setConverting] = useState(false);
   const player = useAudioPlayer();
   const time = useAudioPlayerTime();
   const item = { id: src, src };
@@ -93,6 +112,23 @@ function Player({ src, download, autoPlay, lazy }: Props) {
           <a href={src} download={download}>
             <Download />
           </a>
+        </Button>
+      )}
+      {download?.toLowerCase().endsWith('.wav') && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="shrink-0 px-2"
+          aria-label="Download MP3"
+          disabled={converting}
+          onClick={() => {
+            setConverting(true);
+            saveAsMp3(src, download)
+              .catch((e: Error) => toast.error(e.message))
+              .finally(() => setConverting(false));
+          }}
+        >
+          {converting ? '…' : 'MP3'}
         </Button>
       )}
     </div>

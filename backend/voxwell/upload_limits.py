@@ -35,6 +35,7 @@ LIMITS = {
     "/api/tools/fit": (tools, "MAX_UPLOAD"),
     "/api/music/generate": (tools, "MAX_UPLOAD"),  # its style reference goes through tools._read_audio
     "/api/audio_effects/apply": (audio_effects, "MAX_UPLOAD"),
+    "/api/audio_effects/mp3": (audio_effects, "MAX_MP3_UPLOAD"),
     "/api/audiobook/books": (audiobook, "MAX_UPLOAD"),
     "/api/stories/subtitles": (stories, "MAX_SUBTITLE_BYTES"),
     "/api/voice_cloning/voices": (voice_cloning, "MAX_UPLOAD"),
