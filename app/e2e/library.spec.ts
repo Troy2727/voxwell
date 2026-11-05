@@ -78,6 +78,50 @@ test('gallery: search and filters narrow the voices, and can be cleared', async 
   await expect(page.getByRole('searchbox', { name: 'Search voices' })).toHaveValue('');
 });
 
+test('gallery: favorites survive a reload and can be shown on their own', async ({ app: page }) => {
+  await openFeature(page, 'Gallery');
+  const titles = page.getByRole('main').locator('[data-slot=card-title]');
+  const all = await titles.count();
+  const star = page.getByRole('button', { name: 'Add Meditation Guide to favorites' });
+  await star.click();
+  await expect(page.getByRole('button', { name: 'Remove Meditation Guide from favorites' })).toHaveAttribute('aria-pressed', 'true');
+
+  await page.reload();
+  await openFeature(page, 'Gallery');
+  await page.getByRole('button', { name: 'Favorites', exact: true }).click();
+  await expect(titles).toHaveText(['Meditation Guide']);
+
+  await page.getByRole('button', { name: 'Remove Meditation Guide from favorites' }).click();
+  await expect(page.getByText('No voices match.')).toBeVisible();
+  await page.getByRole('button', { name: 'Clear filters' }).click();
+  await expect(titles).toHaveCount(all);
+});
+
+test('a result downloads as MP3, named after its WAV', async ({ app: page, mode }) => {
+  test.skip(mode === 'real', 'Fakes the conversion, so it only runs against the mock backend.');
+  await page.route(`${BACKEND}/api/audio_effects/mp3`, (route) => route.fulfill({ status: 200, contentType: 'audio/mpeg', body: Buffer.from('fake mp3') }));
+  await openFeature(page, 'Audio effects');
+  await dropFile(page, 'speech.wav');
+  await page.getByRole('slider', { name: 'Reverb', exact: true }).focus();
+  await page.keyboard.press('ArrowRight');
+  await page.getByRole('button', { name: 'Apply effects' }).click();
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download MP3' }).click();
+  expect((await download).suggestedFilename()).toBe('voxwell-effects.mp3');
+});
+
+test('a failed MP3 conversion says so', async ({ app: page, mode }) => {
+  test.skip(mode === 'real', 'Fakes the failure, so it only runs against the mock backend.');
+  await page.route(`${BACKEND}/api/audio_effects/mp3`, (route) => route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ detail: 'Making the MP3 failed; see the Voxwell log.' }) }));
+  await openFeature(page, 'Audio effects');
+  await dropFile(page, 'speech.wav');
+  await page.getByRole('slider', { name: 'Reverb', exact: true }).focus();
+  await page.keyboard.press('ArrowRight');
+  await page.getByRole('button', { name: 'Apply effects' }).click();
+  await page.getByRole('button', { name: 'Download MP3' }).click();
+  await expect(page.getByText('Making the MP3 failed; see the Voxwell log.')).toBeVisible();
+});
+
 test('audio effects: add reverb and distance to a recording', async ({ app: page }) => {
   await openFeature(page, 'Audio effects');
   await dropFile(page, 'speech.wav');

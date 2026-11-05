@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
-import { Check, Headphones, Plus, Search } from 'lucide-react';
+import { Check, Headphones, Plus, Search, Star } from 'lucide-react';
 import { api, apiUrl, sendJson, type Voice } from '../../api';
 import { AudioResult } from '@/components/audio-result';
 import { ChoiceSelect } from '@/components/choice-select';
 import { EmptyState, ErrorAlert, Field, message, Page as PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import { usePersisted } from '@/lib/persisted';
+import { cn } from '@/lib/utils';
 
 interface Preset {
   id: string;
@@ -28,6 +30,8 @@ export default function Page() {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('all');
   const [gender, setGender] = useState('all');
+  const [favorites, setFavorites] = usePersisted<string[]>('voxwell.gallery.favorites', []);
+  const [onlyFavorites, setOnlyFavorites] = useState(false);
 
   useEffect(() => {
     api<Preset[]>('/api/gallery/presets').then(setPresets, (e) => {
@@ -43,13 +47,16 @@ export default function Page() {
     (p) =>
       (category === 'all' || p.category === category) &&
       (gender === 'all' || p.gender === gender) &&
+      (!onlyFavorites || favorites.includes(p.id)) &&
       `${p.name} ${p.category} ${p.description}`.toLowerCase().includes(words),
   );
   const clearFilters = () => {
     setSearch('');
     setCategory('all');
     setGender('all');
+    setOnlyFavorites(false);
   };
+  const toggleFavorite = (id: string) => setFavorites(favorites.includes(id) ? favorites.filter((other) => other !== id) : [...favorites, id]);
 
   return (
     <PageLayout
@@ -60,7 +67,7 @@ export default function Page() {
       <ErrorAlert message={error} />
       {presets === null && <Skeleton className="h-40 w-full" />}
       {!!presets?.length && (
-        <div className="grid gap-4 sm:grid-cols-[2fr_1fr_1fr]">
+        <div className="grid items-end gap-4 sm:grid-cols-[2fr_1fr_1fr_auto]">
           <Field label="Search" htmlFor="gallery-search">
             <div className="relative">
               <Search className="text-muted-foreground pointer-events-none absolute top-2.5 left-3 size-4" />
@@ -73,6 +80,9 @@ export default function Page() {
           <Field label="Gender" htmlFor="gallery-gender">
             <ChoiceSelect id="gallery-gender" options={GENDERS} value={gender} onChange={setGender} />
           </Field>
+          <Button variant={onlyFavorites ? 'default' : 'outline'} aria-pressed={onlyFavorites} onClick={() => setOnlyFavorites(!onlyFavorites)}>
+            <Star /> Favorites
+          </Button>
         </div>
       )}
       {!!presets?.length && (
@@ -89,7 +99,7 @@ export default function Page() {
           <h2 className="text-muted-foreground text-sm font-medium tracking-wide uppercase">{c}</h2>
           <div className="grid gap-4 @2xl:grid-cols-2 @5xl:grid-cols-3 @7xl:grid-cols-4">
             {visible?.filter((p) => p.category === c).map((p) => (
-              <PresetCard key={p.id} preset={p} onUpdated={replace} />
+              <PresetCard key={p.id} preset={p} onUpdated={replace} favorite={favorites.includes(p.id)} onFavorite={() => toggleFavorite(p.id)} />
             ))}
           </div>
         </div>
@@ -98,7 +108,7 @@ export default function Page() {
   );
 }
 
-function PresetCard({ preset, onUpdated }: { preset: Preset; onUpdated: (p: Preset) => void }) {
+function PresetCard({ preset, onUpdated, favorite, onFavorite }: { preset: Preset; onUpdated: (p: Preset) => void; favorite: boolean; onFavorite: () => void }) {
   const [busy, setBusy] = useState<'listen' | 'add' | null>(null);
   const [added, setAdded] = useState<Voice | null>(null);
   const [listened, setListened] = useState(false);
@@ -134,6 +144,17 @@ function PresetCard({ preset, onUpdated }: { preset: Preset; onUpdated: (p: Pres
       <CardHeader>
         <CardTitle>{preset.name}</CardTitle>
         <CardDescription>{preset.description}</CardDescription>
+        <CardAction>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-pressed={favorite}
+            aria-label={favorite ? `Remove ${preset.name} from favorites` : `Add ${preset.name} to favorites`}
+            onClick={onFavorite}
+          >
+            <Star className={cn(favorite && 'fill-primary text-primary')} />
+          </Button>
+        </CardAction>
       </CardHeader>
       <CardContent className="flex flex-1 flex-col gap-3">
         {preset.audio_url ? (

@@ -20,6 +20,7 @@ DISTANCE_DRY_DB, DISTANCE_WET_DB = -18.0, -6.0  # level drop of the direct and r
 DISTANCE_EXTRA_WET = 0.4  # distance 1 adds this much reverb
 NOISE_DB_MIN, NOISE_DB_MAX = -50.0, -10.0  # noise level relative to the speech at noise = 0+ and 1
 NOISE_SEED = 20240
+MP3_MAX_RATE = 48000
 
 
 class Effects(BaseModel):
@@ -159,6 +160,19 @@ def encode_wav(samples, rate: int) -> bytes:
 
     buf = io.BytesIO()
     sf.write(buf, samples, rate, format="WAV", subtype="PCM_16")
+    return buf.getvalue()
+
+
+def encode_mp3(samples, rate: int) -> bytes:
+    """MP3 bytes. MP3 can't hold rates above 48 kHz, so those are resampled first."""
+    import librosa
+    import soundfile as sf
+
+    if rate > MP3_MAX_RATE:
+        samples = librosa.resample(samples.T, orig_sr=rate, target_sr=MP3_MAX_RATE).T
+        rate = MP3_MAX_RATE
+    buf = io.BytesIO()
+    sf.write(buf, samples, rate, format="MP3")
     return buf.getvalue()
 
 

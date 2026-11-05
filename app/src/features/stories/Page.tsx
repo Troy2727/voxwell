@@ -3,7 +3,7 @@ import { Captions, Play } from 'lucide-react';
 import { api, apiUrl, listVoices, sendJson, type Voice } from '../../api';
 import { AudioResult } from '@/components/audio-result';
 import { ChoiceSelect } from '@/components/choice-select';
-import { EffectsControls, EffectsSettings, isNeutral, NO_EFFECTS } from '@/components/effects-controls';
+import { EffectsControls, isNeutral, NO_EFFECTS, reviveEffects } from '@/components/effects-controls';
 import { FileDrop } from '@/components/file-drop';
 import { JobProgress } from '@/components/job-progress';
 import { ErrorAlert, Field, message, Muted, Page as PageLayout, Section } from '@/components/page';
@@ -11,6 +11,7 @@ import { VoiceSelect } from '@/components/voice-select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { usePersisted } from '@/lib/persisted';
 import { LANGUAGES } from '../voice_cloning/languages';
 
 interface Story {
@@ -33,14 +34,14 @@ const DEFAULT_VOICE = 'default';
 export default function Page() {
   const [voices, setVoices] = useState<Voice[]>([]);
   const [title, setTitle] = useState('');
-  const [language, setLanguage] = useState('en');
+  const [language, setLanguage] = usePersisted('voxwell.stories.language', 'en');
   const [script, setScript] = useState('');
   const [speakers, setSpeakers] = useState<string[]>([]);
   const [lineCount, setLineCount] = useState(0);
   const [scriptError, setScriptError] = useState('');
   const [cast, setCast] = useState<Record<string, string>>({});
   const [story, setStory] = useState<Story | null>(null);
-  const [fx, setFx] = useState<EffectsSettings>(NO_EFFECTS);
+  const [fx, setFx] = usePersisted('voxwell.stories.effects', NO_EFFECTS, reviveEffects);
   const [error, setError] = useState('');
   const [subtitles, setSubtitles] = useState<File | null>(null);
   const [subtitleVoice, setSubtitleVoice] = useState('');
@@ -122,8 +123,8 @@ export default function Page() {
           <Field label="Title (optional)" htmlFor="story-title">
             <Input id="story-title" value={title} maxLength={100} onChange={(e) => setTitle(e.target.value)} />
           </Field>
-          <Field label="Language">
-            <ChoiceSelect options={LANGUAGES} value={language} onChange={setLanguage} />
+          <Field label="Language" htmlFor="story-language">
+            <ChoiceSelect id="story-language" options={LANGUAGES} value={language} onChange={setLanguage} />
           </Field>
         </div>
         <Field label="Script" htmlFor="story-script" hint="One line each, as “Name: what they say”. Lines without a name are read by the Narrator.">
@@ -150,7 +151,7 @@ export default function Page() {
             </div>
           ))}
           {voices.length === 0 && <Muted className="text-xs">No saved voices yet; everyone uses the default voice.</Muted>}
-          <EffectsControls value={fx} onChange={setFx} disabled={working} />
+          <EffectsControls value={fx} onChange={setFx} disabled={working} resettable />
           <div>
             <Button disabled={working} onClick={generate}>
               <Play /> {working ? 'Generating…' : 'Generate story'}

@@ -8,7 +8,7 @@ import uuid
 from typing import Literal
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 
 from voxwell.features.audio_effects import dsp
 from voxwell.paths import child_path, data_dir
@@ -18,6 +18,7 @@ log = logging.getLogger(__name__)
 router = APIRouter(tags=["audio_effects"])
 
 MAX_UPLOAD = 50 * 1024 * 1024
+MAX_MP3_UPLOAD = 1024 * 1024 * 1024  # a whole audiobook chapter as WAV can be this long
 MAX_SECONDS = 30 * 60
 OUTPUT_TTL_SECONDS = 24 * 60 * 60  # results are scratch files; download what you want to keep
 _OUTPUT_ID = re.compile(r"^[0-9a-f]{32}$")
@@ -66,6 +67,24 @@ async def apply(
         log.exception("Applying the effects failed")
         raise HTTPException(500, "Applying the effects failed; see the Voxwell log.") from exc
     return {"id": output_id, "url": f"/api/audio_effects/audio/{output_id}"}
+
+
+@router.post("/mp3")
+async def to_mp3(file: UploadFile = File(...)):
+    """The same audio as MP3, for the download button on any result."""
+    data = await file.read(MAX_MP3_UPLOAD + 1)
+    if len(data) > MAX_MP3_UPLOAD:
+        raise HTTPException(413, "The file is too large (1 GB max).")
+    try:
+        audio, rate = await asyncio.to_thread(dsp.decode, data)
+    except ValueError:
+        raise HTTPException(422, "Could not read the file as audio. Use WAV, MP3, FLAC or OGG.")
+    try:
+        mp3 = await asyncio.to_thread(dsp.encode_mp3, audio, rate)
+    except Exception as exc:
+        log.exception("Making the MP3 failed")
+        raise HTTPException(500, "Making the MP3 failed; see the Voxwell log.") from exc
+    return Response(mp3, media_type="audio/mpeg")
 
 
 @router.get("/audio/{output_id}")

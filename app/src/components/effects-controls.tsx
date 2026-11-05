@@ -1,5 +1,7 @@
+import { RotateCcw } from 'lucide-react';
 import { ChoiceSelect } from '@/components/choice-select';
 import { Field } from '@/components/page';
+import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 
 export interface EffectsSettings {
@@ -17,6 +19,9 @@ export const NO_EFFECTS: EffectsSettings = { reverb: 0, distance: 0, noise: 0, n
 
 export const isNeutral = (fx: EffectsSettings) => fx.reverb === 0 && fx.distance === 0 && fx.noise === 0 && fx.pan === 0 && fx.speed === 1 && fx.pitch === 0;
 
+/** Saved settings in today's shape: settings added since they were saved start neutral. */
+export const reviveEffects = (saved: unknown): EffectsSettings => ({ ...NO_EFFECTS, ...(saved as Partial<EffectsSettings>) });
+
 const NOISE_COLORS: [string, string][] = [['pink', 'Pink (hiss)'], ['brown', 'Brown (rumble)']];
 
 function panLabel(pan: number) {
@@ -30,7 +35,7 @@ function pitchLabel(pitch: number) {
 }
 
 /** Sliders for speed, pitch, reverb, distance, background noise and pan; the settings match the backend's Effects model. */
-export function EffectsControls({ value, onChange, disabled }: { value: EffectsSettings; onChange: (fx: EffectsSettings) => void; disabled?: boolean }) {
+export function EffectsControls({ value, onChange, disabled, resettable }: { value: EffectsSettings; onChange: (fx: EffectsSettings) => void; disabled?: boolean; resettable?: boolean }) {
   const set = (patch: Partial<EffectsSettings>) => onChange({ ...value, ...patch });
   const percent = (v: number) => `${Math.round(v * 100)}%`;
   return (
@@ -56,6 +61,13 @@ export function EffectsControls({ value, onChange, disabled }: { value: EffectsS
       <Field label={`Pan: ${panLabel(value.pan)}`} hint="Any pan other than center makes the audio stereo.">
         <Slider min={-1} max={1} step={0.05} value={[value.pan]} onValueChange={([v]) => set({ pan: v })} disabled={disabled} aria-label="Pan" className="py-2" />
       </Field>
+      {resettable && !isNeutral(value) && (
+        <div className="sm:col-span-2">
+          <Button variant="outline" size="sm" disabled={disabled} onClick={() => onChange(NO_EFFECTS)}>
+            <RotateCcw /> Reset effects
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

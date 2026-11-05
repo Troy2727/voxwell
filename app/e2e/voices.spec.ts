@@ -1,4 +1,5 @@
 import { dropFile, ensureVoice, expect, expectAudio, openFeature, pickVoice, test } from './fixtures';
+import { installMockBackend } from './mock-backend';
 
 test('voice cloning: upload a clip, then speak in that voice', async ({ app: page }) => {
   await openFeature(page, 'Voice cloning');
@@ -57,6 +58,75 @@ test('voice cloning: untouched speed and pitch send no effects at all', async ({
   const sent = page.waitForRequest('**/api/voice_cloning/synthesize');
   await page.getByRole('button', { name: 'Generate' }).click();
   expect((await sent).postDataJSON().effects).toBeNull();
+});
+
+test('voice cloning remembers voice, language and effects after a reload, and effects can be reset', async ({ app: page, mode }) => {
+  test.skip(mode === 'real', 'Checks the request, so it only runs against the mock backend.');
+  await openFeature(page, 'Voice cloning');
+  await pickVoice(page, 'Narrator');
+  await page.getByRole('combobox', { name: 'Language' }).click();
+  await page.getByRole('option', { name: 'Spanish' }).click();
+  await page.getByRole('slider', { name: 'Speed', exact: true }).focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByText('Speed: 1.05×')).toBeVisible();
+
+  await page.reload();
+  await openFeature(page, 'Voice cloning');
+  await expect(page.getByText('Speed: 1.05×')).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'Language' })).toHaveText('Spanish');
+  await page.getByLabel('Text').fill('Hola.');
+  let sent = page.waitForRequest('**/api/voice_cloning/synthesize');
+  await page.getByRole('button', { name: 'Generate' }).click();
+  const body = (await sent).postDataJSON();
+  expect(body).toMatchObject({ language: 'es', effects: { speed: 1.05 } });
+  expect(body.voice_id).toBeTruthy();
+
+  await page.getByRole('button', { name: 'Reset effects' }).click();
+  await expect(page.getByText('Speed: 1.00×')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Reset effects' })).toHaveCount(0);
+  sent = page.waitForRequest('**/api/voice_cloning/synthesize');
+  await page.getByRole('button', { name: 'Generate' }).click();
+  expect((await sent).postDataJSON().effects).toBeNull();
+});
+
+test('voice cloning forgets a remembered voice that was deleted', async ({ page, mode }) => {
+  test.skip(mode === 'real', 'Checks the request, so it only runs against the mock backend.');
+  await installMockBackend(page);
+  await page.addInitScript(() => localStorage.setItem('voxwell.voice_cloning.voice', JSON.stringify('deleted-voice')));
+  await page.goto('/');
+  await openFeature(page, 'Voice cloning');
+  await page.getByLabel('Text').fill('Hello.');
+  const sent = page.waitForRequest('**/api/voice_cloning/synthesize');
+  await page.getByRole('button', { name: 'Generate' }).click();
+  expect((await sent).postDataJSON().voice_id).toBeNull();
+});
+
+test('a remembered setting that is unreadable falls back to the default', async ({ page, mode }) => {
+  test.skip(mode === 'real', 'Mock backend only.');
+  await installMockBackend(page);
+  await page.addInitScript(() => localStorage.setItem('voxwell.voice_cloning.effects', '{not json'));
+  await page.goto('/');
+  await openFeature(page, 'Voice cloning');
+  await expect(page.getByText('Speed: 1.00×')).toBeVisible();
+});
+
+test('recently used voices come first and are marked', async ({ app: page, mode }) => {
+  test.skip(mode === 'real', 'Uses the mock backend voices.');
+  await openFeature(page, 'Voice cloning');
+  const picker = page.locator('button[role=combobox][aria-haspopup=dialog]').first();
+  await picker.click();
+  const options = page.getByRole('option');
+  const names = await options.allInnerTexts();
+  const last = names[names.length - 1].split('\n')[0];
+  await options.last().click();
+
+  await page.reload();
+  await openFeature(page, 'Voice cloning');
+  await picker.click();
+  const after = await options.allInnerTexts();
+  expect(after[0]).toContain('Default voice');
+  expect(after[1]).toContain(last);
+  expect(after[1]).toContain('Recent');
 });
 
 test('voice remix: remix a saved voice and save it', async ({ app: page, mode }) => {

@@ -2,14 +2,15 @@ import { useState } from 'react';
 import { RotateCcw, Sparkles } from 'lucide-react';
 import { api, apiUrl } from '../../api';
 import { AudioResult } from '@/components/audio-result';
-import { EffectsControls, EffectsSettings, isNeutral, NO_EFFECTS } from '@/components/effects-controls';
+import { EffectsControls, isNeutral, NO_EFFECTS, reviveEffects } from '@/components/effects-controls';
+import { usePersisted } from '@/lib/persisted';
 import { FileDrop } from '@/components/file-drop';
 import { ErrorAlert, message, Page as PageLayout, Section } from '@/components/page';
 import { Button } from '@/components/ui/button';
 
 export default function Page() {
   const [file, setFile] = useState<File | null>(null);
-  const [fx, setFx] = useState<EffectsSettings>(NO_EFFECTS);
+  const [fx, setFx] = usePersisted('voxwell.audio_effects.effects', NO_EFFECTS, reviveEffects);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [audioUrl, setAudioUrl] = useState('');

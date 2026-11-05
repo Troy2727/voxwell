@@ -398,3 +398,39 @@ def test_the_mcp_tool_offers_speed_and_pitch(monkeypatch, tmp_path):
     assert seen["speed"] == 1.25 and seen["pitch"] == 0
     schema = next(t for t in mcp_server.TOOLS if t["name"] == "apply_effects")["inputSchema"]["properties"]
     assert {"speed", "pitch"} <= set(schema)
+
+
+def to_mp3(wav: bytes):
+    return client.post("/api/audio_effects/mp3", files={"file": ("a.wav", wav, "audio/wav")})
+
+
+def test_a_recording_converts_to_a_real_mp3_of_the_same_length():
+    r = to_mp3(tone_wav(2.0))
+    assert r.status_code == 200, r.text
+    assert r.headers["content-type"] == "audio/mpeg"
+    assert sf.info(io.BytesIO(r.content)).format == "MP3"
+    audio, rate = sf.read(io.BytesIO(r.content))
+    assert len(audio) / rate == pytest.approx(2.0, abs=0.15)
+    assert dominant_hz(audio, rate) == pytest.approx(440, abs=8)
+    assert len(r.content) < len(tone_wav(2.0))
+
+
+def test_stereo_stays_stereo_in_mp3():
+    buf = io.BytesIO()
+    sf.write(buf, np.stack([tone_for_stretching(), tone_for_stretching(hz=330.0)], axis=1), RATE, format="WAV", subtype="PCM_16")
+    assert sf.info(io.BytesIO(to_mp3(buf.getvalue()).content)).channels == 2
+
+
+def test_a_rate_mp3_cant_hold_is_resampled_not_refused():
+    high = 96000
+    buf = io.BytesIO()
+    sf.write(buf, 0.5 * np.sin(2 * np.pi * 440 * np.arange(high) / high), high, format="WAV", subtype="PCM_16")
+    r = to_mp3(buf.getvalue())
+    assert r.status_code == 200, r.text
+    assert sf.info(io.BytesIO(r.content)).samplerate == 48000
+
+
+def test_something_that_isnt_audio_is_refused_with_a_reason():
+    r = to_mp3(b"not audio")
+    assert r.status_code == 422
+    assert "Could not read" in r.json()["detail"]
