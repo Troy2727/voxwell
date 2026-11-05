@@ -193,7 +193,7 @@ Voxwell is **MIT licensed**, and every model it runs allows commercial use ([one
   <sub>Click the diagram to see it full size.</sub>
 </p>
 
-There is **one server, and it only listens on `127.0.0.1`.** The desktop app starts it, and every other way in is a client of the same HTTP API, so each model loads once and is shared by all of them. Each feature is a folder in `backend/voxwell/features/` with its own FastAPI router, mounted at `/api/<feature>/`.
+There is **one server, and it only listens on `127.0.0.1`** ([phone dictation](#-integrations), off by default, comes in through Tailscale). The desktop app starts it, and every other way in is a client of the same HTTP API, so each model loads once and is shared by all of them. Each feature is a folder in `backend/voxwell/features/` with its own FastAPI router, mounted at `/api/<feature>/`.
 
 Models load **lazily**, on the first request that needs them, and use CUDA, then Apple MPS, then the CPU. Voices, projects and results are saved in a local data folder.
 
@@ -306,6 +306,15 @@ curl http://127.0.0.1:8765/v1/audio/speech \
   -o hello.mp3
 ```
 
+**Phone dictation (optional).** Record on your phone and read the text there, while your computer does the work. It's off by default, needs [Tailscale](https://tailscale.com/download) on both devices with the same account, and your computer has to be on.
+
+```sh
+voxwell serve --remote          # prints this computer's private address
+tailscale serve --bg 8765       # in another terminal; undo with: tailscale serve reset
+```
+
+Open the printed `https://` address on your phone. Only your Tailscale account gets in, only dictation can be reached, and other websites open on your phone are refused. This covers recording, not live dictation, and it needs the command line, not the desktop app. Tailscale's HTTPS publishes your computer's name in a public certificate log, so rename the computer first if its name is private, and its free plan is for non-commercial use.
+
 **Phone calls (optional).** Callers to your Twilio number hear a greeting in one of your voices. This is off by default. When on, it runs a separate small server that serves only Twilio's two endpoints, so the main app is never exposed.
 
 <br/>
@@ -377,7 +386,7 @@ Backend tests on Ubuntu, Windows and macOS, plus a frontend typecheck and build,
 
 Alex builds Voxwell end to end: the choice of voice models, the FastAPI backend, the React and Electron app, and the integrations that let AI assistants use it. Voxwell exists so that a complete voice studio can run on your own machine, with no cloud service, no per-minute billing and no uploads.
 
-Before software, Alex spent about ten years in cybersecurity, and Voxwell is built that way. The server only listens on your own computer. The optional phone gateway is the only part that can ever be exposed, and it rejects any request without a valid Twilio signature. A test fails the build if a dependency's license ever stops allowing commercial use.
+Before software, Alex spent about ten years in cybersecurity, and Voxwell is built that way. The server only listens on your own computer. The optional phone gateway and phone dictation are the only parts that can ever be reached from elsewhere: the gateway rejects any request without a valid Twilio signature, and phone dictation accepts only your own Tailscale account. A test fails the build if a dependency's license ever stops allowing commercial use.
 
 <br/>
 

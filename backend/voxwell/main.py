@@ -14,6 +14,7 @@ from voxwell.features import FEATURES
 from voxwell.features.integrations import openai_api
 from voxwell.origins import APP_HOSTS, APP_ORIGINS
 from voxwell.paths import data_dir
+from voxwell.remote import RemoteGate
 from voxwell.upload_limits import UploadLimit
 
 # Model downloads must work behind TLS-inspecting proxies and antivirus, whose certificates
@@ -42,6 +43,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=list(APP_HOSTS))
+# Added last, so it runs first: it decides remote requests before the local-only host check.
+app.add_middleware(RemoteGate)
 
 
 @app.get("/api/health")

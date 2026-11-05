@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0e131b" />
+    <title>Voxwell Dictation</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0 auto;
+        max-width: 560px;
+        padding: 24px 16px calc(24px + env(safe-area-inset-bottom));
+        background: #0e131b;
+        color: #f4f1ea;
+        font: 17px/1.5 -apple-system, system-ui, sans-serif;
+      }
+      h1 {
+        margin: 0;
+        font-size: 24px;
+      }
+      h2 {
+        margin: 0 0 8px;
+        font-size: 15px;
+        color: #a8b3c4;
+      }
+      .muted {
+        margin: 4px 0 20px;
+        color: #a8b3c4;
+        font-size: 14px;
+      }
+      label {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 14px;
+        font-weight: 600;
+      }
+      select,
+      button {
+        min-height: 48px;
+        border: 1px solid #33404f;
+        border-radius: 10px;
+        background: #1a222e;
+        color: inherit;
+        font: inherit;
+      }
+      select {
+        width: 100%;
+        padding: 0 12px;
+      }
+      button {
+        padding: 0 16px;
+        font-weight: 600;
+      }
+      #record {
+        display: block;
+        width: 100%;
+        min-height: 72px;
+        margin: 20px 0 8px;
+        border: 0;
+        border-radius: 16px;
+        background: #ff8a00;
+        color: #111;
+        font-size: 20px;
+        touch-action: manipulation;
+      }
+      #record.recording {
+        background: #e5484d;
+        color: #fff;
+      }
+      #record:disabled {
+        opacity: 0.6;
+      }
+      #status {
+        min-height: 1.5em;
+        margin: 0 0 16px;
+        color: #a8b3c4;
+        font-size: 14px;
+      }
+      #status.error {
+        color: #ff8f8f;
+      }
+      .card {
+        margin-top: 12px;
+        padding: 14px;
+        border: 1px solid #27313f;
+        border-radius: 12px;
+        background: #151c26;
+      }
+      .card p {
+        margin: 0 0 12px;
+        overflow-wrap: anywhere;
+      }
+      .actions {
+        display: flex;
+        gap: 8px;
+      }
+      [hidden] {
+        display: none !important;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Voxwell Dictation</h1>
+    <p class="muted">Your phone records. Your computer turns it into text.</p>
+
+    <label for="language">Language</label>
+    <select id="language">
+      <option value="auto">Auto-detect</option>
+      <option value="en">English</option>
+      <option value="es">Spanish</option>
+      <option value="fr">French</option>
+      <option value="de">German</option>
+      <option value="it">Italian</option>
+      <option value="pt">Portuguese</option>
+      <option value="nl">Dutch</option>
+      <option value="ru">Russian</option>
+      <option value="zh">Chinese</option>
+      <option value="ja">Japanese</option>
+      <option value="ko">Korean</option>
+      <option value="ar">Arabic</option>
+      <option value="hi">Hindi</option>
+      <option value="tr">Turkish</option>
+    </select>
+
+    <button id="record" type="button">Record</button>
+    <p id="status" role="status" aria-live="polite"></p>
+
+    <section id="results" aria-label="Your dictations"></section>
+
+    <template id="result">
+      <div class="card">
+        <p class="text"></p>
+        <div class="actions">
+          <button class="copy" type="button">Copy</button>
+          <button class="delete" type="button">Delete</button>
+        </div>
+      </div>
+    </template>
+
+    <script>
+      const KEY = 'voxwell.dictation.language';
+      const language = document.getElementById('language');
+      const record = document.getElementById('record');
+      const status = document.getElementById('status');
+      const results = document.getElementById('results');
+      let recorder = null;
+      let busy = false;
+
+      const say = (text, isError = false) => {
+        status.textContent = text;
+        status.classList.toggle('error', isError);
+      };
+      const languageName = (code) => {
+        try {
+          return new Intl.DisplayNames('en', { type: 'language' }).of(code) || code;
+        } catch {
+          return code;
+        }
+      };
+
+      try {
+        const saved = localStorage.getItem(KEY);
+        if (saved && [...language.options].some((o) => o.value === saved)) language.value = saved;
+      } catch {
+        /* storage can be blocked */
+      }
+      language.addEventListener('change', () => {
+        try {
+          localStorage.setItem(KEY, language.value);
+        } catch {
+          /* storage can be blocked */
+        }
+      });
+
+      function show(text) {
+        const card = document.getElementById('result').content.cloneNode(true).firstElementChild;
+        card.querySelector('.text').textContent = text;
+        const copy = card.querySelector('.copy');
+        copy.addEventListener('click', async () => {
+          try {
+            await navigator.clipboard.writeText(text);
+            copy.textContent = 'Copied';
+          } catch {
+            say('Could not copy. Press and hold the text to select it.', true);
+          }
+        });
+        card.querySelector('.delete').addEventListener('click', () => card.remove());
+        results.prepend(card);
+      }
+
+      async function transcribe(blob) {
+        busy = true;
+        record.disabled = true;
+        say('Your computer is turning that into text…');
+        const asked = language.value;
+        try {
+          const form = new FormData();
+          form.append('file', blob, 'recording');
+          if (asked !== 'auto') form.append('language', asked);
+          const response = await fetch('/api/dictation/transcribe', { method: 'POST', body: form });
+          if (!response.ok) {
+            const body = await response.text();
+            let detail = body;
+            try {
+              detail = JSON.parse(body).detail || body;
+            } catch {
+              /* a plain-text message */
+            }
+            throw new Error(detail || `Something went wrong (${response.status}).`);
+          }
+          const result = await response.json();
+          if (!result.text) {
+            say('No speech detected.');
+          } else {
+            show(result.text);
+            say(asked === 'auto' ? `Detected: ${languageName(result.language)}. If that's wrong, choose your language above.` : '');
+          }
+        } catch (e) {
+          // fetch only rejects when the computer can't be reached.
+          say(e instanceof TypeError ? "Can't reach your computer. Check that it's on, Voxwell is running, and Tailscale is on here." : e.message, true);
+        } finally {
+          busy = false;
+          record.disabled = false;
+        }
+      }
+
+      async function start() {
+        let stream;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        } catch (e) {
+          say(e && e.name === 'NotAllowedError' ? 'Microphone access was denied. Allow it in your phone or browser settings and try again.' : 'Could not open the microphone.', true);
+          return;
+        }
+        const chunks = [];
+        recorder = new MediaRecorder(stream);
+        recorder.ondataavailable = (event) => {
+          if (event.data.size) chunks.push(event.data);
+        };
+        recorder.onstop = () => {
+          const type = recorder.mimeType;
+          stream.getTracks().forEach((track) => track.stop());
+          recorder = null;
+          record.textContent = 'Record';
+          record.classList.remove('recording');
+          void transcribe(new Blob(chunks, { type }));
+        };
+        recorder.start();
+        record.textContent = 'Stop';
+        record.classList.add('recording');
+        say('Recording…');
+      }
+
+      record.addEventListener('click', () => {
+        if (busy) return;
+        if (recorder) recorder.stop();
+        else void start();
+      });
+    </script>
+  </body>
+</html>
