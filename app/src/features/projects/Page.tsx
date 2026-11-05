@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils';
 
 interface Base {
   id: string;
@@ -79,6 +80,7 @@ const working = (item: Item) => item.kind !== 'speech' && (item.state === 'queue
 export default function Page() {
   const [items, setItems] = useState<Item[] | null>(null);
   const [error, setError] = useState('');
+  const [focused, setFocused] = useState('');
   const timer = useRef<number | undefined>(undefined);
 
   const refresh = async () => {
@@ -98,6 +100,18 @@ export default function Page() {
     return () => window.clearTimeout(timer.current);
   }, []);
 
+  // Home's recent projects link here by hash: bring that one into view.
+  useEffect(() => {
+    if (!items?.length || !window.location.hash.startsWith('#project-')) return;
+    const id = window.location.hash.slice(1);
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    const card = document.getElementById(id);
+    if (!card) return;
+    setFocused(id);
+    card.scrollIntoView({ block: 'center' });
+    card.focus({ preventScroll: true });
+  }, [items]);
+
   return (
     <PageLayout title="Projects" description="Everything you made, newest first." wide>
       <ErrorAlert message={error} />
@@ -110,7 +124,7 @@ export default function Page() {
       {!!items?.length && (
         <div className="grid grid-cols-1 items-start gap-4 @4xl:grid-cols-2">
           {items.map((item) => (
-            <ProjectCard key={`${item.kind}-${item.id}`} item={item} onChanged={refresh} onError={(e) => setError(message(e))} />
+            <ProjectCard key={`${item.kind}-${item.id}`} item={item} focused={focused === `project-${item.kind}-${item.id}`} onChanged={refresh} onError={(e) => setError(message(e))} />
           ))}
         </div>
       )}
@@ -118,7 +132,7 @@ export default function Page() {
   );
 }
 
-function ProjectCard({ item, onChanged, onError }: { item: Item; onChanged: () => void; onError: (e: unknown) => void }) {
+function ProjectCard({ item, focused, onChanged, onError }: { item: Item; focused: boolean; onChanged: () => void; onError: (e: unknown) => void }) {
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(item.title);
   const [busy, setBusy] = useState(false);
@@ -142,7 +156,7 @@ function ProjectCard({ item, onChanged, onError }: { item: Item; onChanged: () =
   const remove = () => run(() => sendJson(path, 'DELETE'), `Deleted "${item.title}"`);
 
   return (
-    <Card className="gap-3 py-4">
+    <Card id={`project-${item.kind}-${item.id}`} tabIndex={-1} className={cn('gap-3 py-4 outline-none', focused && 'ring-primary ring-2')}>
       <CardContent className="flex flex-col gap-3 px-4">
         {editing ? (
           <div className="flex items-center gap-2">
