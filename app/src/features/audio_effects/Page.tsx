@@ -33,7 +33,7 @@ export default function Page() {
   }
 
   return (
-    <PageLayout title="Audio effects" description="Add reverb, distance, background noise or stereo pan to a recording. The same controls are in Voice cloning and Stories.">
+    <PageLayout title="Audio effects" description="Change the speed or pitch of a recording, or add reverb, distance, background noise or stereo pan. The same controls are in Voice cloning and Stories.">
       <Section title="Recording" description="WAV, MP3, FLAC or OGG.">
         <FileDrop file={file} onFile={setFile} accept=".wav,.mp3,.flac,.ogg,audio/*" disabled={busy} />
       </Section>

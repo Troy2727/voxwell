@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Upload, Volume2 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Pause, Upload, Volume2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, apiUrl, listVoices, Voice } from '../../api';
 import { AudioResult } from '@/components/audio-result';
@@ -13,6 +13,8 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { LANGUAGES } from './languages';
 
+const PAUSES: [string, number][] = [['Short', 0.5], ['Medium', 1], ['Long', 2]];
+
 export default function Page() {
   const [voices, setVoices] = useState<Voice[] | null>(null);
   const [voiceId, setVoiceId] = useState('');
@@ -25,6 +27,7 @@ export default function Page() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [audioUrl, setAudioUrl] = useState('');
+  const textBox = useRef<HTMLTextAreaElement>(null);
 
   const refresh = () =>
     listVoices().then(setVoices, (e: Error) => {
@@ -34,6 +37,19 @@ export default function Page() {
   useEffect(() => {
     void refresh();
   }, []);
+
+  function insertPause(seconds: number) {
+    const start = textBox.current?.selectionStart ?? text.length;
+    const end = textBox.current?.selectionEnd ?? text.length;
+    const before = text.slice(0, start);
+    const tag = `${before && !before.endsWith(' ') ? ' ' : ''}[pause ${seconds}] `;
+    setText(before + tag + text.slice(end).trimStart());
+    // After React has put the new text in the box, so the cursor isn't reset by it.
+    requestAnimationFrame(() => {
+      textBox.current?.focus();
+      textBox.current?.setSelectionRange(start + tag.length, start + tag.length);
+    });
+  }
 
   async function upload() {
     if (!file || !name.trim()) return;
@@ -99,9 +115,16 @@ export default function Page() {
             <ChoiceSelect options={LANGUAGES} value={language} onChange={setLanguage} />
           </Field>
         </div>
-        <Field label="Text" htmlFor="clone-text" hint={`${text.length} / 2000`}>
-          <Textarea id="clone-text" rows={5} maxLength={2000} value={text} onChange={(e) => setText(e.target.value)} placeholder="Type what the voice should say…" />
+        <Field label="Text" htmlFor="clone-text" hint={`${text.length} / 2000. Type [pause 2] anywhere for two seconds of silence, up to 10.`}>
+          <Textarea ref={textBox} id="clone-text" rows={5} maxLength={2000} value={text} onChange={(e) => setText(e.target.value)} placeholder="Type what the voice should say…" />
         </Field>
+        <div className="flex flex-wrap items-center gap-2">
+          {PAUSES.map(([label, seconds]) => (
+            <Button key={label} variant="outline" size="sm" aria-label={`${label} pause`} disabled={busy} onClick={() => insertPause(seconds)}>
+              <Pause /> {label}
+            </Button>
+          ))}
+        </div>
         <EffectsControls value={fx} onChange={setFx} disabled={busy} />
         <div>
           <Button disabled={busy || !text.trim()} onClick={generate}>

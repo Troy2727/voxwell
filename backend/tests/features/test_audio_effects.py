@@ -288,3 +288,48 @@ def test_mcp_apply_effects(monkeypatch, tmp_path):
     bad = mcp_server.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {
         "name": "apply_effects", "arguments": {"file_path": str(source), "pan": "left"}}})
     assert bad["result"]["isError"] is True
+
+
+def dominant_hz(x, rate):
+    spectrum = np.abs(np.fft.rfft(x * np.hanning(len(x))))
+    return np.fft.rfftfreq(len(x), 1 / rate)[int(np.argmax(spectrum))]
+
+
+def tone_for_stretching(seconds=2.0, hz=440.0, rate=RATE):
+    return 0.5 * np.sin(2 * np.pi * hz * np.arange(int(seconds * rate)) / rate)
+
+
+def test_speed_changes_length_but_not_pitch():
+    x = tone_for_stretching()
+    for speed, seconds in ((2.0, 1.0), (0.5, 4.0)):
+        y = dsp.process(x, RATE, Effects(speed=speed))
+        assert len(y) / RATE == pytest.approx(seconds, abs=0.05)
+        assert dominant_hz(y, RATE) == pytest.approx(440, abs=8)
+
+
+def test_pitch_changes_pitch_but_not_length():
+    x = tone_for_stretching()
+    for semitones, hz in ((6, 440 * 2 ** 0.5), (-6, 440 / 2 ** 0.5)):
+        y = dsp.process(x, RATE, Effects(pitch=semitones))
+        assert len(y) == pytest.approx(len(x), abs=RATE // 100)
+        assert dominant_hz(y, RATE) == pytest.approx(hz, abs=10)
+
+
+def test_speed_and_pitch_work_on_stereo_and_stay_under_the_ceiling():
+    x = np.stack([tone_for_stretching(), tone_for_stretching(hz=330.0)], axis=1)
+    y = dsp.process(x, RATE, Effects(speed=1.5, pitch=2))
+    assert y.ndim == 2 and y.shape[1] == 2
+    assert len(y) / RATE == pytest.approx(2 / 1.5, abs=0.05)
+    assert np.max(np.abs(y)) <= CEILING + 1e-9
+
+
+def test_normal_speed_and_pitch_count_as_neutral():
+    assert Effects(speed=1.0, pitch=0).is_neutral
+    assert not Effects(speed=1.25).is_neutral
+    assert not Effects(pitch=-1).is_neutral
+
+
+@pytest.mark.parametrize("bad", [{"speed": 0.4}, {"speed": 2.1}, {"pitch": 6.5}, {"pitch": -6.5}])
+def test_speed_and_pitch_outside_their_range_are_refused(bad):
+    with pytest.raises(ValueError):
+        Effects(**bad)

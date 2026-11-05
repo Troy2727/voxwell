@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { Play } from 'lucide-react';
+import { Captions, Play } from 'lucide-react';
 import { api, apiUrl, listVoices, sendJson, type Voice } from '../../api';
 import { AudioResult } from '@/components/audio-result';
 import { ChoiceSelect } from '@/components/choice-select';
 import { EffectsControls, EffectsSettings, isNeutral, NO_EFFECTS } from '@/components/effects-controls';
+import { FileDrop } from '@/components/file-drop';
 import { JobProgress } from '@/components/job-progress';
 import { ErrorAlert, Field, message, Muted, Page as PageLayout, Section } from '@/components/page';
 import { VoiceSelect } from '@/components/voice-select';
@@ -41,6 +42,8 @@ export default function Page() {
   const [story, setStory] = useState<Story | null>(null);
   const [fx, setFx] = useState<EffectsSettings>(NO_EFFECTS);
   const [error, setError] = useState('');
+  const [subtitles, setSubtitles] = useState<File | null>(null);
+  const [subtitleVoice, setSubtitleVoice] = useState('');
   const timer = useRef<number | undefined>(undefined);
   const parseTimer = useRef<number | undefined>(undefined);
 
@@ -93,6 +96,23 @@ export default function Page() {
     }
   }
 
+  async function generateFromSubtitles() {
+    if (!subtitles) return;
+    setError('');
+    setStory(null);
+    const body = new FormData();
+    body.append('file', subtitles);
+    body.append('language', language);
+    body.append('voice_id', subtitleVoice);
+    body.append('title', title);
+    try {
+      const { id } = await api<{ id: string }>('/api/stories/subtitles', { method: 'POST', body });
+      await poll(id);
+    } catch (e) {
+      setError(message(e));
+    }
+  }
+
   const working = story?.state === 'queued' || story?.state === 'running';
 
   return (
@@ -138,6 +158,18 @@ export default function Page() {
           </div>
         </Section>
       )}
+
+      <Section title="From a subtitle file" description="Speak an SRT file in one voice, each line at its time. Lines too long for their time are sped up. Uses the title and language above.">
+        <FileDrop file={subtitles} onFile={setSubtitles} accept=".srt" disabled={working} label="Drop an SRT file here or click to choose" />
+        <Field label="Voice">
+          <VoiceSelect voices={voices} value={subtitleVoice} onChange={setSubtitleVoice} disabled={working} />
+        </Field>
+        <div>
+          <Button variant="outline" disabled={working || !subtitles} onClick={generateFromSubtitles}>
+            <Captions /> {working ? 'Generating…' : 'Generate from subtitles'}
+          </Button>
+        </div>
+      </Section>
 
       <ErrorAlert message={error} />
       {story && working && (

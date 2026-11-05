@@ -50,6 +50,34 @@ test('gallery: listen to a preset, then add it to my voices', async ({ app: page
   await expect(card.getByText(/Added as “.+” in Saved voices\./)).toBeVisible();
 });
 
+test('gallery: search and filters narrow the voices, and can be cleared', async ({ app: page }) => {
+  await openFeature(page, 'Gallery');
+  const titles = page.getByRole('main').locator('[data-slot=card-title]');
+  const all = await titles.count();
+  expect(all).toBeGreaterThan(1);
+
+  // Search looks through the description as well as the name.
+  await page.getByRole('searchbox', { name: 'Search voices' }).fill('airy');
+  await expect(titles).toHaveText(['Meditation Guide']);
+  await expect(page.getByText('1 voice', { exact: true })).toBeVisible();
+  await page.getByRole('searchbox', { name: 'Search voices' }).fill('');
+
+  await page.getByRole('combobox', { name: 'Gender' }).click();
+  await page.getByRole('option', { name: 'Female' }).click();
+  await expect(titles.filter({ hasText: 'Calm Narrator' })).toHaveCount(0);
+  await expect(titles.filter({ hasText: 'Bright Storyteller' })).toHaveCount(1);
+
+  await page.getByRole('combobox', { name: 'Category' }).click();
+  await page.getByRole('option', { name: 'Wellness' }).click();
+  await expect(titles).toHaveText(['Meditation Guide']);
+
+  await page.getByRole('searchbox', { name: 'Search voices' }).fill('no voice is called this');
+  await expect(page.getByText('No voices match.')).toBeVisible();
+  await page.getByRole('button', { name: 'Clear filters' }).click();
+  await expect(titles).toHaveCount(all);
+  await expect(page.getByRole('searchbox', { name: 'Search voices' })).toHaveValue('');
+});
+
 test('audio effects: add reverb and distance to a recording', async ({ app: page }) => {
   await openFeature(page, 'Audio effects');
   await dropFile(page, 'speech.wav');

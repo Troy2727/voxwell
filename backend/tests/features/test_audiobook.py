@@ -102,11 +102,142 @@ def test_windows_text_files_still_import():
 @pytest.mark.parametrize("data,ext,message", [
     (b"", ".txt", "No readable text"),
     (b"not a zip", ".epub", "not a valid EPUB"),
-    (b"x", ".pdf", "EPUB, TXT or Markdown"),
+    (b"x", ".doc", "EPUB, PDF, Word"),
+    (b"x", ".pdf", "damaged"),
+    (b"not a zip", ".docx", "not a valid Word"),
 ])
 def test_import_errors(data, ext, message):
     with pytest.raises(ImportError_, match=message):
         import_book(data, "x", ext)
+
+
+def make_pdf(pages: list[list[str]], title: str = "") -> bytes:
+    """A small real PDF: each page is a list of text lines."""
+    objects = ["<< /Type /Catalog /Pages 2 0 R >>", "", "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"]
+    kids = []
+    for lines in pages:
+        body = "BT /F1 12 Tf 72 720 Td " + " 0 -14 Td ".join(f"({line}) Tj" for line in lines) + " ET"
+        kids.append(f"{len(objects) + 1} 0 R")
+        objects.append(f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents {len(objects) + 2} 0 R /Resources << /Font << /F1 3 0 R >> >> >>")
+        objects.append(f"<< /Length {len(body)} >>\nstream\n{body}\nendstream")
+    objects[1] = f"<< /Type /Pages /Kids [{' '.join(kids)}] /Count {len(kids)} >>"
+    info = f"{len(objects) + 1} 0 R"
+    objects.append(f"<< /Title ({title}) >>")
+    out = "%PDF-1.4\n"
+    offsets = []
+    for i, obj in enumerate(objects, 1):
+        offsets.append(len(out))
+        out += f"{i} 0 obj\n{obj}\nendobj\n"
+    xref = len(out)
+    out += f"xref\n0 {len(objects) + 1}\n0000000000 65535 f \n" + "".join(f"{o:010} 00000 n \n" for o in offsets)
+    out += f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R /Info {info} >>\nstartxref\n{xref}\n%%EOF\n"
+    return out.encode("latin-1")
+
+
+def test_pdf_with_chapter_headings_and_its_title():
+    pdf = make_pdf([["Chapter 1", "It was a dark and", "stormy night."], ["Chapter 2", "The sun came out."]], title="The Long Night")
+    title, chapters = import_book(pdf, "file", ".pdf")
+    assert title == "The Long Night"
+    assert [c.title for c in chapters] == ["Chapter 1", "Chapter 2"]
+    assert "dark and stormy night" in chapters[0].text
+    assert chapters[1].text == "The sun came out."
+
+
+def test_pdf_without_headings_is_one_chapter_named_after_the_file():
+    title, chapters = import_book(make_pdf([["First page."], ["Second page."]]), "my notes", ".pdf")
+    assert title == "my notes"
+    assert len(chapters) == 1 and "First page." in chapters[0].text and "Second page." in chapters[0].text
+
+
+def test_pdf_words_broken_across_lines_are_joined():
+    _, chapters = import_book(make_pdf([["A wonder-", "ful day."]]), "x", ".pdf")
+    assert "wonderful day" in chapters[0].text
+
+
+def blank_pdf(password: str = "") -> bytes:
+    from pypdf import PdfWriter
+
+    writer = PdfWriter()
+    writer.add_blank_page(width=612, height=792)
+    if password:
+        writer.encrypt(password, algorithm="RC4-128")
+    buf = io.BytesIO()
+    writer.write(buf)
+    return buf.getvalue()
+
+
+def test_a_scanned_pdf_says_why_it_cant_be_read():
+    with pytest.raises(ImportError_, match="Scanned"):
+        import_book(blank_pdf(), "x", ".pdf")
+
+
+def test_a_password_protected_pdf_says_so():
+    with pytest.raises(ImportError_, match="password"):
+        import_book(blank_pdf("secret"), "x", ".pdf")
+
+
+WORD_NS = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"'
+
+
+def make_docx(paragraphs: list[tuple[str, str]], title: str = "") -> bytes:
+    """A small real .docx. Its heading style has a Spanish id, as Spanish Word writes it."""
+    body = "".join(
+        f'<w:p><w:pPr><w:pStyle w:val="{style}"/></w:pPr><w:r><w:t>{text}</w:t></w:r></w:p>' if style else f"<w:p><w:r><w:t>{text}</w:t></w:r></w:p>"
+        for style, text in paragraphs
+    )
+    styles = (
+        f'<w:styles {WORD_NS}><w:style w:styleId="Ttulo1"><w:pPr><w:outlineLvl w:val="0"/></w:pPr></w:style>'
+        '<w:style w:styleId="Cita"><w:pPr/></w:style></w:styles>'
+    )
+    core = f'<cp:coreProperties xmlns:cp="urn:cp" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>{title}</dc:title></cp:coreProperties>'
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("word/document.xml", f"<w:document {WORD_NS}><w:body>{body}</w:body></w:document>")
+        z.writestr("word/styles.xml", styles)
+        z.writestr("docProps/core.xml", core)
+    return buf.getvalue()
+
+
+def test_word_headings_start_chapters_whatever_language_word_was_in():
+    doc = make_docx([("Ttulo1", "La tormenta"), ("", "Llovió toda la noche."), ("Cita", "Una cita."), ("Ttulo1", "La mañana"), ("", "Salió el sol.")], title="Mi libro")
+    title, chapters = import_book(doc, "file", ".docx")
+    assert title == "Mi libro"
+    assert [c.title for c in chapters] == ["La tormenta", "La mañana"]
+    assert chapters[0].text == "Llovió toda la noche.\n\nUna cita."
+    assert chapters[1].text == "Salió el sol."
+
+
+def test_word_without_headings_or_title_uses_the_file_name():
+    title, chapters = import_book(make_docx([("", "Just one paragraph.")]), "my doc", ".docx")
+    assert title == "my doc" and [c.text for c in chapters] == ["Just one paragraph."]
+
+
+def test_an_empty_word_file_has_no_readable_text():
+    with pytest.raises(ImportError_, match="No readable text"):
+        import_book(make_docx([]), "x", ".docx")
+
+
+def test_a_zip_that_isnt_a_word_file_is_refused():
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("hello.txt", "hi")
+    with pytest.raises(ImportError_, match="not a valid Word"):
+        import_book(buf.getvalue(), "x", ".docx")
+
+
+def test_a_word_file_that_unpacks_too_large_is_refused(monkeypatch):
+    from voxwell.features.audiobook import importer
+
+    monkeypatch.setattr(importer, "MAX_WORD_XML_BYTES", 10)
+    with pytest.raises(ImportError_, match="too large"):
+        import_book(make_docx([("", "Some text here.")]), "x", ".docx")
+
+
+def test_pdf_and_word_upload_through_the_api():
+    for name, data, heading in (("a.pdf", make_pdf([["Chapter 1", "Hello."]]), "Chapter 1"), ("b.docx", make_docx([("Ttulo1", "Uno"), ("", "Hola.")]), "Uno")):
+        r = client.post("/api/audiobook/books", files={"file": (name, data)})
+        assert r.status_code == 200, r.text
+        assert r.json()["chapters"][0]["title"] == heading
 
 
 def test_damaged_epub():

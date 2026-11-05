@@ -96,14 +96,14 @@ export default function Page() {
   const book = books?.find((b) => b.id === selected);
 
   return (
-    <PageLayout title="Audiobook" description="Turn an EPUB, TXT or Markdown book into narrated chapters.">
-      <Section title="Import a book" description="Text files: chapters start at lines like “Chapter 1” or “# Title”.">
+    <PageLayout title="Audiobook" description="Turn an EPUB, PDF, Word, TXT or Markdown book into narrated chapters.">
+      <Section title="Import a book" description="Word files: chapters start at headings. PDF and text files: at lines like “Chapter 1” or “# Title”. Scanned PDFs can't be read.">
         <FileDrop
           file={null}
           onFile={(f) => f && importBook(f)}
-          accept=".epub,.txt,.md"
+          accept=".epub,.pdf,.docx,.txt,.md"
           disabled={importing}
-          label={importing ? 'Reading the book…' : 'Drop an EPUB, TXT or Markdown file here or click to choose'}
+          label={importing ? 'Reading the book…' : 'Drop an EPUB, PDF, Word, TXT or Markdown file here or click to choose'}
         />
       </Section>
       <ErrorAlert message={error} />
@@ -113,7 +113,7 @@ export default function Page() {
       <div className="flex flex-col gap-2">
         <h2 className="text-muted-foreground text-sm font-medium tracking-wide uppercase">Your books</h2>
         {books === null && <Skeleton className="h-12 w-full" />}
-        {books?.length === 0 && <EmptyState icon={BookOpen} title="No books yet">Import an EPUB, TXT or Markdown file above.</EmptyState>}
+        {books?.length === 0 && <EmptyState icon={BookOpen} title="No books yet">Import an EPUB, PDF, Word, TXT or Markdown file above.</EmptyState>}
         {books?.map((b) => (
           <button
             key={b.id}

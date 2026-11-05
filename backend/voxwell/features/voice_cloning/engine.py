@@ -2,6 +2,7 @@
 
 import contextlib
 import io
+import re
 import threading
 import wave
 from pathlib import Path
@@ -28,6 +29,11 @@ _lock = threading.Lock()
 # (short, long, slow, Spanish), transcribed back: 15 left no extra words and cut no last word;
 # 25 still let 1-2 stray syllables through in 2 of them.
 TAIL_FRAMES = 15
+
+# "[pause]" or "[pause 2.5]" in the text becomes silence instead of being read out.
+_PAUSE = re.compile(r"\[pause(?:\s+(\d+(?:\.\d+)?))?\]", re.IGNORECASE)
+DEFAULT_PAUSE = 0.75  # seconds
+MAX_PAUSE = 10.0  # seconds
 
 
 def _pick_device() -> str:
@@ -98,11 +104,36 @@ def _load_model():
         return _model
 
 
-def _to_wav(samples, sample_rate: int) -> bytes:
+def split_pauses(text: str) -> list[str | float]:
+    """`text` as its spoken parts (str) and the pauses between them (seconds), in order."""
+    parts: list[str | float] = []
+
+    def spoken(chunk: str) -> None:
+        chunk = chunk.strip()
+        if any(c.isalnum() for c in chunk):  # lone punctuation between two tags isn't speech
+            parts.append(chunk)
+
+    start = 0
+    for match in _PAUSE.finditer(text):
+        spoken(text[start : match.start()])
+        parts.append(min(float(match[1]), MAX_PAUSE) if match[1] else DEFAULT_PAUSE)
+        start = match.end()
+    spoken(text[start:])
+    return parts or [text]
+
+
+def _flat(samples):
+    """Model output (a tensor) as a flat numpy array."""
     import numpy as np
 
     arr = samples.detach().cpu().numpy() if hasattr(samples, "detach") else np.asarray(samples)
-    arr = np.clip(arr.reshape(-1), -1.0, 1.0)
+    return arr.reshape(-1)
+
+
+def _to_wav(samples, sample_rate: int) -> bytes:
+    import numpy as np
+
+    arr = np.clip(_flat(samples), -1.0, 1.0)
     pcm = (arr * 32767).astype("<i2")
     buf = io.BytesIO()
     with wave.open(buf, "wb") as w:
@@ -127,17 +158,26 @@ def synthesize(
     `language` is an ISO 639-1 code such as "en". `exaggeration` (0.25-2) sets emotional
     intensity; a lower `cfg_weight` (0-1) gives slower, more deliberate delivery. The defaults
     are Chatterbox's own. The language's pronunciation dictionary is applied to `text` first.
-    `effects` (reverb, distance, noise, pan) is applied to the finished audio; without it, or
-    with neutral settings, the bytes are exactly the model's.
+    `[pause]` or `[pause 2.5]` in `text` becomes that many seconds of silence (at most MAX_PAUSE).
+    `effects` (speed, pitch, reverb, distance, noise, pan) is applied to the finished audio; without
+    it, or with neutral settings, the bytes are exactly the model's.
     """
     if language not in LANGUAGES:
         raise ValueError(f"Unsupported language '{language}'.")
-    text = pronunciation.apply(text, language)
+    import numpy as np
+
     model = _load_model()
     kwargs = {"language_id": language, "exaggeration": exaggeration, "cfg_weight": cfg_weight}
     if reference_audio is not None:
         kwargs["audio_prompt_path"] = str(reference_audio)
-    with _lock:
-        wav = model.generate(text, **kwargs)
-    out = _to_wav(wav, model.sr)
+    audio = []
+    for part in split_pauses(text):
+        if isinstance(part, str):
+            # Per part, so a dictionary entry can't rewrite a pause tag.
+            part = pronunciation.apply(part, language)
+            with _lock:
+                audio.append(_flat(model.generate(part, **kwargs)))
+        else:
+            audio.append(np.zeros(int(part * model.sr), dtype=np.float32))
+    out = _to_wav(np.concatenate(audio), model.sr)
     return apply_to_wav(out, effects) if effects is not None else out

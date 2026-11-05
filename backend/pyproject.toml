@@ -24,6 +24,8 @@ dependencies = [
     "diffusers==0.36.0",  # Stable Audio (sound effects); newest release chatterbox-tts still imports against
     "torchsde>=0.2.6",
     "scipy",
+    "pypdf>=6",
+    "librosa>=0.11.0",
 ]
 
 [tool.uv]

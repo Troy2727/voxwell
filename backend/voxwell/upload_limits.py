@@ -17,6 +17,7 @@ from voxwell.features.audio_effects import router as audio_effects
 from voxwell.features.audiobook import router as audiobook
 from voxwell.features.dictation import router as dictation
 from voxwell.features.integrations import openai_api
+from voxwell.features.stories import router as stories
 from voxwell.features.tools import router as tools
 from voxwell.features.translation import router as translation
 from voxwell.features.voice_cloning import router as voice_cloning
@@ -35,6 +36,7 @@ LIMITS = {
     "/api/music/generate": (tools, "MAX_UPLOAD"),  # its style reference goes through tools._read_audio
     "/api/audio_effects/apply": (audio_effects, "MAX_UPLOAD"),
     "/api/audiobook/books": (audiobook, "MAX_UPLOAD"),
+    "/api/stories/subtitles": (stories, "MAX_SUBTITLE_BYTES"),
     "/api/voice_cloning/voices": (voice_cloning, "MAX_UPLOAD"),
 }
 # Upload routes that take video or long recordings and are deliberately not limited.
