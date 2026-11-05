@@ -122,6 +122,11 @@
   body {
     @apply bg-background text-foreground antialiased;
   }
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
   a {
     @apply text-primary underline-offset-4 hover:underline;
   }
