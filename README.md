@@ -313,7 +313,7 @@ voxwell serve --remote          # prints this computer's private address
 tailscale serve --bg 8765       # in another terminal; undo with: tailscale serve reset
 ```
 
-Open the printed `https://` address on your phone. Only your Tailscale account gets in, only dictation can be reached, and other websites open on your phone are refused. This covers recording, not live dictation, and it needs the command line, not the desktop app. Tailscale's HTTPS publishes your computer's name in a public certificate log, so rename the computer first if its name is private, and its free plan is for non-commercial use.
+Open the printed `https://` address on your phone. Or, on the Voxwell website, save that address once on Home and use its Dictation page. Only your Tailscale account gets in, only dictation can be reached, and other websites open on your phone are refused. This covers recording, not live dictation, and it needs the command line, not the desktop app. Tailscale's HTTPS publishes your computer's name in a public certificate log, so rename the computer first if its name is private, and its free plan is for non-commercial use.
 
 **Phone calls (optional).** Callers to your Twilio number hear a greeting in one of your voices. This is off by default. When on, it runs a separate small server that serves only Twilio's two endpoints, so the main app is never exposed.
 

@@ -154,7 +154,7 @@ export default function Page() {
     <Tabs value={mode} onValueChange={(v) => setMode(v as Mode)}>
       <TabsList>
         <TabsTrigger value="record" disabled={liveActive}>Record</TabsTrigger>
-        <TabsTrigger value="live" disabled={phase !== 'idle'}>Live</TabsTrigger>
+        <TabsTrigger value="live" disabled={phase !== 'idle' || onPhoneOrTablet()}>Live</TabsTrigger>
       </TabsList>
     </Tabs>
   );

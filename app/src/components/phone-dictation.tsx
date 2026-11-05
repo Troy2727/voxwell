@@ -3,7 +3,7 @@ import { ExternalLink, Smartphone } from 'lucide-react';
 import { ErrorAlert, Muted, Section } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { usePersisted } from '@/lib/persisted';
+import { readSaved, usePersisted } from '@/lib/persisted';
 
 const SETUP_URL = 'https://github.com/Troy2727/voxwell#-integrations';
 
@@ -18,9 +18,17 @@ export function phoneAddress(text: string): string | null {
   }
 }
 
-/** On a phone this website can't reach the computer, so it links to the computer's private dictation page. */
+const ADDRESS_KEY = 'voxwell.phone.address';
+
+/** The saved private address, checked again in case what's stored was changed; '' if there's none. */
+export function savedPhoneAddress(): string {
+  const saved = readSaved(ADDRESS_KEY);
+  return typeof saved === 'string' ? (phoneAddress(saved) ?? '') : '';
+}
+
+/** On a phone this website can't reach the computer by itself. With the computer's private address it can dictate. */
 export function PhoneDictation() {
-  const [saved, setSaved] = usePersisted('voxwell.phone.address', '', (value) => (typeof value === 'string' ? (phoneAddress(value) ?? '') : ''));
+  const [saved, setSaved] = usePersisted(ADDRESS_KEY, '', (value) => (typeof value === 'string' ? (phoneAddress(value) ?? '') : ''));
   const [text, setText] = useState('');
   const [changing, setChanging] = useState(false);
   const [error, setError] = useState('');
@@ -39,12 +47,12 @@ export function PhoneDictation() {
   }
 
   return (
-    <Section title="Dictate from your phone" description="Record here while your computer does the work. Your computer must be on, with Voxwell running, and Tailscale on both devices.">
+    <Section title="Dictate from your phone" description="Record on the Dictation page while your computer does the work. Your computer must be on, with Voxwell running, and Tailscale on both devices.">
       {saved && !changing ? (
         <div className="flex flex-wrap items-center gap-2">
           <Button asChild>
             <a href={saved}>
-              <Smartphone /> Open phone dictation
+              <Smartphone /> Open the private page
             </a>
           </Button>
           <Button variant="outline" onClick={() => setChanging(true)}>Change address</Button>

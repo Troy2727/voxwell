@@ -218,3 +218,42 @@ def test_plain_serve_stays_local(monkeypatch):
 def test_the_page_ships_with_the_package():
     assert remote.PAGE.exists()
     assert "<script src" not in remote.PAGE.read_text(encoding="utf-8"), "everything is inline, so the strict policy holds"
+
+
+WEBSITE = "https://voxwell.vercel.app"
+
+
+def test_the_owner_can_dictate_from_the_website_and_the_browser_may_read_the_answer(phone, fake_whisper):
+    r = dictate(phone, {"Tailscale-User-Login": OWNER, "Origin": WEBSITE})
+    assert r.status_code == 200 and r.json()["text"] == "hola"
+    assert r.headers["access-control-allow-origin"] == WEBSITE
+
+
+def test_the_browser_may_ask_first_before_the_website_dictates(phone):
+    r = phone.options(
+        "/api/dictation/transcribe",
+        headers={"Tailscale-User-Login": OWNER, "Origin": WEBSITE, "Access-Control-Request-Method": "POST", "Access-Control-Request-Private-Network": "true"},
+    )
+    assert r.status_code == 200
+    assert r.headers["access-control-allow-origin"] == WEBSITE
+    assert r.headers["access-control-allow-private-network"] == "true"
+
+
+def test_the_website_still_needs_the_owners_account(phone, fake_whisper):
+    assert dictate(phone, {"Tailscale-User-Login": "someone@else.com", "Origin": WEBSITE}).status_code == 403
+    assert dictate(phone, {"Origin": WEBSITE}).status_code == 403
+
+
+@pytest.mark.parametrize(
+    ("method", "path"),
+    [("GET", "/"), ("GET", "/api/voices"), ("POST", "/v1/audio/speech"), ("DELETE", "/api/dictation/transcribe"), ("OPTIONS", "/api/voices"), ("OPTIONS", "/")],
+)
+def test_the_website_can_only_reach_dictation(phone, method, path):
+    r = phone.request(method, path, headers={"Tailscale-User-Login": OWNER, "Origin": WEBSITE})
+    assert r.status_code in (403, 404), f"{method} {path} gave {r.status_code}"
+    assert "voxwell dictation" not in r.text.lower()
+
+
+@pytest.mark.parametrize("origin", ["https://voxwell.vercel.app.evil.example", "https://evil-voxwell.vercel.app", "http://voxwell.vercel.app", "https://voxwell.vercel.app:8443"])
+def test_look_alikes_of_the_website_are_refused(phone, fake_whisper, origin):
+    assert dictate(phone, {"Tailscale-User-Login": OWNER, "Origin": origin}).status_code == 403

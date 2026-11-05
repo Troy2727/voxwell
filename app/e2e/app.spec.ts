@@ -186,7 +186,7 @@ test.describe('errors the user can see', () => {
       await expect(main.getByText('Dictate from your phone', { exact: true })).toBeVisible();
       await main.getByLabel("Your computer's private address").fill('  desktop-1.tail123.ts.net  ');
       await main.getByRole('button', { name: 'Save address' }).click();
-      const open = main.getByRole('link', { name: 'Open phone dictation' });
+      const open = main.getByRole('link', { name: 'Open the private page' });
       await expect(open).toHaveAttribute('href', 'https://desktop-1.tail123.ts.net');
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
@@ -203,14 +203,14 @@ test.describe('errors the user can see', () => {
         await main.getByLabel("Your computer's private address").fill(bad);
         await main.getByRole('button', { name: 'Save address' }).click();
         await expect(main.getByText('It ends in .ts.net.')).toBeVisible();
-        await expect(main.getByRole('link', { name: 'Open phone dictation' })).toHaveCount(0);
+        await expect(main.getByRole('link', { name: 'Open the private page' })).toHaveCount(0);
       });
     }
 
     test('a saved address that was tampered with is ignored', async ({ page }) => {
       await page.addInitScript(() => localStorage.setItem('voxwell.phone.address', JSON.stringify('https://evil.example')));
       await openHome(page);
-      await expect(page.getByRole('main').getByRole('link', { name: 'Open phone dictation' })).toHaveCount(0);
+      await expect(page.getByRole('main').getByRole('link', { name: 'Open the private page' })).toHaveCount(0);
     });
 
     test('the Dictation page offers it too', async ({ page }) => {
