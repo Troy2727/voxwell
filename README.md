@@ -256,6 +256,7 @@ Model weights download on first use of each feature.
 - **GPU.** Windows and Linux get CUDA builds of PyTorch, which run on the CPU when there is no NVIDIA GPU. macOS uses Apple's GPU (MPS) when available.
 - **HTTPS inspection.** Behind a proxy or antivirus that inspects HTTPS, set `UV_SYSTEM_CERTS=1` for the `uv` commands above. The desktop app sets it for you, and the backend itself always trusts the OS certificate store.
 - **Port.** The server listens on `127.0.0.1:8765`. Set `VOXWELL_PORT` to change it.
+- **Speech recognition model.** Set `VOXWELL_WHISPER_MODEL=large-v3-turbo` for a more accurate model, especially in noise. It's slower on a CPU and downloads about 1.6 GB once. Choosing your language on the Dictation page also helps a lot in a noisy room.
 - **Log.** When an error says "see the Voxwell log", the details are in `logs/voxwell.log` in Voxwell's data folder (`%LOCALAPPDATA%\Voxwell` on Windows, `~/Library/Application Support/Voxwell` on macOS, `~/.local/share/Voxwell` on Linux, or `VOXWELL_DATA_DIR`).
 
 </details>

@@ -21,7 +21,7 @@ export function useShortcutDictation() {
       busy = true;
       bridge.setStatus({ phase: 'transcribing' });
       try {
-        const text = await transcribeRecording(blob, language);
+        const { text } = await transcribeRecording(blob, language);
         if (text) {
           await bridge.deliver(text);
           window.dispatchEvent(new CustomEvent(DICTATED_EVENT, { detail: text }));

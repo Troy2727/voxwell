@@ -44,7 +44,7 @@ def status():
 
 
 @router.post("/jobs")
-def create_job(file: UploadFile = File(...), language: str = Form(""), speakers: bool = Form(False), num_speakers: int = Form(0)):
+def create_job(file: UploadFile = File(...), language: str = Form(""), speakers: bool = Form(False), num_speakers: int = Form(0), singing: bool = Form(False)):
     language = language.strip().lower()
     if language and not _LANGUAGE.match(language):
         raise HTTPException(422, f"Unsupported language '{language}'.")
@@ -53,7 +53,7 @@ def create_job(file: UploadFile = File(...), language: str = Form(""), speakers:
     title = Path(file.filename or "").stem.strip()[:100] or "Transcript"  # display only, never a path
     # A fixed suffix: PyAV sniffs the format, and a name like .m3u8 would make it read the upload
     # as a playlist of other files on this computer.
-    job = jobs.create(".audio", title, language, speakers=speakers, num_speakers=num_speakers if speakers else 0)
+    job = jobs.create(".audio", title, language, speakers=speakers, num_speakers=num_speakers if speakers else 0, speech_only=not singing)
     with (job.dir / job.source).open("wb") as out:
         shutil.copyfileobj(file.file, out)
     if (job.dir / job.source).stat().st_size == 0:

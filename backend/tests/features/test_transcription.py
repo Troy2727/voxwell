@@ -17,7 +17,7 @@ SEGMENTS = [Segment(0.0, 1.5, "Hello there."), Segment(2.0, 3.25, "Welcome to Vo
 def fake(monkeypatch):
     calls = []
 
-    def transcribe(audio_path, language=None, on_progress=None):
+    def transcribe(audio_path, language=None, on_progress=None, speech_only=True):
         calls.append((audio_path.read_bytes(), language))
         if on_progress:
             on_progress(0.5)
@@ -51,10 +51,24 @@ def test_happy_path(fake):
     assert fake == [(b"fake audio", None)]  # auto-detect
 
 
+@pytest.mark.parametrize(("form", "speech_only"), [({}, True), ({"singing": "true"}, False)])
+def test_silence_and_music_are_skipped_unless_singing_is_asked_for(fake, monkeypatch, form, speech_only):
+    seen = []
+
+    def transcribe(audio_path, language=None, on_progress=None, speech_only=True):
+        seen.append(speech_only)
+        return Transcript("La la la.", "en", SEGMENTS)
+
+    monkeypatch.setattr(engine, "transcribe", transcribe)
+    r = client.post("/api/transcription/jobs", files={"file": ("song.mp3", b"fake audio", "audio/mpeg")}, data=form)
+    assert r.status_code == 200, r.text
+    assert seen == [speech_only]
+
+
 def test_the_upload_name_never_picks_the_decoder(fake, monkeypatch):
     """Named .m3u8, an upload would be decoded as a playlist that can point at other local files."""
     seen = []
-    monkeypatch.setattr(engine, "transcribe", lambda audio_path, language=None, on_progress=None: seen.append(audio_path.name) or Transcript("", "en", []))
+    monkeypatch.setattr(engine, "transcribe", lambda audio_path, language=None, on_progress=None, speech_only=True: seen.append(audio_path.name) or Transcript("", "en", []))
     done_job(name="list.m3u8")
     assert seen == ["input.audio"]
 
@@ -115,7 +129,7 @@ def test_rejects_bad_input(fake):
 
 
 def test_no_speech_is_an_error(monkeypatch):
-    monkeypatch.setattr(engine, "transcribe", lambda p, language=None, on_progress=None: Transcript("", "en", [Segment(0, 1, "")]))
+    monkeypatch.setattr(engine, "transcribe", lambda p, language=None, on_progress=None, speech_only=True: Transcript("", "en", [Segment(0, 1, "")]))
     monkeypatch.setattr(jobs, "start", jobs._work)
     job = done_job()
     assert job["state"] == "error" and "No speech" in job["error"]

@@ -481,7 +481,7 @@ def _add_speaker_options(p: argparse.ArgumentParser, speakers_help: str) -> None
 
 def cmd_effects(client: Client, args) -> tuple[str, dict]:
     source = _existing_file(args.file)
-    fields = {"reverb": args.reverb, "distance": args.distance, "noise": args.noise, "noise_color": args.noise_color, "pan": args.pan}
+    fields = {"reverb": args.reverb, "distance": args.distance, "noise": args.noise, "noise_color": args.noise_color, "pan": args.pan, "speed": args.speed, "pitch": args.pitch}
     result = client.post_form("/api/audio_effects/apply", fields, source)
     out = _output_path(args.output, f"{source.stem}.effects.wav", ".wav")
     out.write_bytes(client.request("GET", result["url"]))
@@ -619,13 +619,15 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--preview", metavar="FILE", help="also save the preview WAV here")
     p.set_defaults(run=cmd_remix)
 
-    p = sub.add_parser("effects", parents=[common], help="add reverb, distance, background noise or stereo pan to a recording")
+    p = sub.add_parser("effects", parents=[common], help="change the speed or pitch of a recording, or add reverb, distance, background noise or stereo pan")
     p.add_argument("file", help="WAV, MP3, FLAC or OGG")
     p.add_argument("--reverb", type=float, default=0.0, help="0 to 1 (default 0)")
     p.add_argument("--distance", type=float, default=0.0, help="0 (close) to 1 (far away): duller, quieter, more reverberant")
     p.add_argument("--noise", type=float, default=0.0, help="background noise level, 0 to 1 (default 0)")
     p.add_argument("--noise-color", choices=["pink", "brown"], default="pink", help="kind of noise (default pink)")
     p.add_argument("--pan", type=float, default=0.0, help="-1 (left) to 1 (right); any other value makes the output stereo")
+    p.add_argument("--speed", type=float, default=1.0, help="0.5 to 2, at the same pitch (default 1)")
+    p.add_argument("--pitch", type=float, default=0.0, help="semitones, -6 to 6, at the same speed (default 0)")
     p.add_argument("-o", "--output", help="WAV file or folder (default: <name>.effects.wav in the current folder)")
     p.set_defaults(run=cmd_effects)
     p = sub.add_parser("pronounce", parents=[common], help="list, add or remove how a word is pronounced")

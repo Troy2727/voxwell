@@ -175,6 +175,34 @@ test('a backend that stays away gets a plain message in the desktop app', async 
   expect(status.message).toBe("Voxwell's engine isn't responding. Restart the app and try again.");
 });
 
+test('dictation remembers the chosen language and sends it', async ({ app: page }) => {
+  await openFeature(page, 'Dictation');
+  const main = page.getByRole('main');
+  await main.getByRole('combobox', { name: 'Language' }).click();
+  await page.getByRole('option', { name: 'Spanish' }).click();
+
+  await page.reload();
+  await openFeature(page, 'Dictation');
+  await expect(main.getByRole('combobox', { name: 'Language' })).toHaveText('Spanish');
+
+  const sent = page.waitForRequest('**/api/dictation/transcribe');
+  await main.getByRole('button', { name: 'Record' }).click();
+  await main.getByRole('button', { name: 'Stop' }).click();
+  expect((await sent).postData()).toMatch(/name="language"\s+es/);
+  await expect(main.getByRole('button', { name: 'Copy' }).first()).toBeVisible();
+  await expect(main.getByText(/Detected:/)).toHaveCount(0); // you chose it, so there's nothing to report
+});
+
+test('auto-detect says which language it heard, and that goes away with the text', async ({ app: page }) => {
+  await openFeature(page, 'Dictation');
+  const main = page.getByRole('main');
+  await main.getByRole('button', { name: 'Record' }).click();
+  await main.getByRole('button', { name: 'Stop' }).click();
+  await expect(main.getByText('Detected: English. If that\'s wrong, choose your language above.')).toBeVisible();
+  await main.locator('[data-slot=card]').filter({ hasText: 'Result' }).getByRole('button', { name: 'Delete' }).click();
+  await expect(main.getByText(/Detected:/)).toHaveCount(0);
+});
+
 test('dictated text can be deleted from Result and from Recent', async ({ app: page }) => {
   await openFeature(page, 'Dictation');
   const main = page.getByRole('main');

@@ -50,7 +50,7 @@ def fake_tts(monkeypatch):
 @pytest.fixture
 def fake_stt(monkeypatch):
     t = Transcript("Hello there. Bye.", "en", [Segment(0.0, 1.0, "Hello there."), Segment(1.5, 2.0, "Bye.")])
-    monkeypatch.setattr(stt, "transcribe", lambda p, language=None, on_progress=None: t)
+    monkeypatch.setattr(stt, "transcribe", lambda p, language=None, on_progress=None, speech_only=True: t)
 
 
 def speech(**body):
@@ -291,7 +291,7 @@ def test_mcp_transcribe_can_label_speakers(mcp, monkeypatch, tmp_path):
     from voxwell.features.transcription import diarization
 
     t = Transcript("Hi. Bye.", "en", [Segment(0.0, 1.0, "Hi."), Segment(1.0, 2.0, "Bye.")])
-    monkeypatch.setattr(stt, "transcribe", lambda p, language=None, on_progress=None: t)
+    monkeypatch.setattr(stt, "transcribe", lambda p, language=None, on_progress=None, speech_only=True: t)
     seen = []
     monkeypatch.setattr(diarization, "diarize", lambda path, n=0, on_progress=None: seen.append(n) or [diarization.Turn(0.0, 1.0, 0), diarization.Turn(1.0, 2.0, 1)])
     f = tmp_path / "talk.mp3"

@@ -1,7 +1,27 @@
 import { apiUrl, backendUnreachable, errorMessage } from '../../api';
 
+const LANGUAGE_KEY = 'voxwell.dictation.language';
+
+function savedLanguage() {
+  try {
+    return localStorage.getItem(LANGUAGE_KEY) || 'auto';
+  } catch {
+    return 'auto'; // storage can be blocked
+  }
+}
+
 /** The Dictation page's microphone and language, which the global shortcut uses too. */
-export const dictationChoices = { language: 'auto', device: '' };
+export const dictationChoices = { language: savedLanguage(), device: '' };
+
+/** Auto-detect can pick the wrong language in a noisy room, so a chosen language is kept for next time. */
+export function rememberLanguage(language: string) {
+  dictationChoices.language = language;
+  try {
+    localStorage.setItem(LANGUAGE_KEY, language);
+  } catch {
+    /* storage can be blocked; the choice still holds until the page closes */
+  }
+}
 
 /** Fired on window with the text, when the shortcut finishes, so an open Dictation page can show it. */
 export const DICTATED_EVENT = 'voxwell:dictated';
@@ -42,12 +62,12 @@ async function postRecording(form: FormData): Promise<Response> {
   }
 }
 
-/** Send a recording to the backend and return its text, which is empty when no speech was heard. */
-export async function transcribeRecording(blob: Blob, language: string): Promise<string> {
+/** Send a recording to the backend. Its text is empty when no speech was heard. */
+export async function transcribeRecording(blob: Blob, language: string): Promise<{ text: string; language: string }> {
   const form = new FormData();
   form.append('file', blob, 'recording.webm');
   if (language !== 'auto') form.append('language', language);
   const res = await postRecording(form);
   if (!res.ok) throw new Error(await errorMessage(res));
-  return ((await res.json()) as { text: string }).text;
+  return (await res.json()) as { text: string; language: string };
 }

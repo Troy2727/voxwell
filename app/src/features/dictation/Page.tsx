@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { LiveWaveform } from '@/components/ui/live-waveform';
 import { MicSelector } from '@/components/ui/mic-selector';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { DICTATED_EVENT, dictationChoices, openMicrophone, transcribeRecording } from './capture';
+import { DICTATED_EVENT, dictationChoices, openMicrophone, rememberLanguage, transcribeRecording } from './capture';
 import LiveDictation from './LiveDictation';
 
 const LANGUAGES: [string, string][] = [
@@ -18,6 +18,8 @@ const LANGUAGES: [string, string][] = [
 type Phase = 'idle' | 'recording' | 'transcribing';
 type Mode = 'record' | 'live';
 
+const languageName = (code: string) => new Intl.DisplayNames('en', { type: 'language' }).of(code) ?? code;
+
 const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
 export default function Page() {
@@ -27,6 +29,7 @@ export default function Page() {
   const [device, setDevice] = useState(dictationChoices.device);
   const [muted, setMuted] = useState(false);
   const [text, setText] = useState('');
+  const [detected, setDetected] = useState('');
   const [history, setHistory] = useState<string[]>([]);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
@@ -36,7 +39,6 @@ export default function Page() {
   const recorder = useRef<MediaRecorder | null>(null);
   const timer = useRef<number | undefined>(undefined);
   const phaseRef = useRef<Phase>('idle');
-  dictationChoices.language = language;
   dictationChoices.device = device;
 
   const setPhaseBoth = (p: Phase) => {
@@ -47,10 +49,12 @@ export default function Page() {
   const transcribe = useCallback(async (blob: Blob) => {
     setPhaseBoth('transcribing');
     try {
-      const result = await transcribeRecording(blob, dictationChoices.language);
-      setText(result);
-      if (result) {
-        setHistory((h) => [result, ...h].slice(0, 20));
+      const asked = dictationChoices.language;
+      const result = await transcribeRecording(blob, asked);
+      setText(result.text);
+      setDetected(asked === 'auto' ? result.language : '');
+      if (result.text) {
+        setHistory((h) => [result.text, ...h].slice(0, 20));
       } else {
         setError('No speech detected.');
       }
@@ -109,6 +113,7 @@ export default function Page() {
       setError('');
       setCopied(false);
       setText(dictated);
+      setDetected('');
       setHistory((h) => [dictated, ...h].slice(0, 20));
     };
     window.addEventListener(DICTATED_EVENT, show);
@@ -156,8 +161,17 @@ export default function Page() {
       <Field label="Microphone" hint={muted ? `Muted: unmute it to ${mode === 'live' ? 'start' : 'record'}.` : undefined}>
         <MicSelector value={device} onValueChange={setDevice} muted={muted} onMutedChange={setMuted} disabled={phase !== 'idle' || liveActive} className="w-full justify-start border sm:w-full" />
       </Field>
-      <Field label="Language">
-        <ChoiceSelect options={LANGUAGES} value={language} disabled={phase !== 'idle' || liveActive} onChange={setLanguage} />
+      <Field label="Language" htmlFor="dictation-language">
+        <ChoiceSelect
+          id="dictation-language"
+          options={LANGUAGES}
+          value={language}
+          disabled={phase !== 'idle' || liveActive}
+          onChange={(choice) => {
+            rememberLanguage(choice);
+            setLanguage(choice);
+          }}
+        />
       </Field>
     </div>
   );
@@ -202,6 +216,7 @@ export default function Page() {
         {text ? (
           <>
             <p className="leading-relaxed">{text}</p>
+            {detected && <Muted className="text-xs">Detected: {languageName(detected)}. If that's wrong, choose your language above.</Muted>}
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={() => copy(text)}>
                 <Copy /> {copied ? 'Copied' : 'Copy'}

@@ -38,6 +38,7 @@ class Job:
     detected: str = ""  # language reported by the model
     speakers: bool = False  # label who speaks (off by default)
     num_speakers: int = 0  # how many speakers there are, 0 to detect it
+    speech_only: bool = True  # skip silence, noise and music; off to keep singing
 
 
 _jobs: dict[str, Job] = {}
@@ -66,11 +67,11 @@ def _load(folder: Path) -> Job | None:
     return job
 
 
-def create(ext: str, title: str, language: str, *, speakers: bool = False, num_speakers: int = 0) -> Job:
+def create(ext: str, title: str, language: str, *, speakers: bool = False, num_speakers: int = 0, speech_only: bool = True) -> Job:
     job_id = uuid.uuid4().hex[:12]
     folder = _root() / job_id
     folder.mkdir(parents=True)
-    job = Job(job_id, folder, f"input{ext}", title, language, time.time(), speakers=speakers, num_speakers=num_speakers)
+    job = Job(job_id, folder, f"input{ext}", title, language, time.time(), speakers=speakers, num_speakers=num_speakers, speech_only=speech_only)
     with _lock:
         _jobs[job_id] = job
     return job
@@ -143,6 +144,7 @@ def _work(job: Job) -> None:
             t = engine.transcribe(
                 job.dir / job.source, job.language or None,
                 on_progress=lambda f: setattr(job, "percent", int(f * (80 if job.speakers else 99))),
+                speech_only=job.speech_only,
             )
             segments = [{"start": s.start, "end": s.end, "text": s.text} for s in t.segments if s.text]
             if not segments:
