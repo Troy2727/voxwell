@@ -120,7 +120,7 @@ export function HomePage({ name, online, onOpen, onRetry }: { name?: string; onl
       <div className="bg-card grid overflow-hidden rounded-2xl border md:grid-cols-[1.15fr_1fr]">
         <div className="flex flex-col gap-5 p-6 sm:p-8 lg:p-10">
           <h1 className="text-3xl leading-tight font-bold tracking-tight sm:text-4xl">
-            {first ? `Welcome back, ${first}.` : 'Welcome to Voxwell.'}{' '}
+            {first && `Welcome back, ${first}. `}
             <span className="text-primary">
               What will you make?
             </span>
