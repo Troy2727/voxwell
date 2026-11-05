@@ -6,6 +6,7 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
+  color-scheme: light; /* scrollbars, native selects and pickers follow the theme */
   --radius: 0.625rem;
   --background: #f5f1ec;
   --foreground: #182433;
@@ -42,6 +43,7 @@
 }
 
 .dark {
+  color-scheme: dark;
   --background: #0f141c;
   --foreground: #f5f1ec;
   --card: #182433;
