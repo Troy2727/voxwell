@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { Check, ChevronsUpDown, Mic, MicOff } from "lucide-react"
 
+import { NO_MICROPHONE } from "@/lib/microphone"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
@@ -203,7 +204,11 @@ export function useAudioDevices() {
       setDevices(audioInputs)
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to get audio devices"
+        !navigator.mediaDevices
+          ? NO_MICROPHONE
+          : err instanceof Error
+            ? err.message
+            : "Failed to get audio devices"
       )
       console.error("Error getting audio devices:", err)
     } finally {
@@ -243,7 +248,11 @@ export function useAudioDevices() {
       setHasPermission(true)
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to get audio devices"
+        !navigator.mediaDevices
+          ? NO_MICROPHONE
+          : err instanceof Error
+            ? err.message
+            : "Failed to get audio devices"
       )
       console.error("Error getting audio devices:", err)
     } finally {
@@ -264,10 +273,10 @@ export function useAudioDevices() {
       }
     }
 
-    navigator.mediaDevices.addEventListener("devicechange", handleDeviceChange)
+    navigator.mediaDevices?.addEventListener("devicechange", handleDeviceChange)
 
     return () => {
-      navigator.mediaDevices.removeEventListener(
+      navigator.mediaDevices?.removeEventListener(
         "devicechange",
         handleDeviceChange
       )

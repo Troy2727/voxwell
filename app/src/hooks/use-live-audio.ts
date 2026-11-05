@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { wsUrl } from '@/api';
+import { NO_MICROPHONE } from '@/lib/microphone';
 
 /** A message from a live session; the protocol is described in backend/voxwell/live_audio.py. */
 export interface LiveMessage {
@@ -52,6 +53,7 @@ function downsampler(inputRate: number) {
 }
 
 function micError(e: unknown): string {
+  if (!navigator.mediaDevices) return NO_MICROPHONE;
   const name = e instanceof DOMException ? e.name : '';
   if (name === 'NotAllowedError') return 'Microphone access was denied. Allow it in your system or browser settings and try again.';
   if (name === 'NotFoundError') return 'No microphone found.';
