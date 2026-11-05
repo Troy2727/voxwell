@@ -81,7 +81,7 @@ export function HomePage({ name, online, onOpen }: { name?: string; online: bool
         </div>
       </div>
 
-      {online === false && onPhoneOrTablet() && <PhoneDictation />}
+      {online === false && onPhoneOrTablet() && <PhoneDictation onOpenDictation={() => onOpen('dictation')} />}
 
       <div className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold tracking-tight">Start something</h2>
