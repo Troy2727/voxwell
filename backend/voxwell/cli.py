@@ -526,7 +526,8 @@ def build_parser() -> argparse.ArgumentParser:
     common.add_argument("--json", action="store_true", help="print one JSON object instead of text")
     sub = parser.add_subparsers(dest="command", metavar="COMMAND")
 
-    sub.add_parser("serve", help="start the Voxwell server (what the desktop app runs)")
+    p = sub.add_parser("serve", help="start the Voxwell server (what the desktop app runs)")
+    p.add_argument("--remote", action="store_true", help="also allow dictation from your phone, over Tailscale, for your account only")
     p = sub.add_parser("status", parents=[common], help="check that Voxwell is running")
     p.set_defaults(run=cmd_status)
     p = sub.add_parser("voices", parents=[common], help="list saved voices")
@@ -669,9 +670,25 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _enable_remote() -> bool:
+    """Turn on phone dictation for this computer's Tailscale account; False if it can't start."""
+    from voxwell import remote
+
+    try:
+        host, owner = remote.detect_identity()
+    except remote.RemoteSetupError as exc:
+        print(f"voxwell: {exc}", file=sys.stderr)
+        return False
+    remote.enable(host, owner)
+    print(remote.instructions(host, owner, int(os.environ.get("VOXWELL_PORT", "8765"))))
+    return True
+
+
 def main(argv: list[str] | None = None, client: Client | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     if not argv or argv[0] == "serve":
+        if "--remote" in argv and not _enable_remote():
+            return 1
         from voxwell.main import run
 
         run()
