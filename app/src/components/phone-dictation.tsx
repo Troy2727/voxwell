@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { ExternalLink, Smartphone } from 'lucide-react';
+import { ExternalLink, Mic } from 'lucide-react';
 import { ErrorAlert, Muted, Section } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,7 +27,7 @@ export function savedPhoneAddress(): string {
 }
 
 /** On a phone this website can't reach the computer by itself. With the computer's private address it can dictate. */
-export function PhoneDictation() {
+export function PhoneDictation({ onOpenDictation }: { onOpenDictation?: () => void }) {
   const [saved, setSaved] = usePersisted(ADDRESS_KEY, '', (value) => (typeof value === 'string' ? (phoneAddress(value) ?? '') : ''));
   const [text, setText] = useState('');
   const [changing, setChanging] = useState(false);
@@ -49,13 +49,18 @@ export function PhoneDictation() {
   return (
     <Section title="Dictate from your phone" description="Record on the Dictation page while your computer does the work. Your computer must be on, with Voxwell running, and Tailscale on both devices.">
       {saved && !changing ? (
-        <div className="flex flex-wrap items-center gap-2">
-          <Button asChild>
-            <a href={saved}>
-              <Smartphone /> Open the private page
-            </a>
-          </Button>
-          <Button variant="outline" onClick={() => setChanging(true)}>Change address</Button>
+        <div className="flex flex-col gap-3">
+          <Muted>
+            Saved. Recordings go to <span className="text-foreground break-all">{new URL(saved).host}</span>.
+          </Muted>
+          <div className="flex flex-wrap items-center gap-2">
+            {onOpenDictation && (
+              <Button onClick={onOpenDictation}>
+                <Mic /> Open Dictation
+              </Button>
+            )}
+            <Button variant="outline" onClick={() => setChanging(true)}>Change address</Button>
+          </div>
         </div>
       ) : (
         <form className="flex flex-col gap-3" onSubmit={save}>
