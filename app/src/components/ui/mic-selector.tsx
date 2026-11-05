@@ -70,8 +70,7 @@ export function MicSelector({
       deviceId: "",
     }
 
-  const handleDeviceSelect = (deviceId: string, e?: React.MouseEvent) => {
-    e?.preventDefault()
+  const handleDeviceSelect = (deviceId: string) => {
     setSelectedDevice(deviceId)
     onValueChange?.(deviceId)
   }
@@ -94,7 +93,7 @@ export function MicSelector({
   const isPreviewActive = isDropdownOpen && !isMuted
 
   return (
-    <DropdownMenu onOpenChange={handleDropdownOpenChange}>
+    <DropdownMenu modal={false} onOpenChange={handleDropdownOpenChange}>
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
@@ -125,8 +124,7 @@ export function MicSelector({
           devices.map((device) => (
             <DropdownMenuItem
               key={device.deviceId}
-              onClick={(e) => handleDeviceSelect(device.deviceId, e)}
-              onSelect={(e) => e.preventDefault()}
+              onClick={() => handleDeviceSelect(device.deviceId)}
               className="flex items-center justify-between"
             >
               <span className="truncate">{device.label}</span>
