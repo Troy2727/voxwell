@@ -30,6 +30,7 @@ export const DICTATED_EVENT = 'voxwell:dictated';
 
 /** Open the microphone; throws with a sentence for the user. */
 export async function openMicrophone(device: string): Promise<MediaStream> {
+  if (!window.voxwell && onPhoneOrTablet() && !savedPhoneAddress()) throw new Error(PHONE_NEEDS_ADDRESS);
   if (!navigator.mediaDevices || typeof MediaRecorder === 'undefined') throw new Error(NO_MICROPHONE);
   try {
     return await navigator.mediaDevices.getUserMedia({ audio: device ? { deviceId: { exact: device } } : true });
@@ -60,11 +61,12 @@ async function postRecording(form: FormData): Promise<Response> {
   // A phone's own 127.0.0.1 has no Voxwell, so a phone sends it to the computer's private address.
   const onPhone = !window.voxwell && onPhoneOrTablet();
   const phone = onPhone ? savedPhoneAddress() : '';
+  if (onPhone && !phone) throw new Error(PHONE_NEEDS_ADDRESS);
   for (;;) {
     try {
       return await fetch(`${phone || apiUrl('')}/api/dictation/transcribe`, { method: 'POST', body: form });
     } catch {
-      if (Date.now() >= deadline) throw new Error(phone ? PHONE_UNREACHABLE : onPhone ? PHONE_NEEDS_ADDRESS : backendUnreachable());
+      if (Date.now() >= deadline) throw new Error(phone ? PHONE_UNREACHABLE : backendUnreachable());
       await new Promise((resolve) => window.setTimeout(resolve, BACKEND_RETRY_MS));
     }
   }

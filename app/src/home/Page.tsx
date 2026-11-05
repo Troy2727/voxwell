@@ -161,7 +161,7 @@ export function HomePage({ name, online, onOpen, onRetry }: { name?: string; onl
         </div>
       </div>
 
-      {online === false && onPhoneOrTablet() && <PhoneDictation />}
+      {online === false && onPhoneOrTablet() && <PhoneDictation onOpenDictation={() => onOpen('dictation')} />}
 
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">

@@ -293,14 +293,23 @@ test.describe('errors the user can see', () => {
       await expect(main.getByText('Dictate from your phone', { exact: true })).toBeVisible();
       await main.getByLabel("Your computer's private address").fill('  desktop-1.tail123.ts.net  ');
       await main.getByRole('button', { name: 'Save address' }).click();
-      const open = main.getByRole('link', { name: 'Open the private page' });
-      await expect(open).toHaveAttribute('href', 'https://desktop-1.tail123.ts.net');
+      const saved = main.getByText('desktop-1.tail123.ts.net');
+      await expect(saved).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
       await page.reload();
-      await expect(open).toHaveAttribute('href', 'https://desktop-1.tail123.ts.net');
+      await expect(saved).toBeVisible();
       await main.getByRole('button', { name: 'Change address' }).click();
       await expect(main.getByLabel("Your computer's private address")).toBeVisible();
+    });
+
+    test('with a saved address, Home goes to Dictation on this website, not away from it', async ({ page }) => {
+      await page.addInitScript(() => localStorage.setItem('voxwell.phone.address', JSON.stringify('https://desktop-1.tail123.ts.net')));
+      await openHome(page);
+      const main = page.getByRole('main');
+      await expect(main.locator('a[href*="ts.net"]')).toHaveCount(0);
+      await main.getByRole('button', { name: 'Open Dictation' }).click();
+      await expect(page.getByRole('heading', { level: 1, name: 'Dictation' })).toBeVisible();
     });
 
     for (const bad of ['https://evil.example', 'http://desktop-1.tail123.ts.net', 'javascript:alert(1)', 'https://desktop.ts.net.evil.example', 'https://user:pass@desktop-1.tail123.ts.net', 'not an address']) {
@@ -310,14 +319,14 @@ test.describe('errors the user can see', () => {
         await main.getByLabel("Your computer's private address").fill(bad);
         await main.getByRole('button', { name: 'Save address' }).click();
         await expect(main.getByText('It ends in .ts.net.')).toBeVisible();
-        await expect(main.getByRole('link', { name: 'Open the private page' })).toHaveCount(0);
+        await expect(main.getByRole('button', { name: 'Change address' })).toHaveCount(0);
       });
     }
 
     test('a saved address that was tampered with is ignored', async ({ page }) => {
       await page.addInitScript(() => localStorage.setItem('voxwell.phone.address', JSON.stringify('https://evil.example')));
       await openHome(page);
-      await expect(page.getByRole('main').getByRole('link', { name: 'Open the private page' })).toHaveCount(0);
+      await expect(page.getByRole('main').getByRole('button', { name: 'Change address' })).toHaveCount(0);
     });
 
     test('the Dictation page offers it too', async ({ page }) => {
