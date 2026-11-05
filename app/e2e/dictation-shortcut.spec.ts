@@ -243,6 +243,86 @@ test('deleting the top of Recent also clears the current result', async ({ app: 
   await expect(recent.getByText('Older line')).toBeVisible();
 });
 
+test.describe('on the website on a phone', () => {
+  const PRIVATE = 'https://desktop-1.tail123.ts.net';
+  const CORS = { 'Access-Control-Allow-Origin': '*' };
+  test.use({ userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1', viewport: { width: 390, height: 844 } });
+
+  const openDictation = async (page: Page, address?: string) => {
+    if (address) await page.addInitScript((a) => localStorage.setItem('voxwell.phone.address', JSON.stringify(a)), address);
+    await page.getByRole('button', { name: 'Toggle Sidebar' }).first().click();
+    await openFeature(page, 'Dictation');
+  };
+
+  const record = async (page: Page) => {
+    const main = page.getByRole('main').last();
+    await main.getByRole('button', { name: 'Record' }).click();
+    await main.getByRole('button', { name: 'Stop' }).click();
+    return main;
+  };
+
+  test('with a saved address, recording goes to the computer and the text comes back', async ({ app: page }) => {
+    await page.evaluate((a) => localStorage.setItem('voxwell.phone.address', JSON.stringify(a)), PRIVATE);
+    await page.reload();
+    const sent: string[] = [];
+    await page.route(`${PRIVATE}/**`, (route) => {
+      sent.push(route.request().url());
+      return route.fulfill({ status: 200, headers: CORS, contentType: 'application/json', body: JSON.stringify({ text: 'Hola desde el teléfono.', language: 'es' }) });
+    });
+    await openDictation(page);
+    const main = await record(page);
+    await expect(main.getByText('Hola desde el teléfono.').first()).toBeVisible();
+    expect(sent).toEqual([`${PRIVATE}/api/dictation/transcribe`]);
+  });
+
+  test('when the computer can not be reached, it says what to check', async ({ app: page }) => {
+    await page.evaluate((a) => localStorage.setItem('voxwell.phone.address', JSON.stringify(a)), PRIVATE);
+    await page.reload();
+    await page.route(`${PRIVATE}/**`, (route) => route.abort('connectionrefused'));
+    await openDictation(page);
+    const main = await record(page);
+    await expect(main.getByText(/Can't reach your computer/)).toBeVisible();
+    await expect(main.getByText(/runs on a computer/)).toHaveCount(0);
+  });
+
+  test('with no saved address, it says to add one', async ({ app: page }) => {
+    await page.route('**/api/dictation/transcribe', (route) => route.abort('connectionrefused'));
+    await openDictation(page);
+    const main = await record(page);
+    await expect(main.getByText(/Save your computer's private address/)).toBeVisible();
+  });
+
+  test('a tampered saved address is not used', async ({ app: page }) => {
+    await page.evaluate(() => localStorage.setItem('voxwell.phone.address', JSON.stringify('https://evil.example')));
+    await page.reload();
+    const evil: string[] = [];
+    await page.route('https://evil.example/**', (route) => { evil.push(route.request().url()); return route.abort(); });
+    await page.route('**/api/dictation/transcribe', (route) => route.abort('connectionrefused'));
+    await openDictation(page);
+    const main = await record(page);
+    await expect(main.getByText(/Save your computer's private address/)).toBeVisible();
+    expect(evil).toEqual([]);
+  });
+
+  test('the Live tab is off, since it can not work through the phone connection', async ({ app: page }) => {
+    await openDictation(page);
+    await expect(page.getByRole('tab', { name: 'Live' })).toBeDisabled();
+  });
+});
+
+test('a computer browser ignores a saved phone address', async ({ app: page }) => {
+  await page.evaluate(() => localStorage.setItem('voxwell.phone.address', JSON.stringify('https://desktop-1.tail123.ts.net')));
+  await page.reload();
+  const away: string[] = [];
+  await page.route('https://desktop-1.tail123.ts.net/**', (route) => { away.push(route.request().url()); return route.abort(); });
+  await openFeature(page, 'Dictation');
+  const main = page.getByRole('main');
+  await main.getByRole('button', { name: 'Record' }).click();
+  await main.getByRole('button', { name: 'Stop' }).click();
+  await expect(main.getByRole('button', { name: 'Copy' }).first()).toBeVisible();
+  expect(away).toEqual([]);
+});
+
 test('in a browser with no backend, the Dictation page says what to do', async ({ app: page }) => {
   await page.route('**/api/dictation/transcribe', (route) => route.abort('connectionrefused'));
   await openFeature(page, 'Dictation');

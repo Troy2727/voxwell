@@ -5,7 +5,8 @@ removes any identity headers the client sent, adds the signed-in Tailscale user'
 request to this computer. So a request for the configured Host is judged here, before anything else:
 
 - Only the owner's Tailscale account gets in.
-- Other websites open on the phone can't use it: the Origin must be this page's own.
+- Other websites open on the phone can't use it: the Origin must be this page's own, or for
+  dictation alone, Voxwell's own website.
 - Only the phone page and dictation are reachable, not the rest of the API.
 
 The exact Host is required, not any *.ts.net name: a website could re-point its own name at
@@ -35,6 +36,9 @@ PAGE_HEADERS = {
 }
 # What a phone may reach. Everything else answers 404, as if it weren't there.
 FORWARDED = {("GET", "/api/health"), ("POST", "/api/dictation/transcribe")}
+# The hosted website may dictate too, so a phone can use it directly. The browser may ask first (OPTIONS).
+WEBSITE = "https://voxwell.vercel.app"
+FROM_WEBSITE = {("POST", "/api/dictation/transcribe"), ("OPTIONS", "/api/dictation/transcribe")}
 
 
 class RemoteSetupError(Exception):
@@ -121,7 +125,9 @@ class RemoteGate:
         if response is not None:
             return await response(scope, receive, send)
         # Allowed. The rest of the server only knows the local name, and this page's own Origin needs no CORS.
-        headers = [(n, v) for n, v in scope["headers"] if n not in (b"host", b"origin")]
+        # The website's Origin stays, so the server's CORS rules let the browser read the answer.
+        keep_origin = _header(scope, b"origin") == WEBSITE
+        headers = [(n, v) for n, v in scope["headers"] if n != b"host" and (keep_origin or n != b"origin")]
         forwarded = {**scope, "headers": [*headers, (b"host", b"127.0.0.1")]}
         return await self.app(forwarded, receive, send)
 
@@ -131,6 +137,10 @@ class RemoteGate:
         if not owner or (_header(scope, b"tailscale-user-login") or "").lower() != owner:
             return PlainTextResponse("This Voxwell belongs to another Tailscale account.", status_code=403)
         origin = _header(scope, b"origin")
+        if origin == WEBSITE:
+            if (scope["method"], scope["path"]) in FROM_WEBSITE:
+                return None
+            return PlainTextResponse("Not found.", status_code=404)
         if origin != f"https://{host}" and (origin is not None or scope["method"] != "GET"):
             return PlainTextResponse("Only Voxwell's own page can use this.", status_code=403)
         if (scope["method"], scope["path"]) == ("GET", "/"):

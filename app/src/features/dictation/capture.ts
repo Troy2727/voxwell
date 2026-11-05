@@ -1,4 +1,5 @@
-import { apiUrl, backendUnreachable, errorMessage } from '../../api';
+import { apiUrl, backendUnreachable, errorMessage, onPhoneOrTablet } from '../../api';
+import { savedPhoneAddress } from '@/components/phone-dictation';
 
 const LANGUAGE_KEY = 'voxwell.dictation.language';
 
@@ -42,6 +43,8 @@ export async function openMicrophone(device: string): Promise<MediaStream> {
   }
 }
 
+const PHONE_UNREACHABLE = "Can't reach your computer. Check that it's on, Voxwell is running with --remote, and Tailscale is on here.";
+const PHONE_NEEDS_ADDRESS = "Voxwell runs on your computer. To dictate from this phone, Save your computer's private address above.";
 const BACKEND_WAIT_MS = 30_000;
 const BACKEND_RETRY_MS = 1_000;
 
@@ -52,11 +55,14 @@ const BACKEND_RETRY_MS = 1_000;
  */
 async function postRecording(form: FormData): Promise<Response> {
   const deadline = Date.now() + (window.voxwell ? BACKEND_WAIT_MS : 0);
+  // A phone's own 127.0.0.1 has no Voxwell, so a phone sends it to the computer's private address.
+  const onPhone = !window.voxwell && onPhoneOrTablet();
+  const phone = onPhone ? savedPhoneAddress() : '';
   for (;;) {
     try {
-      return await fetch(apiUrl('/api/dictation/transcribe'), { method: 'POST', body: form });
+      return await fetch(`${phone || apiUrl('')}/api/dictation/transcribe`, { method: 'POST', body: form });
     } catch {
-      if (Date.now() >= deadline) throw new Error(backendUnreachable());
+      if (Date.now() >= deadline) throw new Error(phone ? PHONE_UNREACHABLE : onPhone ? PHONE_NEEDS_ADDRESS : backendUnreachable());
       await new Promise((resolve) => window.setTimeout(resolve, BACKEND_RETRY_MS));
     }
   }
