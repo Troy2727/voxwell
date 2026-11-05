@@ -1,13 +1,18 @@
+import { savedPhoneAddress } from '@/components/phone-dictation';
+
 export const BACKEND_URL = window.voxwell?.backendUrl ?? 'http://127.0.0.1:8765';
+
+/** A phone's own 127.0.0.1 has no Voxwell, so a phone uses the computer's saved private address. */
+const backendUrl = () => (!window.voxwell && onPhoneOrTablet() && savedPhoneAddress()) || BACKEND_URL;
 
 /** Absolute backend URL, e.g. for an <audio src>. */
 export function apiUrl(path: string): string {
-  return BACKEND_URL + path;
+  return backendUrl() + path;
 }
 
-/** Backend WebSocket URL (ws://), for the live features. */
+/** Backend WebSocket URL (ws:// or wss://), for the live features. */
 export function wsUrl(path: string): string {
-  return BACKEND_URL.replace(/^http/, 'ws') + path;
+  return backendUrl().replace(/^http/, 'ws') + path;
 }
 
 /** The server's sentence for a failed response: FastAPI's `detail` (a string, or a list for invalid input). */
@@ -30,7 +35,11 @@ export const onPhoneOrTablet = () =>
 /** What to tell the user when fetch rejects, which only happens when the backend can't be reached. */
 export const backendUnreachable = () => {
   if (window.voxwell) return "Voxwell's engine isn't responding. Restart the app and try again.";
-  if (onPhoneOrTablet()) return "Voxwell runs on a computer, not a phone or tablet. Open this page on the computer where it's installed, or use Dictate from your phone on Home.";
+  if (onPhoneOrTablet()) {
+    const address = savedPhoneAddress();
+    if (address) return `Can't reach your computer at ${new URL(address).host}. Check that it's on, Voxwell is running with voxwell serve --remote, and Tailscale is on on both devices.`;
+    return "Voxwell runs on a computer, not a phone or tablet. To use it here, save your computer's private address under Use Voxwell from your phone on Home.";
+  }
   return "Can't reach Voxwell on this computer. Start the Voxwell app or run voxwell serve, allow local network access if your browser asks, then try again.";
 };
 

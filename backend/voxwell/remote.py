@@ -1,13 +1,14 @@
-"""Optional dictation from your phone, over a private Tailscale connection. Off unless `voxwell serve --remote`.
+"""Optional use from your phone, over a private Tailscale connection. Off unless `voxwell serve --remote`.
 
 The server still listens only on 127.0.0.1. `tailscale serve` receives the phone's HTTPS request,
 removes any identity headers the client sent, adds the signed-in Tailscale user's, and passes the
 request to this computer. So a request for the configured Host is judged here, before anything else:
 
 - Only the owner's Tailscale account gets in.
-- Other websites open on the phone can't use it: the Origin must be this page's own, or for
-  dictation alone, Voxwell's own website.
-- Only the phone page and dictation are reachable, not the rest of the API.
+- Other websites open on the phone can't use it: the Origin must be this page's own, or
+  Voxwell's own website.
+- Voxwell's website reaches the whole app, as it does on the computer itself. The small phone page
+  served here reaches only dictation.
 
 The exact Host is required, not any *.ts.net name: a website could re-point its own name at
 127.0.0.1 and set these headers itself (DNS rebinding), but it can't do that with this computer's name.
@@ -34,11 +35,10 @@ PAGE_HEADERS = {
     "Content-Security-Policy": "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; media-src 'self' blob:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
     "Referrer-Policy": "no-referrer",
 }
-# What a phone may reach. Everything else answers 404, as if it weren't there.
+# What the phone page may reach. Everything else answers 404, as if it weren't there.
 FORWARDED = {("GET", "/api/health"), ("POST", "/api/dictation/transcribe")}
-# The hosted website may dictate too, so a phone can use it directly. The browser may ask first (OPTIONS).
+# The hosted website may use everything, so a phone can use the whole app through it.
 WEBSITE = "https://voxwell.vercel.app"
-FROM_WEBSITE = {("POST", "/api/dictation/transcribe"), ("OPTIONS", "/api/dictation/transcribe")}
 
 
 class RemoteSetupError(Exception):
@@ -82,9 +82,10 @@ def enable(host: str, owner: str) -> None:
 
 def instructions(host: str, owner: str, port: int) -> str:
     return (
-        f"Phone dictation is on, for {owner} only.\n"
+        f"Phone access is on, for {owner} only.\n"
         f"1. In another terminal, run: tailscale serve --bg {port}\n"
-        f"2. On your phone, with Tailscale on and signed in to {owner}, open: https://{host}\n"
+        f"2. On your phone, with Tailscale on and signed in to {owner}, open https://voxwell.vercel.app\n"
+        f"   and save this address on Home: https://{host}\n"
         "To turn it off later: tailscale serve reset, then start Voxwell without --remote."
     )
 
@@ -117,12 +118,10 @@ class RemoteGate:
         is_remote = bool(host) and _host_of(scope) == host
         if not is_remote and not _proxied(scope):
             return await self.app(scope, receive, send)
-        if scope["type"] == "websocket":
-            return await send({"type": "websocket.close", "code": 1008})
-        if not is_remote:
-            return await PlainTextResponse("Not available through a proxy.", status_code=403)(scope, receive, send)
-        response = self._refusal(scope, host)
+        response = self._refusal(scope, host) if is_remote else PlainTextResponse("Not available through a proxy.", status_code=403)
         if response is not None:
+            if scope["type"] == "websocket":
+                return await send({"type": "websocket.close", "code": 1008})
             return await response(scope, receive, send)
         # Allowed. The rest of the server only knows the local name, and this page's own Origin needs no CORS.
         # The website's Origin stays, so the server's CORS rules let the browser read the answer.
@@ -138,8 +137,8 @@ class RemoteGate:
             return PlainTextResponse("This Voxwell belongs to another Tailscale account.", status_code=403)
         origin = _header(scope, b"origin")
         if origin == WEBSITE:
-            if (scope["method"], scope["path"]) in FROM_WEBSITE:
-                return None
+            return None
+        if scope["type"] == "websocket":  # the phone page has no live features
             return PlainTextResponse("Not found.", status_code=404)
         if origin != f"https://{host}" and (origin is not None or scope["method"] != "GET"):
             return PlainTextResponse("Only Voxwell's own page can use this.", status_code=403)

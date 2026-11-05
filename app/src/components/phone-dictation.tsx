@@ -26,7 +26,7 @@ export function savedPhoneAddress(): string {
   return typeof saved === 'string' ? (phoneAddress(saved) ?? '') : '';
 }
 
-/** On a phone this website can't reach the computer by itself. With the computer's private address it can dictate. */
+/** On a phone this website can't reach the computer by itself. With the computer's private address every page works. */
 export function PhoneDictation({ onOpenDictation }: { onOpenDictation?: () => void }) {
   const [saved, setSaved] = usePersisted(ADDRESS_KEY, '', (value) => (typeof value === 'string' ? (phoneAddress(value) ?? '') : ''));
   const [text, setText] = useState('');
@@ -47,11 +47,11 @@ export function PhoneDictation({ onOpenDictation }: { onOpenDictation?: () => vo
   }
 
   return (
-    <Section title="Dictate from your phone" description="Record on the Dictation page while your computer does the work. Your computer must be on, with Voxwell running, and Tailscale on both devices.">
+    <Section title="Use Voxwell from your phone" description="Every page works here while your computer does the work. Your computer must be on, with Voxwell running, and Tailscale on both devices.">
       {saved && !changing ? (
         <div className="flex flex-col gap-3">
           <Muted>
-            Saved. Recordings go to <span className="text-foreground break-all">{new URL(saved).host}</span>.
+            Saved. This phone uses <span className="text-foreground break-all">{new URL(saved).host}</span>.
           </Muted>
           <div className="flex flex-wrap items-center gap-2">
             {onOpenDictation && (

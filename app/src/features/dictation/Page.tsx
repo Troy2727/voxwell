@@ -3,7 +3,7 @@ import { Copy, Mic, Square, Trash2 } from 'lucide-react';
 import { onPhoneOrTablet } from '../../api';
 import { ChoiceSelect } from '@/components/choice-select';
 import { ErrorAlert, Field, Muted, Page as PageLayout, Section } from '@/components/page';
-import { PhoneDictation } from '@/components/phone-dictation';
+import { PhoneDictation, savedPhoneAddress } from '@/components/phone-dictation';
 import { Button } from '@/components/ui/button';
 import { LiveWaveform } from '@/components/ui/live-waveform';
 import { MicSelector } from '@/components/ui/mic-selector';
@@ -154,7 +154,7 @@ export default function Page() {
     <Tabs value={mode} onValueChange={(v) => setMode(v as Mode)}>
       <TabsList>
         <TabsTrigger value="record" disabled={liveActive}>Record</TabsTrigger>
-        <TabsTrigger value="live" disabled={phase !== 'idle' || onPhoneOrTablet()}>Live</TabsTrigger>
+        <TabsTrigger value="live" disabled={phase !== 'idle' || (onPhoneOrTablet() && !savedPhoneAddress())}>Live</TabsTrigger>
       </TabsList>
     </Tabs>
   );
@@ -210,7 +210,7 @@ export default function Page() {
             ? 'Press Ctrl/Cmd+Shift+Space anywhere to start and stop; the text is copied for you to paste.'
             : 'The global shortcut is available in the desktop app.'}
         </Muted>
-        {onPhoneOrTablet() && <Muted className="text-xs">Live works on a computer. On a phone, use Record.</Muted>}
+        {onPhoneOrTablet() && !savedPhoneAddress() && <Muted className="text-xs">On a phone, Live needs your computer's private address, saved above.</Muted>}
         <div role="alert">
           <ErrorAlert message={error} />
         </div>
