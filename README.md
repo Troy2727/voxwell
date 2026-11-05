@@ -130,25 +130,14 @@ Voxwell is **MIT licensed**, and every model it runs allows commercial use ([one
 
 ## <img src="docs/readme/icons/sparkles.svg" width="24" height="24" alt="" /> Features
 
-**Recently added**
-
-| Feature | Where | What you get |
-| --- | --- | --- |
-| **More voices** | Gallery | 40 ready-made voices. |
-| **Search and filters** | Gallery | Searching "whispering" finds Sleep Story; Wellness + Female shows 3 voices. |
-| **Pause buttons** | Voice cloning | Short, Medium and Long. |
-| **Speed and pitch** | Voice cloning | A slider for each. |
-| **Subtitles** | Stories | **Generate from subtitles** speaks an SRT file, each line at its time. |
-| **PDF and Word** | Audiobook | The file picker accepts .pdf and .docx. |
-
 **Voices**
 
 | Feature | What it does |
 | --- | --- |
-| **Voice cloning** | Clone a voice from a few seconds of clean speech. Saved voices work everywhere in the app. |
+| **Voice cloning** | Clone a voice from a few seconds of clean speech. Saved voices work everywhere in the app. Add <img src="docs/readme/labels/short.svg" alt="Short" height="24" align="absmiddle" />, <img src="docs/readme/labels/medium.svg" alt="Medium" height="24" align="absmiddle" /> and <img src="docs/readme/labels/long.svg" alt="Long" height="24" align="absmiddle" /> pauses with a click, and set the speech with <img src="docs/readme/labels/speed.svg" alt="Speed" height="24" align="absmiddle" /> and <img src="docs/readme/labels/pitch.svg" alt="Pitch" height="24" align="absmiddle" /> sliders. |
 | **Voice design** | Describe a voice ("warm, low, slight British accent") and Voxwell creates it. |
 | **Voice remix** | Turn a saved voice into a new one by describing it, from a light touch (Low) to a full change (Max). The original stays as it is. |
-| **Gallery** | Start from one of 40 ready-made voices. **Search** by name or description (try "whispering"), filter by **category** and **gender**, or star your favorites. |
+| **Gallery** | Start from one of 40 ready-made voices. <img src="docs/readme/labels/search.svg" alt="Search" height="24" align="absmiddle" /> by name or description ("whispering" finds Sleep Story), filter by <img src="docs/readme/labels/category.svg" alt="category" height="24" align="absmiddle" /> and <img src="docs/readme/labels/gender.svg" alt="gender" height="24" align="absmiddle" /> (Wellness + Female shows 3 voices), or star your favorites. |
 | **Collections** | Keep saved voices organized in folders. |
 | **Pronunciation** | Teach every voice how to say names, brands and jargon. Each language has one list, and it applies to all speech. |
 
@@ -156,10 +145,10 @@ Voxwell is **MIT licensed**, and every model it runs allows commercial use ([one
 
 | Feature | What it does |
 | --- | --- |
-| **Stories** | A script with a different voice for each speaker, or an SRT subtitle file spoken in one voice, each line at its time, with **Generate from subtitles**. |
-| **Audiobook** | Drop in an EPUB, **PDF**, **Word (.docx)**, TXT or Markdown file and narrate it chapter by chapter. You can stop and resume. Scanned PDFs can't be read. |
-| **Effects** | Use the **Speed** and **Pitch** sliders, or add reverb, distance, background noise or stereo pan, to any recording or while generating in Voice cloning and Stories. |
-| **Pauses** | Put `[pause]` or `[pause 2.5]` in any text to add silence, up to 10 seconds. The Voice cloning page has **Short**, **Medium** and **Long** buttons for it. |
+| **Stories** | A script with a different voice for each speaker, or an SRT subtitle file spoken in one voice, each line at its time, with <img src="docs/readme/labels/generate-from-subtitles.svg" alt="Generate from subtitles" height="24" align="absmiddle" />. |
+| **Audiobook** | Drop in an EPUB, <img src="docs/readme/labels/pdf.svg" alt="PDF" height="24" align="absmiddle" />, <img src="docs/readme/labels/word-docx.svg" alt="Word (.docx)" height="24" align="absmiddle" />, TXT or Markdown file and narrate it chapter by chapter. You can stop and resume. Scanned PDFs can't be read. |
+| **Effects** | Use the <img src="docs/readme/labels/speed.svg" alt="Speed" height="24" align="absmiddle" /> and <img src="docs/readme/labels/pitch.svg" alt="Pitch" height="24" align="absmiddle" /> sliders, or add reverb, distance, background noise or stereo pan, to any recording or while generating in Voice cloning and Stories. |
+| **Pauses** | Put `[pause]` or `[pause 2.5]` in any text to add silence, up to 10 seconds. The Voice cloning page has <img src="docs/readme/labels/short.svg" alt="Short" height="24" align="absmiddle" />, <img src="docs/readme/labels/medium.svg" alt="Medium" height="24" align="absmiddle" /> and <img src="docs/readme/labels/long.svg" alt="Long" height="24" align="absmiddle" /> buttons for it. |
 | **Sound effects** | Describe a sound and generate it with Stable Audio Open. Needs a free Hugging Face token and accepting the model's terms. |
 | **Music** | Songs with sung lyrics, or instrumentals, from a description (ACE-Step 1.5). AI can write the lyrics; regenerate any section, follow a style reference, or split a track into vocals and instrumental. Installs once from the Music page (about 12 GB). |
 
