@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Copy, Mic, Square, Trash2 } from 'lucide-react';
+import { onPhoneOrTablet } from '../../api';
 import { ChoiceSelect } from '@/components/choice-select';
 import { ErrorAlert, Field, Muted, Page as PageLayout, Section } from '@/components/page';
+import { PhoneDictation } from '@/components/phone-dictation';
 import { Button } from '@/components/ui/button';
 import { LiveWaveform } from '@/components/ui/live-waveform';
 import { MicSelector } from '@/components/ui/mic-selector';
@@ -184,6 +186,7 @@ export default function Page() {
   }
   return (
     <PageLayout title="Dictation" description="Speak and get text, all on this computer.">
+      {onPhoneOrTablet() && <PhoneDictation />}
       <Section title="Record" action={tabs}>
         <div className="bg-muted/30 flex flex-col items-center gap-4 rounded-xl border p-6">
           <LiveWaveform active={recording} processing={phase === 'transcribing'} deviceId={device || undefined} height={64} mode="static" className="w-full" />

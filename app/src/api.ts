@@ -30,7 +30,7 @@ export const onPhoneOrTablet = () =>
 /** What to tell the user when fetch rejects, which only happens when the backend can't be reached. */
 export const backendUnreachable = () => {
   if (window.voxwell) return "Voxwell's engine isn't responding. Restart the app and try again.";
-  if (onPhoneOrTablet()) return "Voxwell runs on a computer, not a phone or tablet. Open this page on the computer where it's installed.";
+  if (onPhoneOrTablet()) return "Voxwell runs on a computer, not a phone or tablet. Open this page on the computer where it's installed, or use Dictate from your phone on Home.";
   return "Can't reach Voxwell on this computer. Start the Voxwell app or run voxwell serve, allow local network access if your browser asks, then try again.";
 };
 
