@@ -1,0 +1,107 @@
+name: Installers
+
+# Builds the desktop installers and keeps them as run artifacts; it publishes nothing. Signing turns
+# on for each OS once its secrets are set (see docs/INSTALLERS.md); without them the builds are unsigned.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - app/electron/**
+      - app/electron-builder.yml
+      - app/build/**
+      - app/scripts/fetch-uv.cjs
+      - app/e2e-electron/packaged-smoke.cjs
+      - .github/workflows/installers.yml
+      - backend/pyproject.toml
+      - backend/uv.lock
+
+permissions:
+  contents: read
+
+concurrency:
+  group: installers-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  installer:
+    name: Installer (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            targets: --win --x64
+          - os: macos-latest
+            targets: --mac --arm64 --x64
+          - os: ubuntu-latest
+            targets: --linux --x64
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: app
+        shell: bash
+    env:
+      # Mac: certificate and notarization. electron-builder notarizes when the APPLE_ values are set.
+      CSC_LINK: ${{ secrets.MAC_CERTIFICATE_P12_BASE64 }}
+      CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      # Windows: Azure Artifact Signing.
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+      AZURE_SIGNING_ENDPOINT: ${{ vars.AZURE_SIGNING_ENDPOINT }}
+      AZURE_SIGNING_ACCOUNT: ${{ vars.AZURE_SIGNING_ACCOUNT }}
+      AZURE_SIGNING_PROFILE: ${{ vars.AZURE_SIGNING_PROFILE }}
+      AZURE_SIGNING_PUBLISHER: ${{ vars.AZURE_SIGNING_PUBLISHER }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
+      - run: node --test electron/backend-setup.test.cjs
+      - run: npm run build
+      - run: node scripts/fetch-uv.cjs
+      - name: Build
+        run: |
+          args=(${{ matrix.targets }} --publish never)
+          if [ "$RUNNER_OS" = "macOS" ] && [ -z "$CSC_LINK" ]; then
+            export CSC_IDENTITY_AUTO_DISCOVERY=false
+            unset CSC_LINK CSC_KEY_PASSWORD
+            echo "::notice::No Mac certificate is set, so this build is unsigned."
+          fi
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            if [ -n "$AZURE_CLIENT_SECRET" ]; then
+              args+=("-c.win.azureSignOptions.endpoint=$AZURE_SIGNING_ENDPOINT")
+              args+=("-c.win.azureSignOptions.codeSigningAccountName=$AZURE_SIGNING_ACCOUNT")
+              args+=("-c.win.azureSignOptions.certificateProfileName=$AZURE_SIGNING_PROFILE")
+              args+=("-c.win.azureSignOptions.publisherName=$AZURE_SIGNING_PUBLISHER")
+            else
+              echo "::notice::No Windows signing account is set, so this build is unsigned."
+            fi
+            unset CSC_LINK CSC_KEY_PASSWORD
+          fi
+          npx electron-builder "${args[@]}"
+      - name: Check the packaged app
+        if: runner.os != 'Linux'
+        run: node e2e-electron/packaged-smoke.cjs
+      - name: Check the packaged app under a display
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb libnss3 libatk1.0-0t64 libatk-bridge2.0-0t64 libgtk-3-0t64 libgbm1 libasound2t64
+          xvfb-run -a node e2e-electron/packaged-smoke.cjs
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        with:
+          name: voxwell-${{ matrix.os }}
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            app/release/*.exe
+            app/release/*.dmg
+            app/release/*.AppImage
+            app/release/*.deb

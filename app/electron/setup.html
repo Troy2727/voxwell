@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'" />
+    <title>Setting up Voxwell</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      body {
+        margin: 0;
+        padding: 32px;
+        background: #0e131b;
+        color: #f4f1ea;
+        font: 15px/1.5 system-ui, sans-serif;
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 22px;
+      }
+      p {
+        margin: 0 0 16px;
+        color: #a8b3c4;
+      }
+      .bar {
+        position: relative;
+        height: 6px;
+        overflow: hidden;
+        border-radius: 3px;
+        background: #27313f;
+      }
+      .bar::after {
+        content: '';
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: 35%;
+        border-radius: 3px;
+        background: #ff8a00;
+        animation: slide 1.6s ease-in-out infinite alternate;
+      }
+      @keyframes slide {
+        to {
+          transform: translateX(186%);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .bar::after {
+          width: 100%;
+          animation: none;
+          opacity: 0.6;
+        }
+      }
+      #step {
+        min-height: 3em;
+        margin-top: 12px;
+        font-size: 13px;
+        overflow-wrap: anywhere;
+      }
+      pre {
+        max-height: 150px;
+        overflow: auto;
+        padding: 10px;
+        border-radius: 6px;
+        background: #1a222e;
+        color: #f4f1ea;
+        font-size: 12px;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+      button {
+        padding: 8px 16px;
+        border: 1px solid #27313f;
+        border-radius: 6px;
+        background: #1a222e;
+        color: inherit;
+        font: inherit;
+        cursor: pointer;
+      }
+      button.primary {
+        border-color: #ff8a00;
+        background: #ff8a00;
+        color: #111;
+        font-weight: 600;
+      }
+      [hidden] {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <section id="working">
+      <h1>Setting up Voxwell</h1>
+      <p>This happens once and can take a while, because it downloads several GB. Everything stays on this computer. You can close this window and carry on later.</p>
+      <div class="bar" aria-hidden="true"></div>
+      <p id="step" role="status" aria-live="polite">Getting ready…</p>
+    </section>
+    <section id="failed" role="alert" hidden>
+      <h1>Setup didn't finish</h1>
+      <pre id="reason"></pre>
+      <button id="retry" class="primary" type="button">Try again</button>
+      <button id="quit" type="button">Quit</button>
+    </section>
+    <script src="setup.js"></script>
+  </body>
+</html>

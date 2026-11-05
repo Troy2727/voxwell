@@ -13,7 +13,8 @@ dependencies = [
     "truststore>=0.10",  # trust the OS certificate store (corporate proxies, antivirus TLS inspection)
     # Models (imported lazily by each feature).
     "chatterbox-tts==0.1.6",
-    "parler-tts @ git+https://github.com/huggingface/parler-tts.git",
+    # Archives of fixed commits, not git+https: the desktop installer must work on a computer without Git.
+    "parler-tts @ https://github.com/huggingface/parler-tts/archive/d108732cd57788ec86bc857d99a6cabd66663d68.tar.gz",
     "faster-whisper>=1.0",
     "sherpa-onnx>=1.12",  # speaker diarization (Apache-2.0); wheels for Windows, macOS and Linux on Python 3.11
     "transformers==4.46.3",
@@ -32,6 +33,8 @@ dependencies = [
 # parler-tts pins transformers==4.46.1; chatterbox-tts 0.1.6 needs 4.46.3 (patch-level bump).
 override-dependencies = [
     "transformers==4.46.3",
+    # parler-tts asks for this from Git; the same commit as an archive needs no Git to install.
+    "descript-audiotools @ https://github.com/descriptinc/audiotools/archive/348ebf2034ce24e2a91a553e3171cb00c0c71678.tar.gz",
     # chatterbox-tts 0.1.6 pins diffusers==0.29.0, which has no StableAudioPipeline (added in 0.30). 0.36.0 is the
     # newest release where every diffusers name chatterbox imports still exists (tests/test_model_api_contracts.py).
     "diffusers==0.36.0",

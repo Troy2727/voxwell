@@ -1,0 +1,50 @@
+# Installers: `npm run dist`. Signing turns on in CI when its secrets are set; see docs/INSTALLERS.md.
+appId: com.voxwell.app
+productName: Voxwell
+copyright: Copyright (c) Voxwell contributors
+artifactName: Voxwell-${version}-${os}-${arch}.${ext}
+directories:
+  output: release
+  buildResources: build
+# The UI is bundled by Vite and the main process uses only Electron and Node, so no node_modules.
+files:
+  - electron/**
+  - "!electron/*.test.cjs"
+  - dist/**
+  - package.json
+  - "!node_modules/**"
+extraResources:
+  - from: ../backend
+    to: backend
+    filter:
+      - pyproject.toml
+      - uv.lock
+      - voxwell/**
+      - "!**/__pycache__/**"
+      - "!**/*.pyc"
+  - from: vendor/uv/${os}-${arch}
+    to: uv
+protocols:
+  - name: Voxwell
+    schemes: [voxwell]
+win:
+  target: nsis
+nsis:
+  # Per user, so it needs no administrator rights.
+  oneClick: true
+  perMachine: false
+mac:
+  target: dmg
+  category: public.app-category.productivity
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  extendInfo:
+    NSMicrophoneUsageDescription: Voxwell uses the microphone for dictation, voice agents and live translation. Audio stays on this computer.
+linux:
+  target: [AppImage, deb]
+  category: AudioVideo
+  maintainer: Voxwell contributors <noreply@voxwell.invalid>
+  synopsis: A voice studio that runs on your computer
+  description: Voice cloning, voice design, dubbing, dictation and transcription that run on your own computer.

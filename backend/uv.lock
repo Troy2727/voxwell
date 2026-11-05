@@ -12,6 +12,7 @@ constraints = [
     { name = "setuptools", specifier = "<81" },
 ]
 overrides = [
+    { name = "descript-audiotools", url = "https://github.com/descriptinc/audiotools/archive/348ebf2034ce24e2a91a553e3171cb00c0c71678.tar.gz" },
     { name = "diffusers", specifier = "==0.36.0" },
     { name = "pykakasi", marker = "sys_platform == 'never'" },
     { name = "transformers", specifier = "==4.46.3" },
@@ -394,7 +395,7 @@ wheels = [
 [[package]]
 name = "descript-audiotools"
 version = "0.7.4"
-source = { git = "https://github.com/descriptinc/audiotools#348ebf2034ce24e2a91a553e3171cb00c0c71678" }
+source = { url = "https://github.com/descriptinc/audiotools/archive/348ebf2034ce24e2a91a553e3171cb00c0c71678.tar.gz" }
 dependencies = [
     { name = "argbind" },
     { name = "ffmpy" },
@@ -421,6 +422,46 @@ dependencies = [
     { name = "torchaudio", version = "2.6.0+cu124", source = { registry = "https://download.pytorch.org/whl/cu124" }, marker = "sys_platform != 'darwin'" },
     { name = "tqdm" },
 ]
+sdist = { hash = "sha256:c93fc09f338eec2e8b08f39af18699cf75f24db156802590fa87934dafd3b9a1" }
+
+[package.metadata]
+requires-dist = [
+    { name = "argbind" },
+    { name = "ffmpy" },
+    { name = "flatten-dict" },
+    { name = "gradio", marker = "extra == 'tests'", specifier = "==3.32.0" },
+    { name = "importlib-resources" },
+    { name = "ipython" },
+    { name = "julius" },
+    { name = "librosa" },
+    { name = "line-profiler", marker = "extra == 'tests'" },
+    { name = "markdown2" },
+    { name = "matplotlib" },
+    { name = "myst-nb", marker = "extra == 'docs'" },
+    { name = "myst-parser", marker = "extra == 'docs'" },
+    { name = "numpy" },
+    { name = "pesq", marker = "extra == 'tests'" },
+    { name = "protobuf", specifier = ">=3.19.6,!=4.24.0,<5.0.0" },
+    { name = "pyloudnorm" },
+    { name = "pystoi" },
+    { name = "pytest", marker = "extra == 'tests'" },
+    { name = "pytest-cov", marker = "extra == 'tests'" },
+    { name = "randomname" },
+    { name = "rich" },
+    { name = "scipy" },
+    { name = "soundfile" },
+    { name = "sphinx", marker = "extra == 'docs'" },
+    { name = "sphinx-multiversion", marker = "extra == 'docs'" },
+    { name = "sphinx-rtd-theme", marker = "extra == 'docs'" },
+    { name = "tensorboard" },
+    { name = "torch" },
+    { name = "torch-stoi" },
+    { name = "torchaudio" },
+    { name = "tqdm" },
+    { name = "transformers", marker = "extra == 'tests'", specifier = ">=4.23.1" },
+    { name = "transformers", marker = "extra == 'whisper'", specifier = ">=4.23.1" },
+]
+provides-extras = ["tests", "docs", "whisper"]
 
 [[package]]
 name = "diffusers"
@@ -1375,7 +1416,7 @@ wheels = [
 [[package]]
 name = "parler-tts"
 version = "0.2.2"
-source = { git = "https://github.com/huggingface/parler-tts.git#d108732cd57788ec86bc857d99a6cabd66663d68" }
+source = { url = "https://github.com/huggingface/parler-tts/archive/d108732cd57788ec86bc857d99a6cabd66663d68.tar.gz" }
 dependencies = [
     { name = "descript-audio-codec" },
     { name = "descript-audiotools" },
@@ -1385,6 +1426,26 @@ dependencies = [
     { name = "torch", version = "2.6.0+cu124", source = { registry = "https://download.pytorch.org/whl/cu124" }, marker = "sys_platform != 'darwin'" },
     { name = "transformers" },
 ]
+sdist = { hash = "sha256:216767fadd90807a8bb8d81dbe9e9e6b9ad91f76e8371fcfa93a1d59e99f273a" }
+
+[package.metadata]
+requires-dist = [
+    { name = "accelerate", marker = "extra == 'train'" },
+    { name = "black", marker = "extra == 'dev'", specifier = "~=23.1" },
+    { name = "datasets", extras = ["audio"], marker = "extra == 'train'", specifier = ">=2.14.5" },
+    { name = "descript-audio-codec" },
+    { name = "descript-audiotools", git = "https://github.com/descriptinc/audiotools" },
+    { name = "evaluate", marker = "extra == 'train'" },
+    { name = "isort", marker = "extra == 'dev'", specifier = ">=5.5.4" },
+    { name = "jiwer", marker = "extra == 'train'" },
+    { name = "protobuf", specifier = ">=4.0.0" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.0.241,<=0.0.259" },
+    { name = "sentencepiece" },
+    { name = "torch" },
+    { name = "transformers", specifier = "<=4.46.1,>=4.46.1" },
+    { name = "wandb", marker = "extra == 'train'" },
+]
+provides-extras = ["dev", "train"]
 
 [[package]]
 name = "parso"
@@ -2538,7 +2599,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.115" },
     { name = "faster-whisper", specifier = ">=1.0" },
     { name = "librosa", specifier = ">=0.11.0" },
-    { name = "parler-tts", git = "https://github.com/huggingface/parler-tts.git" },
+    { name = "parler-tts", url = "https://github.com/huggingface/parler-tts/archive/d108732cd57788ec86bc857d99a6cabd66663d68.tar.gz" },
     { name = "platformdirs", specifier = ">=4" },
     { name = "pypdf", specifier = ">=6" },
     { name = "python-multipart", specifier = ">=0.0.9" },
