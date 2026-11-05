@@ -350,6 +350,7 @@ test.describe('on the website on a phone', () => {
   test('the Live tab is off, since it can not work through the phone connection', async ({ app: page }) => {
     await openDictation(page);
     await expect(page.getByRole('tab', { name: 'Live' })).toBeDisabled();
+    await expect(page.getByText('Live works on a computer. On a phone, use Record.')).toBeVisible();
   });
 });
 
@@ -364,6 +365,38 @@ test('a computer browser ignores a saved phone address', async ({ app: page }) =
   await main.getByRole('button', { name: 'Stop' }).click();
   await expect(main.getByRole('button', { name: 'Copy' }).first()).toBeVisible();
   expect(away).toEqual([]);
+});
+
+test.describe('the microphone menu', () => {
+  const openMenu = async (page: Page) => {
+    await openFeature(page, 'Dictation');
+    const main = page.getByRole('main');
+    await main.locator('button').filter({ has: page.locator('svg.lucide-chevrons-up-down') }).first().click();
+    await expect(page.getByRole('menu')).toBeVisible();
+    return main;
+  };
+
+  test('closes when a microphone is picked, so the page works again', async ({ app: page }) => {
+    const main = await openMenu(page);
+    await page.getByRole('menuitem').first().click();
+    await expect(page.getByRole('menu')).toBeHidden();
+    await main.getByRole('button', { name: 'Record', exact: true }).click();
+    await expect(main.getByRole('button', { name: 'Stop' })).toBeVisible();
+    await main.getByRole('button', { name: 'Stop' }).click();
+  });
+
+  test('does not block the page while open: one click on Record works', async ({ app: page }) => {
+    const main = await openMenu(page);
+    await main.getByRole('button', { name: 'Record', exact: true }).click({ force: true });
+    await expect(main.getByRole('button', { name: 'Stop' })).toBeVisible();
+    await main.getByRole('button', { name: 'Stop' }).click();
+  });
+
+  test('stays open for Mute, so Unmute is right there', async ({ app: page }) => {
+    await openMenu(page);
+    await page.getByRole('button', { name: 'Mute' }).click();
+    await expect(page.getByRole('button', { name: 'Unmute' })).toBeVisible();
+  });
 });
 
 test('in a browser with no backend, the Dictation page says what to do', async ({ app: page }) => {

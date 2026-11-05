@@ -210,6 +210,7 @@ export default function Page() {
             ? 'Press Ctrl/Cmd+Shift+Space anywhere to start and stop; the text is copied for you to paste.'
             : 'The global shortcut is available in the desktop app.'}
         </Muted>
+        {onPhoneOrTablet() && <Muted className="text-xs">Live works on a computer. On a phone, use Record.</Muted>}
         <div role="alert">
           <ErrorAlert message={error} />
         </div>
