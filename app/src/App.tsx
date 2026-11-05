@@ -112,6 +112,8 @@ function FeatureMenu({ active, onSelect }: { active: string; onSelect: (id: stri
   ))];
 }
 
+const BACKEND_START_MS = 2 * 60_000;
+
 function Shell({ user }: { user?: User }) {
   useShortcutDictation();
   const [active, setActive] = useState(HOME);
@@ -119,8 +121,21 @@ function Shell({ user }: { user?: User }) {
   // Bumped when the backend comes back, so the open page reloads its data.
   const [connection, setConnection] = useState(0);
 
+  // The desktop app starts its own backend, which takes up to a minute or two to load, so a failed
+  // check that soon only means it's still starting.
   useEffect(() => {
-    api('/api/health').then(() => setOnline(true), () => setOnline(false));
+    const startedAt = Date.now();
+    let timer: number | undefined;
+    const check = () =>
+      api('/api/health').then(
+        () => setOnline(true),
+        () => {
+          if (window.voxwell && Date.now() - startedAt < BACKEND_START_MS) timer = window.setTimeout(check, 2000);
+          else setOnline(false);
+        },
+      );
+    void check();
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {

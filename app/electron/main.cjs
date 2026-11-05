@@ -3,13 +3,20 @@ const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { spawn } = require('node:child_process');
 const dictation = require('./dictation.cjs');
+const { enginePaths, install, isReady } = require('./backend-setup.cjs');
 
 const BACKEND_PORT = process.env.VOXWELL_PORT || '8765';
 // uv must trust the OS certificate store, or installing/updating dependencies fails behind
 // TLS-inspecting proxies and antivirus.
 const UV_TLS = { UV_SYSTEM_CERTS: '1' };
 let backend;
+let setupChild;
 let win;
+
+// An installed app has its own uv and backend; a source checkout uses the developer's.
+const engine = app.isPackaged
+  ? enginePaths({ resourcesPath: process.resourcesPath, userData: app.getPath('userData'), version: app.getVersion() })
+  : null;
 
 // The built UI loads from app://voxwell, an origin of its own that the backend allows. From file://
 // its origin would be "null", which sandboxed iframes on any website share.
@@ -72,11 +79,43 @@ ipcMain.handle('auth:open', (_event, url) => {
 function startBackend() {
   // The backend stops when its stdin closes, which the OS does however this app ends. Killing
   // `uv` alone is not enough: on Windows the server process it started would keep running.
-  backend = spawn('uv', ['run', 'voxwell'], {
-    cwd: path.join(__dirname, '..', '..', 'backend'),
-    env: { ...UV_TLS, ...process.env, VOXWELL_PORT: BACKEND_PORT, VOXWELL_EXIT_WITH_PARENT: '1' },
+  const [command, args, cwd] = engine
+    ? [engine.uv, ['run', '--no-sync', 'voxwell'], engine.project]
+    : ['uv', ['run', 'voxwell'], path.join(__dirname, '..', '..', 'backend')];
+  backend = spawn(command, args, {
+    cwd,
+    env: { ...UV_TLS, ...process.env, ...engine?.env, VOXWELL_PORT: BACKEND_PORT, VOXWELL_EXIT_WITH_PARENT: '1' },
     stdio: ['pipe', 'inherit', 'inherit'],
+    windowsHide: true,
   });
+}
+
+/** First launch: shows progress until the engine is installed, and offers another try if it fails. */
+async function runSetup() {
+  const setupWin = new BrowserWindow({
+    width: 560,
+    height: 420,
+    resizable: false,
+    title: 'Setting up Voxwell',
+    autoHideMenuBar: true,
+    webPreferences: { preload: path.join(__dirname, 'setup-preload.cjs'), contextIsolation: true },
+  });
+  const send = (channel, value) => {
+    if (!setupWin.isDestroyed()) setupWin.webContents.send(channel, value);
+  };
+  ipcMain.on('setup:quit', () => app.quit());
+  await setupWin.loadFile(path.join(__dirname, 'setup.html'));
+  for (;;) {
+    try {
+      await install(engine, { onLine: (line) => send('setup:progress', line), onChild: (child) => { setupChild = child; } });
+      setupChild = null;
+      return setupWin;
+    } catch (e) {
+      setupChild = null;
+      send('setup:failed', e.message);
+      await new Promise((resolve) => ipcMain.once('setup:retry', resolve));
+    }
+  }
 }
 
 function createWindow() {
@@ -91,20 +130,23 @@ function createWindow() {
   return win;
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   if (!primary) return;
   protocol.handle(APP_SCHEME, serveDist);
+  const setupWin = engine && !isReady(engine) ? await runSetup() : null;
   startBackend();
   dictation.register(
     createWindow(),
     process.env.VOXWELL_DEV ? 'http://localhost:5173/overlay.html' : `${APP_SCHEME}://voxwell/overlay.html`,
   );
+  setupWin?.close(); // after the main window opens, or closing the last window would quit
   const url = authUrlIn(process.argv);
   if (url) deliverAuthUrl(url);
 });
 
 app.on('will-quit', () => {
   dictation.unregister();
+  setupChild?.kill();
   if (backend) {
     backend.stdin.end();
     backend.kill();

@@ -87,9 +87,28 @@ test.describe('errors the user can see', () => {
       const off = () => () => {};
       Object.assign(window, { voxwell: { backendUrl: 'http://127.0.0.1:8765', dictation: { onToggle: off, onCancel: off }, auth: { onCallback: off } } });
     });
+    await page.clock.install();
     await page.goto('/');
+    // It starts its own backend, so at first a failed check only means it's still starting.
+    await expect(page.getByRole('main').getByText('Connecting…')).toBeVisible();
+    await expect(page.getByText("Voxwell isn't running on this computer")).toHaveCount(0);
+    await page.clock.fastForward('02:05');
     await expect(page.getByText("Voxwell isn't running on this computer")).toBeVisible();
     await expect(page.getByRole('link', { name: 'Install it' })).toHaveCount(0);
+  });
+
+  test('backend starting in the desktop app: Home goes straight to running once it answers', async ({ page }) => {
+    await installMockBackend(page);
+    await page.route(`${BACKEND}/api/health`, (route) => route.abort('connectionrefused'));
+    await page.addInitScript(() => {
+      const off = () => () => {};
+      Object.assign(window, { voxwell: { backendUrl: 'http://127.0.0.1:8765', dictation: { onToggle: off, onCancel: off }, auth: { onCallback: off } } });
+    });
+    await page.goto('/');
+    await expect(page.getByRole('main').getByText('Connecting…')).toBeVisible();
+    await page.unroute(`${BACKEND}/api/health`);
+    await expect(page.getByText('Running on this computer', { exact: true })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText("Voxwell isn't running on this computer")).toHaveCount(0);
   });
 
   test('an action with no backend says what to do, not "Failed to fetch"', async ({ app: page }) => {
