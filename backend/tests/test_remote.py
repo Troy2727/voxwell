@@ -89,7 +89,7 @@ def test_only_dictation_can_be_reached_even_by_the_owner(phone, method, path):
 def test_the_live_websocket_is_closed_for_the_phone(phone):
     from starlette.websockets import WebSocketDisconnect
 
-    with pytest.raises(WebSocketDisconnect), phone.websocket_connect("/api/dictation/live", headers=OK):
+    with pytest.raises(WebSocketDisconnect), phone.websocket_connect(f"wss://{HOST}/api/dictation/live", headers=OK):
         pass
 
 
@@ -244,14 +244,41 @@ def test_the_website_still_needs_the_owners_account(phone, fake_whisper):
     assert dictate(phone, {"Origin": WEBSITE}).status_code == 403
 
 
-@pytest.mark.parametrize(
-    ("method", "path"),
-    [("GET", "/"), ("GET", "/api/voices"), ("POST", "/v1/audio/speech"), ("DELETE", "/api/dictation/transcribe"), ("OPTIONS", "/api/voices"), ("OPTIONS", "/")],
-)
-def test_the_website_can_only_reach_dictation(phone, method, path):
-    r = phone.request(method, path, headers={"Tailscale-User-Login": OWNER, "Origin": WEBSITE})
-    assert r.status_code in (403, 404), f"{method} {path} gave {r.status_code}"
-    assert "voxwell dictation" not in r.text.lower()
+FROM_WEBSITE = {"Tailscale-User-Login": OWNER, "Origin": WEBSITE}
+
+
+@pytest.mark.parametrize("path", ["/api/voices", "/api/gallery/presets", "/api/projects/items"])
+def test_the_website_on_a_phone_reaches_the_whole_app(phone, path):
+    r = phone.get(path, headers=FROM_WEBSITE)
+    assert r.status_code == 200, f"{path} gave {r.status_code}"
+    assert r.headers["access-control-allow-origin"] == WEBSITE
+
+
+def test_the_browser_may_ask_first_for_any_feature(phone):
+    r = phone.options("/api/voices", headers={**FROM_WEBSITE, "Access-Control-Request-Method": "DELETE", "Access-Control-Request-Private-Network": "true"})
+    assert r.status_code == 200 and r.headers["access-control-allow-origin"] == WEBSITE
+
+
+def test_the_website_gets_the_app_not_the_phone_page(phone):
+    assert "voxwell dictation" not in phone.get("/", headers=FROM_WEBSITE).text.lower()
+
+
+def test_the_website_on_a_phone_can_use_the_live_features(phone):
+    with phone.websocket_connect(f"wss://{HOST}/api/agents/agents/0123456789ab/live", headers=FROM_WEBSITE) as ws:
+        ws.send_json({"type": "start", "config": {}})
+        assert ws.receive_json() == {"type": "error", "message": "Unknown agent."}
+
+
+@pytest.mark.parametrize("headers", [{"Origin": WEBSITE}, {"Tailscale-User-Login": "someone@else.com", "Origin": WEBSITE}, {"Tailscale-User-Login": OWNER, "Origin": "https://evil.example"}])
+def test_the_live_features_still_need_the_owner_and_the_website(phone, headers):
+    from starlette.websockets import WebSocketDisconnect
+
+    with pytest.raises(WebSocketDisconnect), phone.websocket_connect(f"wss://{HOST}/api/agents/agents/0123456789ab/live", headers=headers):
+        pass
+
+
+def test_another_account_gets_nothing_from_the_website_either(phone):
+    assert phone.get("/api/voices", headers={"Tailscale-User-Login": "someone@else.com", "Origin": WEBSITE}).status_code == 403
 
 
 @pytest.mark.parametrize("origin", ["https://voxwell.vercel.app.evil.example", "https://evil-voxwell.vercel.app", "http://voxwell.vercel.app", "https://voxwell.vercel.app:8443"])

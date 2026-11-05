@@ -262,17 +262,20 @@ test.describe('on the website on a phone', () => {
   };
 
   test('with a saved address, recording goes to the computer and the text comes back', async ({ app: page }) => {
+    const sent: string[] = [];
+    // The computer answers every page; only the recording gets text back.
+    await page.route(`${PRIVATE}/**`, (route) => {
+      const url = route.request().url();
+      sent.push(url);
+      const body = url.endsWith('/api/dictation/transcribe') ? { text: 'Hola desde el teléfono.', language: 'es' } : url.endsWith('/api/health') ? { status: 'ok' } : [];
+      return route.fulfill({ status: 200, headers: CORS, contentType: 'application/json', body: JSON.stringify(body) });
+    });
     await page.evaluate((a) => localStorage.setItem('voxwell.phone.address', JSON.stringify(a)), PRIVATE);
     await page.reload();
-    const sent: string[] = [];
-    await page.route(`${PRIVATE}/**`, (route) => {
-      sent.push(route.request().url());
-      return route.fulfill({ status: 200, headers: CORS, contentType: 'application/json', body: JSON.stringify({ text: 'Hola desde el teléfono.', language: 'es' }) });
-    });
     await openDictation(page);
     const main = await record(page);
     await expect(main.getByText('Hola desde el teléfono.').first()).toBeVisible();
-    expect(sent).toEqual([`${PRIVATE}/api/dictation/transcribe`]);
+    expect(sent.filter((url) => url.includes('/api/dictation/'))).toEqual([`${PRIVATE}/api/dictation/transcribe`]);
   });
 
   test('with a saved address, the page says where recordings go and has no link away from the website', async ({ app: page }) => {
@@ -347,10 +350,18 @@ test.describe('on the website on a phone', () => {
     expect(evil).toEqual([]);
   });
 
-  test('the Live tab is off, since it can not work through the phone connection', async ({ app: page }) => {
+  test('with no saved address, the Live tab is off, and the page says why', async ({ app: page }) => {
     await openDictation(page);
     await expect(page.getByRole('tab', { name: 'Live' })).toBeDisabled();
-    await expect(page.getByText('Live works on a computer. On a phone, use Record.')).toBeVisible();
+    await expect(page.getByText("On a phone, Live needs your computer's private address, saved above.")).toBeVisible();
+  });
+
+  test('with a saved address, the Live tab is on', async ({ app: page }) => {
+    await page.evaluate((a) => localStorage.setItem('voxwell.phone.address', JSON.stringify(a)), PRIVATE);
+    await page.reload();
+    await openDictation(page);
+    await expect(page.getByRole('tab', { name: 'Live' })).toBeEnabled();
+    await expect(page.getByText(/Live needs your computer/)).toHaveCount(0);
   });
 });
 

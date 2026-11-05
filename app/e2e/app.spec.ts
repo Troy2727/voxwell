@@ -290,7 +290,7 @@ test.describe('errors the user can see', () => {
     test('Home saves the private address, opens it, and remembers it', async ({ page }) => {
       await openHome(page);
       const main = page.getByRole('main');
-      await expect(main.getByText('Dictate from your phone', { exact: true })).toBeVisible();
+      await expect(main.getByText('Use Voxwell from your phone', { exact: true })).toBeVisible();
       await main.getByLabel("Your computer's private address").fill('  desktop-1.tail123.ts.net  ');
       await main.getByRole('button', { name: 'Save address' }).click();
       const saved = main.getByText('desktop-1.tail123.ts.net');
@@ -333,7 +333,7 @@ test.describe('errors the user can see', () => {
       await openHome(page);
       await page.getByRole('button', { name: 'Toggle Sidebar' }).first().click();
       await openFeature(page, 'Dictation');
-      await expect(page.getByRole('main').getByText('Dictate from your phone', { exact: true })).toBeVisible();
+      await expect(page.getByRole('main').getByText('Use Voxwell from your phone', { exact: true })).toBeVisible();
     });
 
     test('an action with no backend points to it', async ({ page }) => {
@@ -343,7 +343,39 @@ test.describe('errors the user can see', () => {
       await openFeature(page, 'Audio effects');
       await dropFile(page, 'speech.wav');
       await page.getByRole('button', { name: 'Apply effects' }).click();
-      await expect(page.getByRole('alert').filter({ hasText: 'Dictate from your phone' })).toBeVisible();
+      await expect(page.getByRole('alert').filter({ hasText: 'Use Voxwell from your phone' })).toBeVisible();
+    });
+
+    test('with a saved address, every page uses the computer: Home connects and Gallery lists its voices', async ({ page }) => {
+      const PRIVATE = 'https://desktop-1.tail123.ts.net';
+      const json = (body: unknown) => ({ status: 200, headers: { 'Access-Control-Allow-Origin': '*' }, contentType: 'application/json', body: JSON.stringify(body) });
+      const preset = (id: string, name: string) => ({ id, name, category: 'Narration', gender: 'Female', description: `${name}.`, sample: 'Hi.', ready: false, audio_url: null });
+      const local: string[] = [];
+      await page.route(`${BACKEND}/**`, (route) => {
+        local.push(route.request().url());
+        return route.abort('connectionrefused');
+      });
+      await page.route(`${PRIVATE}/**`, (route) => {
+        const path = new URL(route.request().url()).pathname;
+        if (path === '/api/health') return route.fulfill(json({ status: 'ok' }));
+        if (path === '/api/gallery/presets') return route.fulfill(json([preset('calm', 'Calm Narrator'), preset('bright', 'Bright Storyteller')]));
+        return route.fulfill(json([]));
+      });
+      await page.addInitScript((a) => localStorage.setItem('voxwell.phone.address', JSON.stringify(a)), PRIVATE);
+      await page.goto('/');
+      await expect(page.getByText('Connected to your computer', { exact: true })).toBeVisible();
+      await page.getByRole('button', { name: 'Toggle Sidebar' }).first().click();
+      await openFeature(page, 'Gallery');
+      await expect(page.getByRole('main').getByText('2 voices', { exact: true })).toBeVisible();
+      await expect(page.getByRole('main').getByText('Calm Narrator', { exact: true })).toBeVisible();
+      expect(local).toEqual([]);
+    });
+
+    test('with a saved address the computer does not answer: Home says so, not that phones are unsupported', async ({ page }) => {
+      await page.addInitScript(() => localStorage.setItem('voxwell.phone.address', JSON.stringify('https://desktop-1.tail123.ts.net')));
+      await page.route('https://desktop-1.tail123.ts.net/**', (route) => route.abort('connectionrefused'));
+      await page.goto('/');
+      await expect(page.getByText("Can't reach your computer", { exact: true })).toBeVisible();
     });
   });
 
@@ -352,7 +384,7 @@ test.describe('errors the user can see', () => {
     await page.route(`${BACKEND}/api/health`, (route) => route.abort('connectionrefused'));
     await page.goto('/');
     await expect(page.getByText("Voxwell isn't running on this computer")).toBeVisible();
-    await expect(page.getByRole('main').getByText('Dictate from your phone', { exact: true })).toHaveCount(0);
+    await expect(page.getByRole('main').getByText('Use Voxwell from your phone', { exact: true })).toHaveCount(0);
   });
 
   test('a file that is too large: the server message is shown', async ({ app: page }) => {
