@@ -4,6 +4,7 @@ import { api, onPhoneOrTablet } from '../api';
 import { WaveStage } from '../auth/wave-stage';
 import { FEATURES } from '../features';
 import { EmptyState, Section } from '@/components/page';
+import { PhoneDictation } from '@/components/phone-dictation';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -79,6 +80,8 @@ export function HomePage({ name, online, onOpen }: { name?: string; online: bool
           <WaveStage />
         </div>
       </div>
+
+      {online === false && onPhoneOrTablet() && <PhoneDictation />}
 
       <div className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold tracking-tight">Start something</h2>

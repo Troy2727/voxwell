@@ -1,3 +1,4 @@
+import type { Page } from '@playwright/test';
 import { BACKEND, dropFile, expect, expectAudio, openFeature, test } from './fixtures';
 import { installMockBackend } from './mock-backend';
 
@@ -166,6 +167,76 @@ test.describe('errors the user can see', () => {
     await page.unroute(`${BACKEND}/api/projects/items`);
     await page.getByRole('button', { name: 'Reload' }).click();
     await expect(page.getByText('Running on this computer', { exact: true })).toBeVisible();
+  });
+
+  const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
+
+  test.describe('on a phone', () => {
+    test.use({ userAgent: IPHONE, viewport: { width: 390, height: 844 } });
+
+    const openHome = async (page: Page) => {
+      await installMockBackend(page);
+      await page.route(`${BACKEND}/api/health`, (route) => route.abort('connectionrefused'));
+      await page.goto('/');
+    };
+
+    test('Home saves the private address, opens it, and remembers it', async ({ page }) => {
+      await openHome(page);
+      const main = page.getByRole('main');
+      await expect(main.getByText('Dictate from your phone', { exact: true })).toBeVisible();
+      await main.getByLabel("Your computer's private address").fill('  desktop-1.tail123.ts.net  ');
+      await main.getByRole('button', { name: 'Save address' }).click();
+      const open = main.getByRole('link', { name: 'Open phone dictation' });
+      await expect(open).toHaveAttribute('href', 'https://desktop-1.tail123.ts.net');
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
+      await page.reload();
+      await expect(open).toHaveAttribute('href', 'https://desktop-1.tail123.ts.net');
+      await main.getByRole('button', { name: 'Change address' }).click();
+      await expect(main.getByLabel("Your computer's private address")).toBeVisible();
+    });
+
+    for (const bad of ['https://evil.example', 'http://desktop-1.tail123.ts.net', 'javascript:alert(1)', 'https://desktop.ts.net.evil.example', 'https://user:pass@desktop-1.tail123.ts.net', 'not an address']) {
+      test(`Home refuses ${bad} as the address`, async ({ page }) => {
+        await openHome(page);
+        const main = page.getByRole('main');
+        await main.getByLabel("Your computer's private address").fill(bad);
+        await main.getByRole('button', { name: 'Save address' }).click();
+        await expect(main.getByText('It ends in .ts.net.')).toBeVisible();
+        await expect(main.getByRole('link', { name: 'Open phone dictation' })).toHaveCount(0);
+      });
+    }
+
+    test('a saved address that was tampered with is ignored', async ({ page }) => {
+      await page.addInitScript(() => localStorage.setItem('voxwell.phone.address', JSON.stringify('https://evil.example')));
+      await openHome(page);
+      await expect(page.getByRole('main').getByRole('link', { name: 'Open phone dictation' })).toHaveCount(0);
+    });
+
+    test('the Dictation page offers it too', async ({ page }) => {
+      await openHome(page);
+      await page.getByRole('button', { name: 'Toggle Sidebar' }).first().click();
+      await openFeature(page, 'Dictation');
+      await expect(page.getByRole('main').getByText('Dictate from your phone', { exact: true })).toBeVisible();
+    });
+
+    test('an action with no backend points to it', async ({ page }) => {
+      await openHome(page);
+      await page.route(`${BACKEND}/api/audio_effects/apply`, (route) => route.abort('connectionrefused'));
+      await page.getByRole('button', { name: 'Toggle Sidebar' }).first().click();
+      await openFeature(page, 'Audio effects');
+      await dropFile(page, 'speech.wav');
+      await page.getByRole('button', { name: 'Apply effects' }).click();
+      await expect(page.getByRole('alert').filter({ hasText: 'Dictate from your phone' })).toBeVisible();
+    });
+  });
+
+  test('a computer browser and the desktop app do not offer it', async ({ page }) => {
+    await installMockBackend(page);
+    await page.route(`${BACKEND}/api/health`, (route) => route.abort('connectionrefused'));
+    await page.goto('/');
+    await expect(page.getByText("Voxwell isn't running on this computer")).toBeVisible();
+    await expect(page.getByRole('main').getByText('Dictate from your phone', { exact: true })).toHaveCount(0);
   });
 
   test('a file that is too large: the server message is shown', async ({ app: page }) => {
