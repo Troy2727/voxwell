@@ -57,13 +57,14 @@ def transcribe(
     language: str | None = None,
     on_progress: Callable[[float], None] | None = None,
     *,
-    speech_only: bool = False,
+    speech_only: bool = True,
 ) -> Transcript:
     """Transcribe an audio file; detect the language when `language` is None.
 
     `on_progress`, if given, receives the fraction of the audio done (0..1) after each segment.
-    `speech_only` skips what a voice detector doesn't hear as speech, so silence or noise gives empty
-    text instead of words Whisper invented. It can also skip singing, so it's off unless asked for.
+    `speech_only` skips what a voice detector doesn't hear as speech, so silence, noise or music gives
+    empty text instead of words Whisper invented. It can also skip singing, so a transcript of a song
+    turns it off.
     """
     model = _load_model()
     try:

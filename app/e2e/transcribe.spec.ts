@@ -1,5 +1,15 @@
 import { dropFile, expect, openFeature, recall, SCRIPT, test } from './fixtures';
 
+test('transcribe: asking for singing reaches the server', async ({ app: page, mode }) => {
+  test.skip(mode === 'real', 'Checks the request, so it only runs against the mock backend.');
+  await openFeature(page, 'Transcribe');
+  await dropFile(page, 'speech.wav');
+  await page.getByRole('checkbox', { name: 'Also transcribe singing' }).check();
+  const sent = page.waitForRequest((r) => r.url().endsWith('/api/transcription/jobs') && r.method() === 'POST');
+  await page.getByRole('main').getByRole('button', { name: 'Transcribe', exact: true }).click();
+  expect((await sent).postData()).toMatch(/name="singing"\s+true/);
+});
+
 test('transcribe: the transcript matches what was said; export and AI clean-up work', async ({ app: page }) => {
   await openFeature(page, 'Transcribe');
   await dropFile(page, 'speech.wav');

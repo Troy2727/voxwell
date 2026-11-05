@@ -36,11 +36,13 @@ async def apply(
     noise: float = Form(0.0),
     noise_color: Literal["pink", "brown"] = Form("pink"),
     pan: float = Form(0.0),
+    speed: float = Form(1.0),
+    pitch: float = Form(0.0),
 ):
     try:
-        fx = dsp.Effects(reverb=reverb, distance=distance, noise=noise, noise_color=noise_color, pan=pan)
+        fx = dsp.Effects(reverb=reverb, distance=distance, noise=noise, noise_color=noise_color, pan=pan, speed=speed, pitch=pitch)
     except ValueError:
-        raise HTTPException(422, "reverb, distance and noise go from 0 to 1; pan goes from -1 to 1.")
+        raise HTTPException(422, "reverb, distance and noise go from 0 to 1; pan goes from -1 to 1; speed goes from 0.5 to 2; pitch goes from -6 to 6.")
     data = await file.read(MAX_UPLOAD + 1)
     if len(data) > MAX_UPLOAD:
         raise HTTPException(413, "The file is too large (50 MB max).")

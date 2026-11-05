@@ -116,7 +116,7 @@ def test_speak_reads_stdin(capsys, monkeypatch, tmp_path):
 
 def test_transcribe_prints_or_saves(capsys, monkeypatch, audio, tmp_path):
     transcript = Transcript("Hello there.", "en", [Segment(0.0, 1.0, "Hello there.")])
-    monkeypatch.setattr(dictation_engine, "transcribe", lambda path, language=None, on_progress=None: transcript)
+    monkeypatch.setattr(dictation_engine, "transcribe", lambda path, language=None, on_progress=None, speech_only=True: transcript)
     monkeypatch.setattr(transcription_jobs, "start", transcription_jobs._work)
     code, out, _ = run(capsys, "transcribe", str(audio))
     assert code == 0 and out.strip() == "Hello there."
@@ -219,7 +219,7 @@ def test_design_saves_the_voice_and_preview(capsys, monkeypatch, tmp_path):
 def test_jobs_are_titled_after_the_file(capsys, monkeypatch, audio, tmp_path, name, title):
     """Projects lists CLI and MCP work under the file's name, even one the header can't hold as is."""
     transcript = Transcript("Hi.", "en", [Segment(0.0, 1.0, "Hi.")])
-    monkeypatch.setattr(dictation_engine, "transcribe", lambda path, language=None, on_progress=None: transcript)
+    monkeypatch.setattr(dictation_engine, "transcribe", lambda path, language=None, on_progress=None, speech_only=True: transcript)
     monkeypatch.setattr(transcription_jobs, "start", transcription_jobs._work)
     named = tmp_path / name
     named.write_bytes(audio.read_bytes())
@@ -284,7 +284,7 @@ def test_transcribe_and_dub_label_speakers(capsys, monkeypatch, audio, tmp_path)
     seen = []
     monkeypatch.setattr(diarization, "diarize", lambda path, n=0, on_progress=None: seen.append(n) or turns)
     transcript = Transcript("Hi. Bye.", "en", [Segment(0.0, 1.0, "Hi."), Segment(1.0, 2.0, "Bye.")])
-    monkeypatch.setattr(dictation_engine, "transcribe", lambda path, language=None, on_progress=None: transcript)
+    monkeypatch.setattr(dictation_engine, "transcribe", lambda path, language=None, on_progress=None, speech_only=True: transcript)
     monkeypatch.setattr(transcription_jobs, "start", transcription_jobs._work)
     code, out, _ = run(capsys, "transcribe", str(audio), "--speakers", "--num-speakers", "2")
     assert code == 0 and out.strip() == "Speaker 1: Hi.\n\nSpeaker 2: Bye."

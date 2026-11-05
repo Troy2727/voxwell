@@ -333,3 +333,68 @@ def test_normal_speed_and_pitch_count_as_neutral():
 def test_speed_and_pitch_outside_their_range_are_refused(bad):
     with pytest.raises(ValueError):
         Effects(**bad)
+
+
+def seconds_of(wav: bytes) -> float:
+    audio, rate = sf.read(io.BytesIO(wav))
+    return len(audio) / rate
+
+
+def tone_wav(seconds=2.0) -> bytes:
+    buf = io.BytesIO()
+    sf.write(buf, tone_for_stretching(seconds), RATE, format="WAV", subtype="PCM_16")
+    return buf.getvalue()
+
+
+def test_the_audio_effects_page_can_change_speed_and_pitch():
+    """The route lists its settings one by one, so a new setting left off is silently ignored."""
+    r = client.post("/api/audio_effects/apply", data={"speed": "2"}, files={"file": ("a.wav", tone_wav(), "audio/wav")})
+    assert r.status_code == 200, r.text
+    assert seconds_of(client.get(r.json()["url"]).content) == pytest.approx(1.0, abs=0.05)
+
+    r = client.post("/api/audio_effects/apply", data={"pitch": "6"}, files={"file": ("a.wav", tone_wav(), "audio/wav")})
+    audio, rate = sf.read(io.BytesIO(client.get(r.json()["url"]).content))
+    assert dominant_hz(audio, rate) == pytest.approx(440 * 2**0.5, abs=10)
+
+
+@pytest.mark.parametrize("bad", [{"speed": "3"}, {"pitch": "9"}])
+def test_the_route_refuses_speed_and_pitch_out_of_range_and_says_the_range(bad):
+    r = client.post("/api/audio_effects/apply", data=bad, files={"file": ("a.wav", tone_wav(), "audio/wav")})
+    assert r.status_code == 422
+    assert "speed goes from 0.5 to 2" in r.json()["detail"] and "pitch goes from -6 to 6" in r.json()["detail"]
+
+
+def test_every_effects_setting_reaches_the_route():
+    import inspect
+
+    from voxwell.features.audio_effects import router
+
+    assert set(Effects.model_fields) <= set(inspect.signature(router.apply).parameters)
+
+
+def test_the_command_line_can_change_speed_and_pitch(monkeypatch, tmp_path):
+    sent = {}
+
+    class FakeClient:
+        def post_form(self, path, fields, source):
+            sent.update(fields)
+            return {"url": "/x"}
+
+        def request(self, method, url):
+            return tone_wav()
+
+    source = tmp_path / "a.wav"
+    source.write_bytes(tone_wav())
+    parser = cli.build_parser()
+    args = parser.parse_args(["effects", str(source), "--speed", "1.5", "--pitch", "-2", "-o", str(tmp_path / "out.wav")])
+    cli.cmd_effects(FakeClient(), args)
+    assert sent["speed"] == 1.5 and sent["pitch"] == -2
+
+
+def test_the_mcp_tool_offers_speed_and_pitch(monkeypatch, tmp_path):
+    seen = {}
+    monkeypatch.setattr(mcp_server, "_run", lambda command, **kwargs: seen.update(kwargs) or "ok")
+    mcp_server.apply_effects({"file_path": "a.wav", "speed": 1.25})
+    assert seen["speed"] == 1.25 and seen["pitch"] == 0
+    schema = next(t for t in mcp_server.TOOLS if t["name"] == "apply_effects")["inputSchema"]["properties"]
+    assert {"speed", "pitch"} <= set(schema)

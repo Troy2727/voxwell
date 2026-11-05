@@ -132,7 +132,7 @@ def test_edit_text_with_preset_and_instruction(monkeypatch):
 
 def test_edit_a_finished_transcription(monkeypatch):
     fake_model(monkeypatch)
-    monkeypatch.setattr(engine, "transcribe", lambda p, language=None, on_progress=None: Transcript("Hello there.", "en", [Segment(0, 1, "Hello there.")]))
+    monkeypatch.setattr(engine, "transcribe", lambda p, language=None, on_progress=None, speech_only=True: Transcript("Hello there.", "en", [Segment(0, 1, "Hello there.")]))
     monkeypatch.setattr(jobs, "start", jobs._work)
     jid = client.post("/api/transcription/jobs", files={"file": ("a.mp3", b"x", "audio/mpeg")}).json()["id"]
     assert post(job_id=jid, preset="formal").json()["text"] == "HELLO THERE."

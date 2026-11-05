@@ -4,10 +4,12 @@ import { api, apiUrl } from '../../api';
 import { ChoiceSelect } from '@/components/choice-select';
 import { FileDrop } from '@/components/file-drop';
 import { JobProgress } from '@/components/job-progress';
-import { EmptyState, ErrorAlert, Field, message, Page as PageLayout, Section } from '@/components/page';
+import { EmptyState, ErrorAlert, Field, message, Muted, Page as PageLayout, Section } from '@/components/page';
 import { appendSpeakerFields, SpeakerOptions } from '@/components/speaker-options';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   type CharacterAlignmentResponseModel,
@@ -82,6 +84,7 @@ export default function Page() {
   const [language, setLanguage] = useState(AUTO);
   const [speakers, setSpeakers] = useState(false);
   const [speakerCount, setSpeakerCount] = useState('');
+  const [singing, setSinging] = useState(false);
   const [starting, setStarting] = useState(false);
   const [list, setList] = useState<Summary[] | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
@@ -115,6 +118,7 @@ export default function Page() {
     form.append('file', file);
     form.append('language', language === AUTO ? '' : language);
     appendSpeakerFields(form, speakers, speakerCount);
+    if (singing) form.append('singing', 'true');
     try {
       const { id } = await api<{ id: string }>('/api/transcription/jobs', { method: 'POST', body: form });
       setSelected(id);
@@ -142,6 +146,13 @@ export default function Page() {
           disabled={starting}
           hint="Marks who is speaking in the text and in TXT, SRT and VTT downloads. Takes extra time and downloads a small model the first time."
         />
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <Checkbox id="transcribe-singing" checked={singing} disabled={starting} onCheckedChange={(v) => setSinging(v === true)} />
+            <Label htmlFor="transcribe-singing">Also transcribe singing</Label>
+          </div>
+          <Muted className="text-xs">Silence and music are skipped so they can't turn into invented words. Turn this on for songs, though silence may then give wrong text.</Muted>
+        </div>
         <div className="flex flex-wrap items-end gap-4">
           <Field label="Language" className="w-full sm:w-56">
             <ChoiceSelect options={LANGUAGES} value={language} onChange={setLanguage} />

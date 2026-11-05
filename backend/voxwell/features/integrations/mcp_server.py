@@ -161,7 +161,7 @@ TOOLS = [
     },
     {
         "name": "apply_effects",
-        "description": "Add reverb, distance, background noise or stereo pan to a recording. Saves a WAV (stereo when pan is "
+        "description": "Change the speed or pitch of a recording, or add reverb, distance, background noise or stereo pan. Saves a WAV (stereo when pan is "
         "not 0; reverb adds a short tail) and returns its path. Leave an effect out to leave it off.",
         "inputSchema": _schema({
             "file_path": _FILE,
@@ -170,6 +170,8 @@ TOOLS = [
             "noise": {"type": "number", "description": "Background noise level, 0 to 1."},
             "noise_color": {"type": "string", "enum": ["pink", "brown"], "description": "Default pink."},
             "pan": {"type": "number", "description": "-1 (left) to 1 (right)."},
+            "speed": {"type": "number", "description": "0.5 to 2, at the same pitch. Default 1."},
+            "pitch": {"type": "number", "description": "Semitones, -6 to 6, at the same speed. Default 0."},
             "output_path": {"type": "string", "description": "Where to save the WAV. Default: the Voxwell MCP folder."},
         }, ["file_path"]),
     },
@@ -351,9 +353,10 @@ def dub_video(args: dict) -> str:
 
 def apply_effects(args: dict) -> str:
     try:
-        levels = {k: float(args.get(k) or 0) for k in ("reverb", "distance", "noise", "pan")}
+        levels = {k: float(args.get(k) or 0) for k in ("reverb", "distance", "noise", "pan", "pitch")}
+        levels["speed"] = float(args.get("speed") or 1)
     except (TypeError, ValueError):
-        raise ToolError("reverb, distance, noise and pan must be numbers.")
+        raise ToolError("reverb, distance, noise, pan, speed and pitch must be numbers.")
     return _run(cli.cmd_effects, file=_required(args, "file_path"), noise_color=args.get("noise_color") or "pink",
                 output=args.get("output_path") or _default_folder(), **levels)
 

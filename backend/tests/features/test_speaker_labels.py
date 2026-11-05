@@ -64,7 +64,7 @@ def test_no_turns_means_no_labels():
 def fake(monkeypatch):
     calls = {"diarize": []}
 
-    def transcribe(audio_path, language=None, on_progress=None):
+    def transcribe(audio_path, language=None, on_progress=None, speech_only=True):
         return Transcript("Hello there. Welcome to Voxwell. Thanks.", "en", SEGMENTS)
 
     def diarize(path, num_speakers=0, on_progress=None):

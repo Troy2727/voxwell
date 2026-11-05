@@ -54,6 +54,25 @@ def test_empty_file(monkeypatch):
     assert _post(data=b"").status_code == 422
 
 
+def test_live_turns_skip_silence_and_noise_too(monkeypatch):
+    """Live dictation, live translation and voice agents all transcribe through this."""
+    from voxwell import live_audio
+
+    seen = []
+
+    class Info:
+        duration, language = 1.0, "en"
+
+    class Model:
+        def transcribe(self, path, language=None, vad_filter=False):
+            seen.append(vad_filter)
+            return iter([]), Info()
+
+    monkeypatch.setattr(engine, "_load_model", lambda: Model())
+    assert live_audio.transcribe_turn(b"\x00\x00" * 1600, None).text == ""
+    assert seen == [True]
+
+
 def test_undecodable_audio(monkeypatch):
     def boom(path, language=None, speech_only=False):
         raise engine.AudioError("Could not decode the audio.")
@@ -110,9 +129,9 @@ def test_engine_transcribe_with_fake_model(monkeypatch, tmp_path):
     monkeypatch.setattr(engine, "_load_model", lambda: Model())
     t = engine.transcribe(tmp_path / "a.wav")
     assert t.text == "hi there" and t.language == "en" and t.segments[0].end == 1.5
-    assert Model.vad_filter is False  # dubbing and file transcription keep all of their audio
-    engine.transcribe(tmp_path / "a.wav", speech_only=True)
-    assert Model.vad_filter is True
+    assert Model.vad_filter is True  # by default silence and noise can't turn into invented words
+    engine.transcribe(tmp_path / "a.wav", speech_only=False)
+    assert Model.vad_filter is False  # keeps singing, for a transcript that asks for it
 
 
 def test_status_reports_ready_when_faster_whisper_is_installed():
