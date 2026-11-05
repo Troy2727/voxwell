@@ -332,3 +332,35 @@ test('in a browser with no backend, the Dictation page says what to do', async (
   await expect(main.getByText(/Start the Voxwell app or run voxwell serve/)).toBeVisible();
   await expect(main.getByText('Failed to fetch')).toHaveCount(0);
 });
+
+test.describe('in a browser with no microphone support', () => {
+  test.beforeEach(async ({ app: page }) => {
+    await page.addInitScript(() => Object.defineProperty(navigator, 'mediaDevices', { value: undefined }));
+    await page.reload();
+  });
+
+  test('Dictation stays on screen, and Record says why it can not work', async ({ app: page }) => {
+    await openFeature(page, 'Dictation');
+    const main = page.getByRole('main').last();
+    await main.getByRole('button', { name: 'Record' }).click();
+    await expect(main.getByText(/This browser can't use a microphone here/)).toBeVisible();
+    await expect(page.getByText('Something went wrong')).toHaveCount(0);
+  });
+
+  test('Live translation stays on screen, and Start says why it can not work', async ({ app: page }) => {
+    await openFeature(page, 'Live translation');
+    const main = page.getByRole('main').last();
+    await main.getByRole('button', { name: 'Start' }).click();
+    await expect(main.getByText(/This browser can't use a microphone here/)).toBeVisible();
+    await expect(page.getByText('Something went wrong')).toHaveCount(0);
+  });
+});
+
+test('in a browser that can not record, Record says why', async ({ app: page }) => {
+  await page.addInitScript(() => Object.defineProperty(window, 'MediaRecorder', { value: undefined }));
+  await page.reload();
+  await openFeature(page, 'Dictation');
+  const main = page.getByRole('main').last();
+  await main.getByRole('button', { name: 'Record' }).click();
+  await expect(main.getByText(/This browser can't use a microphone here/)).toBeVisible();
+});

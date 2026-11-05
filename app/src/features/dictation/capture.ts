@@ -1,5 +1,6 @@
 import { apiUrl, backendUnreachable, errorMessage, onPhoneOrTablet } from '../../api';
 import { savedPhoneAddress } from '@/components/phone-dictation';
+import { NO_MICROPHONE } from '@/lib/microphone';
 
 const LANGUAGE_KEY = 'voxwell.dictation.language';
 
@@ -29,6 +30,7 @@ export const DICTATED_EVENT = 'voxwell:dictated';
 
 /** Open the microphone; throws with a sentence for the user. */
 export async function openMicrophone(device: string): Promise<MediaStream> {
+  if (!navigator.mediaDevices || typeof MediaRecorder === 'undefined') throw new Error(NO_MICROPHONE);
   try {
     return await navigator.mediaDevices.getUserMedia({ audio: device ? { deviceId: { exact: device } } : true });
   } catch (e) {
