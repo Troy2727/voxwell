@@ -14,12 +14,15 @@ function Progress({
         "relative h-2 w-full overflow-hidden rounded-full bg-primary/20",
         className
       )}
+      // Voxwell: pass the value on, so screen readers hear it (upstream dropped it).
+      value={value}
       {...props}
     >
       <ProgressPrimitive.Indicator
         data-slot="progress-indicator"
         className="h-full w-full flex-1 bg-primary transition-all"
-        style={{ transform: `translateX(-${100 - (value || 0)}%)` }}
+        // Voxwell: no value (indeterminate) draws a full bar, for the caller to animate.
+        style={{ transform: value == null ? undefined : `translateX(-${100 - value}%)` }}
       />
     </ProgressPrimitive.Root>
   )

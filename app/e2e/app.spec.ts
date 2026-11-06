@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import type { Page } from '@playwright/test';
 import { BACKEND, dropFile, expect, expectAudio, openFeature, test } from './fixtures';
 import { installMockBackend } from './mock-backend';
@@ -163,6 +165,62 @@ test('every slider has a name a screen reader can announce', async ({ app: page 
       await expect.soft(slider, `a slider on ${title}`).toHaveAccessibleName(/\S/);
     }
   }
+});
+
+test('a result waveform seeks from the keyboard and reads its time', async ({ app: page, mode }) => {
+  test.skip(mode === 'real', 'Serves the result itself, so it only runs against the mock backend.');
+  // Browsers seek only in media served with byte ranges, as the real backend does; the shared mock does not.
+  const tone = readFileSync(path.join(__dirname, 'fixtures', 'tone.wav'));
+  await page.route('**/mock/tone.wav', (route) => {
+    const range = /bytes=(\d+)-(\d*)/.exec(route.request().headers().range ?? '');
+    if (!range) return route.fulfill({ body: tone, contentType: 'audio/wav', headers: { 'accept-ranges': 'bytes' } });
+    const start = Number(range[1]);
+    const end = range[2] ? Number(range[2]) : tone.length - 1;
+    return route.fulfill({
+      status: 206,
+      body: tone.subarray(start, end + 1),
+      contentType: 'audio/wav',
+      headers: { 'accept-ranges': 'bytes', 'content-range': `bytes ${start}-${end}/${tone.length}` },
+    });
+  });
+  await openFeature(page, 'Audio effects');
+  await dropFile(page, 'speech.wav');
+  await page.getByRole('button', { name: 'Apply effects' }).click();
+  await expectAudio(page);
+  const scrubber = page.getByRole('slider', { name: 'Audio waveform scrubber' }).last();
+  await expect(scrubber).toHaveAttribute('aria-valuetext', /^0:00 of \d+:\d\d$/);
+  await scrubber.focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(scrubber).toHaveAttribute('aria-valuetext', /^0:0[1-9] of /);
+  await page.keyboard.press('Home');
+  await expect(scrubber).toHaveAttribute('aria-valuetext', /^0:00 of /);
+});
+
+test('a dropped file of the wrong type is refused with a message', async ({ app: page }) => {
+  await openFeature(page, 'Audio effects');
+  const zone = page.getByRole('button', { name: /Drop a file here/ });
+  const drop = async (name: string, type: string) => {
+    const data = await page.evaluateHandle(([n, t]) => {
+      const d = new DataTransfer();
+      d.items.add(new File(['x'], n, { type: t }));
+      return d;
+    }, [name, type]);
+    await zone.dispatchEvent('drop', { dataTransfer: data });
+  };
+  await drop('notes.txt', 'text/plain');
+  await expect(page.getByText("This page can't use notes.txt.")).toBeVisible();
+  await expect(zone).toBeVisible(); // nothing was picked
+  await drop('clip.wav', 'audio/wav');
+  await expect(page.getByText('clip.wav')).toBeVisible();
+});
+
+test('a running job announces its step and reports its progress', async ({ app: page, mode }) => {
+  test.skip(mode === 'real', 'Relies on the mock job passing through a known running step.');
+  await openFeature(page, 'Stories');
+  await dropFile(page, 'subtitles.srt');
+  await page.getByRole('button', { name: 'Generate from subtitles' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Line 2 of 4' })).toBeVisible();
+  await expect(page.getByRole('progressbar', { name: 'Line 2 of 4' })).toHaveAttribute('aria-valuenow', '50');
 });
 
 test('integrations: shows the local API and records a phone greeting', async ({ app: page }) => {
