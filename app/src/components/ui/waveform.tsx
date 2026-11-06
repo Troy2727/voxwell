@@ -376,6 +376,9 @@ export const ScrollingWaveform = ({
   )
 }
 
+// Voxwell: minutes:seconds for the scrubber's spoken value.
+const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`
+
 export type AudioScrubberProps = WaveformProps & {
   currentTime?: number
   duration?: number
@@ -429,29 +432,43 @@ export const AudioScrubber = ({
     [duration, onSeek]
   )
 
-  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+  // Voxwell: pointer events instead of mouse events, so touch can drag too.
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault()
     setIsDragging(true)
     handleScrub(e.clientX)
   }
 
+  // Voxwell: seek from the keyboard, as the slider role promises.
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const step = { ArrowLeft: -5, ArrowDown: -5, ArrowRight: 5, ArrowUp: 5 }[e.key]
+    const to = e.key === "Home" ? 0 : e.key === "End" ? duration : step === undefined ? null : currentTime + step
+    if (to === null || !(duration > 0)) return
+    e.preventDefault()
+    const time = Math.min(duration, Math.max(0, to))
+    setLocalProgress(time / duration)
+    onSeek?.(time)
+  }
+
   useEffect(() => {
     if (!isDragging) return
 
-    const handleMouseMove = (e: MouseEvent) => {
+    const handlePointerMove = (e: PointerEvent) => {
       handleScrub(e.clientX)
     }
 
-    const handleMouseUp = () => {
+    const handlePointerUp = () => {
       setIsDragging(false)
     }
 
-    document.addEventListener("mousemove", handleMouseMove)
-    document.addEventListener("mouseup", handleMouseUp)
+    document.addEventListener("pointermove", handlePointerMove)
+    document.addEventListener("pointerup", handlePointerUp)
+    document.addEventListener("pointercancel", handlePointerUp)
 
     return () => {
-      document.removeEventListener("mousemove", handleMouseMove)
-      document.removeEventListener("mouseup", handleMouseUp)
+      document.removeEventListener("pointermove", handlePointerMove)
+      document.removeEventListener("pointerup", handlePointerUp)
+      document.removeEventListener("pointercancel", handlePointerUp)
     }
   }, [isDragging, duration, handleScrub])
 
@@ -463,8 +480,11 @@ export const AudioScrubber = ({
       aria-valuemax={duration}
       aria-valuemin={0}
       aria-valuenow={currentTime}
-      className={cn("relative cursor-pointer select-none", className)}
-      onMouseDown={handleMouseDown}
+      // Voxwell: read as "0:12 of 1:05", not raw seconds.
+      aria-valuetext={`${clock(currentTime)} of ${clock(duration)}`}
+      className={cn("focus-visible:ring-ring/50 relative cursor-pointer touch-none rounded-sm outline-none select-none focus-visible:ring-[3px]", className)}
+      onKeyDown={handleKeyDown}
+      onPointerDown={handlePointerDown}
       ref={containerRef}
       role="slider"
       style={{ height: heightStyle }}

@@ -12,7 +12,8 @@ Changes made in Voxwell (marked `Voxwell:` in the code):
 - Imports point at this folder instead of the upstream registry paths; `audio-player` uses the `radix-ui` package like the shadcn files.
 - `voice-picker` takes Voxwell's own voice shape instead of the ElevenLabs SDK type, and shows a brand-colored disc instead of the three.js `Orb`, so neither the cloud SDK nor WebGL is needed. It also passes an `id` to its trigger, so a form label can name it.
 - `use-transcript-viewer` defines the character-alignment type locally instead of importing it from the ElevenLabs SDK.
-- `waveform`: `AudioScrubber` passes its `height` to the canvas (upstream always drew it 128px tall).
+- `waveform`: `AudioScrubber` passes its `height` to the canvas (upstream always drew it 128px tall). It also seeks with the arrow keys, Home and End, drags with touch as well as the mouse (pointer events), reads its value as "0:12 of 1:05", and shows the focus ring.
+- `progress` passes `value` on to Radix, so screen readers hear it, and draws a full bar when there is no value.
 - `sonner` reads the theme from `@/lib/theme` instead of `next-themes`.
 - `button`: the default variant fades orange to gold with a glow, and disabled default buttons are gray instead of dimmed.
 
