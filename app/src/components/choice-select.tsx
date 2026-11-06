@@ -2,17 +2,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { cn } from '@/lib/utils';
 
 /** A dropdown over [value, label] pairs, e.g. the LANGUAGES lists. Values must be non-empty. */
-export function ChoiceSelect({ options, value, onChange, disabled, className, id }: {
+export function ChoiceSelect({ options, value, onChange, disabled, className, id, 'aria-label': ariaLabel }: {
   options: readonly (readonly [string, string])[];
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
   className?: string;
   id?: string;
+  /** For a dropdown outside a Field, which has no visible label to name it. */
+  'aria-label'?: string;
 }) {
   return (
     <Select value={value} onValueChange={onChange} disabled={disabled}>
-      <SelectTrigger id={id} className={cn('w-full', className)}>
+      <SelectTrigger id={id} aria-label={ariaLabel} className={cn('w-full', className)}>
         <SelectValue />
       </SelectTrigger>
       <SelectContent>

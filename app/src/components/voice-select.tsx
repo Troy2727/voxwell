@@ -13,11 +13,12 @@ const recentVoices = () => {
 };
 
 /** Pick a saved voice (with a play preview of its reference clip), or the default voice. */
-export function VoiceSelect({ voices, value, onChange, disabled, defaultLabel = 'Default voice', defaultDescription = 'Built into the speech model' }: {
+export function VoiceSelect({ voices, value, onChange, disabled, id, defaultLabel = 'Default voice', defaultDescription = 'Built into the speech model' }: {
   voices: Voice[] | null;
   value: string;
   onChange: (id: string) => void;
   disabled?: boolean;
+  id?: string;
   defaultLabel?: string | null;
   defaultDescription?: string;
 }) {
@@ -62,6 +63,7 @@ export function VoiceSelect({ voices, value, onChange, disabled, defaultLabel = 
         </Select>
       )}
       <VoicePicker
+        id={id}
         voices={options}
         value={value}
         onValueChange={choose}
