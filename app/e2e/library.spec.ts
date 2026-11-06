@@ -53,6 +53,7 @@ test('gallery: listen to a preset, then add it to my voices', async ({ app: page
 test('gallery: search and filters narrow the voices, and can be cleared', async ({ app: page }) => {
   await openFeature(page, 'Gallery');
   const titles = page.getByRole('main').locator('[data-slot=card-title]');
+  await expect(page.getByText(/^\d+ voices$/)).toBeVisible(); // loaded; count() alone doesn't wait
   const all = await titles.count();
   expect(all).toBeGreaterThan(1);
 
@@ -69,7 +70,9 @@ test('gallery: search and filters narrow the voices, and can be cleared', async 
 
   await page.getByRole('combobox', { name: 'Category' }).click();
   await page.getByRole('option', { name: 'Wellness' }).click();
-  await expect(titles).toHaveText(['Meditation Guide']);
+  // Female and Wellness together: other female voices drop out (the real gallery has several Wellness ones).
+  await expect(titles.filter({ hasText: 'Bright Storyteller' })).toHaveCount(0);
+  await expect(titles.filter({ hasText: 'Meditation Guide' })).toHaveCount(1);
 
   await page.getByRole('searchbox', { name: 'Search voices' }).fill('no voice is called this');
   await expect(page.getByText('No voices match.')).toBeVisible();
@@ -81,6 +84,7 @@ test('gallery: search and filters narrow the voices, and can be cleared', async 
 test('gallery: favorites survive a reload and can be shown on their own', async ({ app: page }) => {
   await openFeature(page, 'Gallery');
   const titles = page.getByRole('main').locator('[data-slot=card-title]');
+  await expect(page.getByText(/^\d+ voices$/)).toBeVisible(); // loaded; count() alone doesn't wait
   const all = await titles.count();
   const star = page.getByRole('button', { name: 'Add Meditation Guide to favorites' });
   await star.click();
