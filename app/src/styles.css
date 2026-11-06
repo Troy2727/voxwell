@@ -21,7 +21,7 @@
   --muted-foreground: #5b6675;
   --accent: #ede7df; /* hover background in menus and ghost buttons */
   --accent-foreground: #182433;
-  --destructive: #dc2626;
+  --destructive: #c81e1e; /* 4.6:1 or more as text on every surface, 5.7:1 under white text */
   --success: #1a7f37;
   --highlight: #d97706; /* waveforms, voice discs */
   --cta-from: #ff7a00; /* main buttons: orange to gold, same as FanClash's Create Debate */
@@ -56,7 +56,7 @@
   --muted-foreground: #a9b4c2;
   --accent: #22324a;
   --accent-foreground: #f5f1ec;
-  --destructive: #e5484d;
+  --destructive: #f47174; /* 4.6:1 or more as text on every surface, incl. outline buttons */
   --success: #3fb950;
   --highlight: #ffc800;
   --cta-foreground: #0f141c;
