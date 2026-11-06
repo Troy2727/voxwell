@@ -59,6 +59,7 @@ export default function Conversation({ agent }: { agent: Agent }) {
   const queue = useRef<string[]>([]);
   const audio = useRef<HTMLAudioElement | null>(null);
   const held = useRef(false);
+  const left = useRef(false); // this conversation is gone (another agent, the editor, another page)
   const bottom = useRef<HTMLDivElement>(null);
 
   const history = () => messages.filter((m) => !m.failed).slice(-HISTORY).map(({ role, content }) => ({ role, content }));
@@ -81,7 +82,8 @@ export default function Conversation({ agent }: { agent: Agent }) {
     el.play().catch(() => playNext());
   };
   const play = (base64: string | undefined) => {
-    if (!base64) return;
+    // A reply that lands after the user left is not spoken over whatever they opened next.
+    if (!base64 || left.current) return;
     queue.current.push(`data:audio/wav;base64,${base64}`);
     if (!audio.current) playNext();
   };
@@ -120,7 +122,13 @@ export default function Conversation({ agent }: { agent: Agent }) {
   useEffect(() => {
     bottom.current?.scrollIntoView({ block: 'nearest' }); // newer Chromium returns a promise: not a cleanup
   }, [messages.length]);
-  useEffect(() => () => stopPlayback(), []);
+  useEffect(() => {
+    left.current = false; // StrictMode mounts twice
+    return () => {
+      left.current = true;
+      stopPlayback();
+    };
+  }, []);
 
   const sendText = async () => {
     const message_ = text.trim();
