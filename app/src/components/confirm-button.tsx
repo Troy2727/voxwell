@@ -12,7 +12,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button, buttonVariants } from '@/components/ui/button';
 
-/** A button that asks before doing something that cannot be undone (replaces window.confirm). */
+/** A button that asks before doing something that cannot be undone (replaces window.confirm).
+ *  The button itself looks like any other; only the confirm step in the dialog is red. */
 export function ConfirmButton({ title, description, confirmLabel = 'Delete', onConfirm, disabled, children }: {
   title: string;
   description?: ReactNode;
@@ -24,7 +25,7 @@ export function ConfirmButton({ title, description, confirmLabel = 'Delete', onC
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <Button variant="outline" size="sm" className="text-destructive hover:text-destructive" disabled={disabled}>
+        <Button variant="outline" size="sm" disabled={disabled}>
           {children}
         </Button>
       </AlertDialogTrigger>
