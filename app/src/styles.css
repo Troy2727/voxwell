@@ -2,10 +2,12 @@
    Colors come from the Voxwell logo: orange V, amber rings, navy well. Dark is the default. */
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "@fontsource-variable/bricolage-grotesque"; /* bundled, so headings work offline */
 
 @custom-variant dark (&:is(.dark *));
 
 :root {
+  color-scheme: light; /* scrollbars, native selects and pickers follow the theme */
   --radius: 0.625rem;
   --background: #f5f1ec;
   --foreground: #182433;
@@ -42,6 +44,7 @@
 }
 
 .dark {
+  color-scheme: dark;
   --background: #0f141c;
   --foreground: #f5f1ec;
   --card: #182433;
@@ -75,6 +78,7 @@
 
 @theme inline {
   --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-heading: "Bricolage Grotesque Variable", var(--font-sans);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -119,6 +123,12 @@
   }
   body {
     @apply bg-background text-foreground antialiased;
+  }
+  h1,
+  h2,
+  h3 {
+    @apply font-heading;
+    text-wrap: balance;
   }
   a {
     @apply text-primary underline-offset-4 hover:underline;
