@@ -69,6 +69,22 @@ def _torch_load_to_cpu():
         torch.load = original
 
 
+def _finish_short_text_step(self, logits, next_token):
+    """The rest of Chatterbox 0.1.6's AlignmentStreamAnalyzer.step after its repetition check."""
+    import torch
+
+    if next_token is not None:
+        token = next_token.view(-1)[0].item() if isinstance(next_token, torch.Tensor) else next_token
+        self.generated_tokens = (self.generated_tokens + [token])[-8:]
+    long_tail = self.complete and self.alignment[self.completed_at:, -3:].sum(dim=0).max() >= 5
+    token_repetition = len(self.generated_tokens) >= 3 and len(set(self.generated_tokens[-2:])) == 1
+    if long_tail or token_repetition:
+        logits = logits.new_full(logits.shape, -(2**15))
+        logits[..., self.eos_idx] = 2**15
+    self.curr_frame_pos += 1
+    return logits
+
+
 def _limit_tail(analyzer_cls) -> None:
     """Make the analyzer force the end-of-speech token TAIL_FRAMES frames after the text ends.
 
@@ -80,7 +96,15 @@ def _limit_tail(analyzer_cls) -> None:
         return
 
     def step(self, logits, next_token=None):
-        logits = original(self, logits, next_token)
+        try:
+            logits = original(self, logits, next_token)
+        except IndexError:
+            # Chatterbox's repetition check looks at the text tokens before the last 5. A text of
+            # 5 tokens or fewer ("Two.") has none, and max() over that empty slice raises. The
+            # check can't fire then, so finish the step the way Chatterbox would without it.
+            if self.alignment.shape[1] > 5:
+                raise
+            logits = _finish_short_text_step(self, logits, next_token)
         if self.completed_at is not None and self.curr_frame_pos - self.completed_at > TAIL_FRAMES:
             logits = logits.new_full(logits.shape, -(2**15))
             logits[..., self.eos_idx] = 2**15

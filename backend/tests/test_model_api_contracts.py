@@ -85,10 +85,48 @@ def test_tail_limit_matches_installed_analyzer():
     cls = asa.AlignmentStreamAnalyzer
     assert list(inspect.signature(cls.step).parameters)[:3] == ["self", "logits", "next_token"]
     init = inspect.getsource(cls.__init__)
-    for field in ("self.completed_at", "self.curr_frame_pos", "self.eos_idx"):
+    for field in ("self.completed_at", "self.curr_frame_pos", "self.eos_idx", "self.alignment", "self.complete", "self.generated_tokens"):
         assert field in init, f"chatterbox renamed {field}; update engine._limit_tail"
+    # engine._finish_short_text_step repeats the end of step() for texts of 5 tokens or fewer.
+    # If Chatterbox fixes or changes that check, review the copy.
+    # The module's source: cls.step may already be engine's wrapper once the model has loaded.
+    assert "A[self.completed_at:, :-5].max(dim=1)" in inspect.getsource(asa)
     # Chatterbox builds the analyzer (and so the limit) only for the multilingual model, the one we use.
     assert "is_multilingual" in inspect.getsource(t3.T3.inference)
+
+
+@pytest.mark.parametrize("text_tokens", [3, 5])
+def test_short_text_finishes_instead_of_crashing(text_tokens):
+    # A one-word text ("Two." between pause tags) is 5 tokens or fewer. Chatterbox 0.1.6's
+    # repetition check then takes max() over an empty slice and raised IndexError mid-generation.
+    torch = pytest.importorskip("torch")
+    asa = pytest.importorskip("chatterbox.models.t3.inference.alignment_stream_analyzer")
+    from voxwell.features.voice_cloning import engine
+
+    class Analyzer(asa.AlignmentStreamAnalyzer):  # a subclass, so the real class stays unpatched
+        pass
+
+    engine._limit_tail(Analyzer)
+    a = Analyzer.__new__(Analyzer)  # __init__ needs the model; set the state it would
+    i, j = 2, 2 + text_tokens
+    a.text_tokens_slice, a.eos_idx = (i, j), 0
+    a.alignment = torch.zeros(0, j - i)
+    a.curr_frame_pos = a.text_position = 0
+    a.started, a.started_at, a.complete, a.completed_at = False, None, False, None
+    a.generated_tokens = []
+
+    def attend_to_last_text_token(rows, width):
+        attn = torch.zeros(rows, width)
+        attn[:, j - 1] = 1.0
+        return [attn] * len(asa.LLAMA_ALIGNED_HEADS)
+
+    picks = []
+    for frame in range(60):
+        # The first chunk holds the prompt (T0 rows); later ones are one row each, as with KV-caching.
+        a.last_aligned_attns = attend_to_last_text_token(j + 4, j + 4) if frame == 0 else attend_to_last_text_token(1, j + 4 + frame)
+        picks.append(int(a.step(torch.zeros(1, 8), next_token=torch.tensor([[10 + frame]])).argmax()))
+    assert a.curr_frame_pos == 60
+    assert a.eos_idx in picks[: a.completed_at + engine.TAIL_FRAMES + 2]  # it still stops
 
 
 def test_faster_whisper_calls_match_installed_api(monkeypatch, tmp_path):

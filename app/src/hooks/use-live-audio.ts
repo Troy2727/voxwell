@@ -82,6 +82,15 @@ export function useLiveAudio(path: string, onMessage: (message: LiveMessage) => 
   const handler = useRef(onMessage);
   handler.current = onMessage;
   const paused = useRef(false);
+  // A start() still waiting for the microphone or the audio worklet. stop(), cancel() and unmounting
+  // clear it, so that start gives up instead of opening a session nobody is left to close.
+  const starting = useRef<object | null>(null);
+
+  const abandonStart = useCallback(() => {
+    if (!starting.current) return;
+    starting.current = null;
+    setStatus('idle');
+  }, []);
 
   const stopAudio = (s: Session) => {
     s.stream.getTracks().forEach((t) => t.stop());
@@ -101,7 +110,10 @@ export function useLiveAudio(path: string, onMessage: (message: LiveMessage) => 
 
   const start = useCallback(
     async (config: Record<string, unknown>, deviceId?: string) => {
-      if (session.current) return;
+      if (session.current || starting.current) return;
+      const attempt = {};
+      starting.current = attempt;
+      const abandoned = () => starting.current !== attempt;
       setError('');
       setStatus('connecting');
       let stream: MediaStream;
@@ -110,8 +122,14 @@ export function useLiveAudio(path: string, onMessage: (message: LiveMessage) => 
           audio: { ...(deviceId ? { deviceId: { exact: deviceId } } : {}), channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
         });
       } catch (e) {
+        if (abandoned()) return;
+        starting.current = null;
         setError(micError(e));
         setStatus('idle');
+        return;
+      }
+      if (abandoned()) {
+        stream.getTracks().forEach((t) => t.stop());
         return;
       }
       const ctx = new AudioContext();
@@ -124,10 +142,18 @@ export function useLiveAudio(path: string, onMessage: (message: LiveMessage) => 
       } catch (e) {
         stream.getTracks().forEach((t) => t.stop());
         void ctx.close();
+        if (abandoned()) return;
+        starting.current = null;
         setError(`Live audio is not available here: ${e instanceof Error ? e.message : String(e)}`);
         setStatus('idle');
         return;
       }
+      if (abandoned()) {
+        stream.getTracks().forEach((t) => t.stop());
+        void ctx.close();
+        return;
+      }
+      starting.current = null;
       ctx.createMediaStreamSource(stream).connect(tap);
       tap.connect(ctx.destination); // keeps the tap running; it outputs silence
 
@@ -197,7 +223,10 @@ export function useLiveAudio(path: string, onMessage: (message: LiveMessage) => 
 
   const stop = useCallback(() => {
     const s = session.current;
-    if (!s) return;
+    if (!s) {
+      abandonStart();
+      return;
+    }
     if (s.ws.readyState !== WebSocket.OPEN || s.ending) {
       close(s);
       return;
@@ -208,19 +237,21 @@ export function useLiveAudio(path: string, onMessage: (message: LiveMessage) => 
     s.ws.send(JSON.stringify({ type: 'end' }));
     setStatus('finishing');
     setSpeaking(false);
-  }, [close]);
+  }, [close, abandonStart]);
 
   const cancel = useCallback(() => {
     if (session.current) close(session.current);
-  }, [close]);
+    else abandonStart();
+  }, [close, abandonStart]);
 
   const pause = useCallback((on: boolean) => {
     paused.current = on;
   }, []);
 
   useEffect(() => () => {
+    abandonStart();
     if (session.current) close(session.current);
-  }, [close]);
+  }, [close, abandonStart]);
 
   return { status, speaking, error, start, stop, cancel, pause };
 }
