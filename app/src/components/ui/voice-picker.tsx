@@ -49,6 +49,8 @@ interface VoicePickerProps {
   onValueChange?: (value: string) => void
   placeholder?: string
   className?: string
+  // Voxwell: an id on the trigger, so a <label for> names it for screen readers.
+  id?: string
   open?: boolean
   onOpenChange?: (open: boolean) => void
 }
@@ -59,6 +61,7 @@ function VoicePicker({
   onValueChange,
   placeholder = "Select a voice...",
   className,
+  id,
   open,
   onOpenChange,
 }: VoicePickerProps) {
@@ -74,6 +77,7 @@ function VoicePicker({
       <Popover open={isOpen} onOpenChange={setIsOpen}>
         <PopoverTrigger asChild>
           <Button
+            id={id}
             variant="outline"
             role="combobox"
             aria-expanded={isOpen}

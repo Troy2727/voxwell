@@ -128,7 +128,7 @@ export default function Page() {
   return (
     <PageLayout title="Pronunciation" description="Teach every voice how to say names, brands and jargon. Applies to all speech Voxwell makes.">
       <Section title="Language" description="Each language has its own list.">
-        <ChoiceSelect options={LANGUAGES} value={language} onChange={setLanguage} />
+        <ChoiceSelect options={LANGUAGES} value={language} onChange={setLanguage} aria-label="Language" />
       </Section>
 
       <Section title={editing ? 'Edit word' : 'Add a word'} description="Write the respelling the way it should sound, e.g. Nguyen becomes win.">

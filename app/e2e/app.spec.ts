@@ -15,6 +15,17 @@ test('home: shows the backend is running and opens a feature', async ({ app: pag
   await expect(page.getByRole('heading', { level: 1, name: 'Voice cloning' })).toBeVisible();
 });
 
+test('form fields are named by their visible labels, so screen readers announce them', async ({ app: page }) => {
+  await openFeature(page, 'Dubbing');
+  await expect(page.getByRole('combobox', { name: 'Target language' })).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'Voice', exact: true })).toBeVisible();
+  await openFeature(page, 'Transcribe');
+  await expect(page.getByRole('spinbutton', { name: 'Characters per subtitle' })).toBeVisible();
+  await expect(page.getByRole('spinbutton', { name: 'Seconds per subtitle' })).toBeVisible();
+  await openFeature(page, 'Pronunciation');
+  await expect(page.getByRole('combobox', { name: 'Language', exact: true })).toBeVisible();
+});
+
 test.describe('home', () => {
   test.skip(({ mode }) => mode === 'real', 'These fake the backend state, so they only run against the mock backend.');
   const status = (page: Page) => page.locator('[role=status].sr-only');

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { cloneElement, isValidElement, useId, type ReactNode } from 'react';
 import { AlertCircle, type LucideIcon } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -38,12 +38,18 @@ export function Section({ title, description, action, className, children }: { t
   );
 }
 
-/** A labelled form control with an optional hint underneath. */
+/**
+ * A labelled form control with an optional hint underneath.
+ * Without `htmlFor`, a single child control gets an id so the label names it for screen readers.
+ */
 export function Field({ label, hint, htmlFor, className, children }: { label: ReactNode; hint?: ReactNode; htmlFor?: string; className?: string; children: ReactNode }) {
+  const autoId = useId();
+  const child = !htmlFor && isValidElement<{ id?: string }>(children) ? children : null;
+  const id = htmlFor ?? (child ? (child.props.id ?? autoId) : undefined);
   return (
     <div className={cn('flex flex-col gap-2', className)}>
-      <Label htmlFor={htmlFor}>{label}</Label>
-      {children}
+      <Label htmlFor={id}>{label}</Label>
+      {child ? cloneElement(child, { id }) : children}
       {hint && <p className="text-muted-foreground text-xs">{hint}</p>}
     </div>
   );

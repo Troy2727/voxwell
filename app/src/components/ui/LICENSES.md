@@ -10,7 +10,7 @@ The files in this folder are copied into Voxwell (not installed as packages), as
 Changes made in Voxwell (marked `Voxwell:` in the code):
 
 - Imports point at this folder instead of the upstream registry paths; `audio-player` uses the `radix-ui` package like the shadcn files.
-- `voice-picker` takes Voxwell's own voice shape instead of the ElevenLabs SDK type, and shows a brand-colored disc instead of the three.js `Orb`, so neither the cloud SDK nor WebGL is needed.
+- `voice-picker` takes Voxwell's own voice shape instead of the ElevenLabs SDK type, and shows a brand-colored disc instead of the three.js `Orb`, so neither the cloud SDK nor WebGL is needed. It also passes an `id` to its trigger, so a form label can name it.
 - `use-transcript-viewer` defines the character-alignment type locally instead of importing it from the ElevenLabs SDK.
 - `waveform`: `AudioScrubber` passes its `height` to the canvas (upstream always drew it 128px tall).
 - `sonner` reads the theme from `@/lib/theme` instead of `next-themes`.
