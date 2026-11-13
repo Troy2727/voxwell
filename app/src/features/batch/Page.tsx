@@ -4,6 +4,7 @@ import { api, listVoices, sendJson, type Voice } from '../../api';
 import { ChoiceSelect } from '@/components/choice-select';
 import { FileDrop } from '@/components/file-drop';
 import { ErrorAlert, Field, message, Muted, Page as PageLayout, Section } from '@/components/page';
+import { TaskRow } from '@/components/task-row';
 import { VoiceSelect } from '@/components/voice-select';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -109,6 +110,8 @@ function Queue({ voices }: { voices: Voice[] }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const timer = useRef<number | undefined>(undefined);
+  // What each queued job was made from, so a failed one can be sent again.
+  const sources = useRef(new Map<string, { file: File; language: string; voice: string }>());
 
   useEffect(() => () => window.clearTimeout(timer.current), []);
 
@@ -132,6 +135,11 @@ function Queue({ voices }: { voices: Voice[] }) {
     form.append('voice', voice);
     try {
       const res = await api<{ jobs: QueuedJob[]; errors: { name: string; error: string }[] }>('/api/batch/jobs', { method: 'POST', body: form });
+      const unmatched = [...files];
+      for (const job of res.jobs) {
+        const i = unmatched.findIndex((f) => f.name === job.name);
+        if (i >= 0) sources.current.set(job.id, { file: unmatched.splice(i, 1)[0], language, voice });
+      }
       setQueued(res.jobs);
       setRejected(res.errors);
       setFiles([]);
@@ -141,6 +149,32 @@ function Queue({ voices }: { voices: Voice[] }) {
       setError(message(e));
     } finally {
       setBusy(false);
+    }
+  }
+
+  /** Send a failed video again with the settings it was first queued with. */
+  async function retry(failed: QueuedJob) {
+    const source = sources.current.get(failed.id);
+    if (!source) return;
+    setError('');
+    const form = new FormData();
+    form.append('files', source.file);
+    form.append('target_language', source.language);
+    form.append('voice', source.voice);
+    try {
+      const res = await api<{ jobs: QueuedJob[]; errors: { name: string; error: string }[] }>('/api/batch/jobs', { method: 'POST', body: form });
+      const job = res.jobs[0];
+      if (!job) {
+        setError(res.errors[0] ? `${res.errors[0].name}: ${res.errors[0].error}` : 'The video was not queued again.');
+        return;
+      }
+      sources.current.set(job.id, source);
+      const next = queued.map((j) => (j.id === failed.id ? job : j));
+      setQueued(next);
+      window.clearTimeout(timer.current);
+      await poll(next);
+    } catch (e) {
+      setError(message(e));
     }
   }
 
@@ -179,13 +213,10 @@ function Queue({ voices }: { voices: Voice[] }) {
         <div className="divide-y rounded-lg border px-3">
           {queued.map((j) => {
             const s = statuses[j.id];
+            const state = !s || s.state === 'queued' ? 'queued' : s.state === 'error' ? 'failed' : s.state;
+            const detail = s?.state === 'error' ? s.error : s?.state === 'done' ? 'Saved. Find it in Projects.' : s?.step || undefined;
             return (
-              <FileRow key={j.id} name={j.name} percent={s?.state === 'running' ? s.percent : undefined}>
-                {!s ? <Badge variant="secondary">…</Badge>
-                  : s.state === 'done' ? <Badge className="bg-success text-white">Done</Badge>
-                  : s.state === 'error' ? <span className="text-destructive text-xs">{s.error}</span>
-                  : <span className="text-muted-foreground text-xs">{s.step} {s.state === 'running' && `${s.percent}%`}</span>}
-              </FileRow>
+              <TaskRow key={j.id} name={j.name} state={state} percent={s?.percent ?? 0} detail={detail} onRetry={sources.current.has(j.id) ? () => retry(j) : undefined} />
             );
           })}
         </div>
