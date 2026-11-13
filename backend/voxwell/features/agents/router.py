@@ -134,7 +134,7 @@ async def live(ws: WebSocket, agent_id: str):
         stream = config.get("stream_reply", False)
         if not isinstance(stream, bool):
             raise ValueError("stream_reply must be true or false.")
-        if stream and agent.mood_match:
+        if agent.mood_match:  # streamed or not, its first tempo change shouldn't wait for the library
             mood.warm_up()
         guard = threading.Lock()  # history and turns: held only briefly, never during model work
         turns: dict[int, _Turn] = {}
@@ -149,7 +149,7 @@ async def live(ws: WebSocket, agent_id: str):
             chosen = mood.choose_mood(text) if agent.mood_match else None  # once, before the first sentence
             delivery = mood.delivery_for(chosen) if chosen else None
             result = conversation.run_turn(agent, earlier, text, _TurnEmit(emit, turn.cut), current, started, delivery)
-            if chosen:
+            if chosen and not turn.cut.is_set():  # a reply the user cut off shows no mood
                 result["mood"] = chosen
             sentences = result.pop("sentences")
             with guard:

@@ -76,3 +76,10 @@ def test_a_mood_matched_live_session_warms_up(monkeypatch):
         ws.send_json({"type": "start", "config": {"stream_reply": True}})
         assert ws.receive_json()["type"] == "ready"
     assert warmed == [True]
+
+
+def test_quotes_in_the_message_never_touch_the_fences(monkeypatch):
+    seen = []
+    monkeypatch.setattr(direction, "complete", lambda system, user, max_new_tokens=80: seen.append(user) or "calm")
+    mood.choose_mood('say "hi"')
+    assert seen[0] == "\"\"\"say 'hi'\"\"\""

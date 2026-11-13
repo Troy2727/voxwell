@@ -1,4 +1,4 @@
-"""Mood match: an agent's spoken delivery follows how the user sounds.
+"""Mood match: an agent's spoken delivery follows the mood of what the user says.
 
 Once per spoken turn, the local model AI direction uses reads the user's words and picks one mood
 from a fixed list; a fixed table turns the mood into the voice engine's settings, through AI
@@ -67,7 +67,7 @@ def choose_mood(user_text: str) -> str:
     text = (user_text or "").strip()
     if not text:
         return NEUTRAL
-    quoted = text[:MAX_INPUT].replace('"""', "'''")  # the message can't close the quotes early
+    quoted = text[:MAX_INPUT].replace('"', "'")  # the message can't run into the quotes around it
     try:
         from voxwell.features.tools import direction
 

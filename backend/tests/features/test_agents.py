@@ -997,3 +997,17 @@ def test_an_empty_live_turn_has_no_mood(stream, moods, monkeypatch):
             if m["type"] == "turn":
                 turns.append(m)
     assert turns == [{"type": "turn", "index": 0, "transcript": ""}] and moods.asked == []
+
+
+def test_a_cut_reply_shows_no_mood(stream, moods, monkeypatch):
+    import threading
+
+    never = threading.Event()
+    stream.rounds = [["The first sentence is right here. ", never, "Never said."]]
+    ws, session = live_session(make_agent(mood_match=True)["id"], ["hello"], monkeypatch)
+    say_turn(session)
+    until(session, "reply_audio")
+    session.send_json({"type": "cut", "index": 0, "heard_seq": 0, "heard_ms": 500})
+    turn = until(session, "turn")[-1]
+    assert turn["cut"] is True and "mood" not in turn
+    finish(ws, session)
