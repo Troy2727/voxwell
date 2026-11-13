@@ -162,13 +162,8 @@ class DirectedSpeakRequest(SpeakRequest):
 
 MAX_NOTE = 300
 PACE_TEMPO = {"slow": 0.9, "normal": 1.0, "fast": 1.15}
-PACE_CFG = {"slow": 0.3, "normal": 0.5, "fast": 0.5}  # lower CFG = more deliberate delivery
-
-
-def exaggeration_for(intensity: float) -> float:
-    """0..1 intensity -> Chatterbox exaggeration: 0.3 (flat) .. 0.5 (natural) .. 1.4 (theatrical)."""
-    i = min(max(intensity, 0.0), 1.0)
-    return 0.3 + i * 0.4 if i <= 0.5 else 0.5 + (i - 0.5) * 1.8
+PACE_CFG = direction.PACE_CFG
+exaggeration_for = direction.exaggeration_for
 
 
 @router.post("/direction/interpret")
