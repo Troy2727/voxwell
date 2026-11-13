@@ -194,6 +194,7 @@ export function useLiveAudio(path: string, onMessage: (message: LiveMessage) => 
       };
       const windowSamples = Math.max(1, Math.round((ctx.sampleRate * LEVEL_WINDOW_MS) / 1000));
       const windowMs = (windowSamples / ctx.sampleRate) * 1000;
+      let carry = new Float32Array(0); // microphone samples not yet in a level window
       session.current = s;
       let opened = false;
       let failed = false;
@@ -202,12 +203,18 @@ export function useLiveAudio(path: string, onMessage: (message: LiveMessage) => 
         if (ws.readyState !== WebSocket.OPEN || s.ending) return;
         const watch = level.current;
         if (watch) {
+          // Whole windows only; the samples left over wait for the next block, so every sample is measured.
+          const block = new Float32Array(carry.length + ev.data.length);
+          block.set(carry);
+          block.set(ev.data, carry.length);
           const now = performance.now();
-          for (let start = 0; start + windowSamples <= ev.data.length; start += windowSamples) {
+          let start = 0;
+          for (; start + windowSamples <= block.length; start += windowSamples) {
             let sum = 0;
-            for (let i = start; i < start + windowSamples; i++) sum += ev.data[i] * ev.data[i];
-            watch(Math.sqrt(sum / windowSamples), now - ((ev.data.length - start) / ctx.sampleRate) * 1000, windowMs);
+            for (let i = start; i < start + windowSamples; i++) sum += block[i] * block[i];
+            watch(Math.sqrt(sum / windowSamples), now - ((block.length - start) / ctx.sampleRate) * 1000, windowMs);
           }
+          carry = block.slice(start);
         }
         const pcm = toPcm(ev.data);
         if (paused.current) {

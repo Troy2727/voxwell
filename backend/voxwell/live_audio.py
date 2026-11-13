@@ -320,7 +320,7 @@ async def _close(ws: WebSocket) -> None:
         pass
 
 
-async def run_session(ws: WebSocket, open_session: Callable[[dict], Process]) -> None:
+async def run_session(ws: WebSocket, open_session: Callable[[dict], Process | Session]) -> None:
     """Serve one live session on `ws`.
 
     `open_session(config)` gets the start message's config, checks the feature's own options

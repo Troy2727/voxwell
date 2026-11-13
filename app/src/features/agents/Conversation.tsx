@@ -118,6 +118,7 @@ export default function Conversation({ agent }: { agent: Agent }) {
   // The microphone stays silenced from the first sentence until the reply is complete and has all
   // played, including the gaps while the next sentence is still being written.
   const streamIdle = () => {
+    detector.current.reset(); // a run must not carry over into the next reply
     if (streaming.current && !streaming.current.done) return;
     streaming.current = null;
     setPlaying(false);
@@ -126,7 +127,9 @@ export default function Conversation({ agent }: { agent: Agent }) {
   const streamPlayer = () =>
     (player.current ??= new StreamPlayer(
       (seq) => {
-        detector.current.grace(performance.now()); // each sentence starts from silence
+        // Echo cancellation needs a moment when the agent starts talking from silence; within a reply
+        // the short gaps between sentences don't reset it, so speech over them keeps counting.
+        if (seq === 0) detector.current.grace(performance.now());
         setPlaying(true);
         if (seq === 0 && import.meta.env.DEV) console.debug(`Flow replies: first audio ${Math.round(performance.now() - turnEndAt.current)} ms after turn_end`);
       },
@@ -168,6 +171,7 @@ export default function Conversation({ agent }: { agent: Agent }) {
       add({ role: 'user', content: String(m.transcript ?? '') }, { role: 'assistant', content: '', toolCalls: m.tool_calls as ToolCall[], turn });
       streaming.current = { turn, index: Number(m.index), done: false };
       streamPlayer().newReply();
+      detector.current.reset();
     } else if (m.type === 'reply_text' && !cutTurns.current.has(turnKey(m.index))) {
       const turn = turnKey(m.index);
       setMessages((list) => list.map((x) => (x.turn === turn ? { ...x, content: x.content ? `${x.content} ${m.text}` : String(m.text) } : x)));
