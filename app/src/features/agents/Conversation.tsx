@@ -87,7 +87,7 @@ function StreamText({ text }: { text: string }) {
     !w.trim() ? (
       <Fragment key={i}>{w}</Fragment>
     ) : (
-      <span key={i} className="animate-in fade-in blur-in-sm fill-mode-both duration-500" style={{ animationDelay: `${delays.current[i]}ms` }}>
+      <span key={i} className="animate-in fade-in blur-in-sm fill-mode-both duration-500 motion-reduce:animate-none" style={{ animationDelay: `${delays.current[i]}ms` }}>
         {w}
       </span>
     ),
