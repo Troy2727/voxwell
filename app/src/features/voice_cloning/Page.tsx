@@ -8,7 +8,7 @@ import { EffectsControls, isNeutral, NO_EFFECTS, reviveEffects } from '@/compone
 import { ApprovalCard } from '@/components/approval-card';
 import { FileDrop } from '@/components/file-drop';
 import { ErrorAlert, Field, message, Page as PageLayout, Section } from '@/components/page';
-import { usePromptMenu } from '@/components/prompt-menu';
+import { usePromptMenu, type PromptItem } from '@/components/prompt-menu';
 import { VoiceSelect } from '@/components/voice-select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,6 +41,7 @@ export default function Page() {
   const [cueNote, setCueNote] = useState('');
   const textBox = useRef<HTMLTextAreaElement>(null);
   const cuesHere = !!cues && cues.languages.includes(language);
+  const cuesOffered = cuesHere && cues.available;
   const cueHint = !cuesHere
     ? ''
     : cues.available
@@ -70,6 +71,9 @@ export default function Page() {
     tag = `${before && !before.endsWith(' ') ? ' ' : ''}${tag} `;
     return { text: before + tag + source.slice(end).trimStart(), cursor: start + tag.length };
   }
+
+  /** A / menu entry that puts `tag` where the typed word was. */
+  const tagItem = (label: string, hint: string, tag: string): PromptItem => ({ label, hint, pick: (t, at) => withTag(t, tag, at, at) });
 
   /** Put `tag` at the cursor, in place of any selection. */
   function insertTag(tag: string) {
@@ -115,8 +119,12 @@ export default function Page() {
     sources: {
       '@': { title: 'Voices', items: (voices ?? []).map((v) => ({ label: v.name, hint: 'voice', pick: () => setVoiceId(v.id) })) },
       '/': {
-        title: 'Pauses',
-        items: PAUSES.map(([label, seconds]) => ({ label: `pause-${label.toLowerCase()}`, hint: `${seconds} s`, pick: (t, at) => withTag(t, `[pause ${seconds}]`, at, at) })),
+        title: cuesOffered ? 'Pauses and cues' : 'Pauses',
+        items: [
+          ...PAUSES.map(([label, seconds]) => tagItem(`pause-${label.toLowerCase()}`, `${seconds} s`, `[pause ${seconds}]`)),
+          // Typed words can't hold spaces, so "clear throat" is found as "clear-throat".
+          ...(cuesOffered ? cues.groups.flatMap((g) => g.tags.map(({ tag }) => tagItem(tag.replaceAll(' ', '-'), g.label, `[${tag}]`))) : []),
+        ],
       },
     },
   });
@@ -198,7 +206,7 @@ export default function Page() {
         <Field
           label="Text"
           htmlFor="clone-text"
-          hint={`${text.length} / 2000. Type [pause 2] anywhere for two seconds of silence, up to 10. @ picks a voice, / adds a pause, Ctrl+Enter generates.${cueHint}`}
+          hint={`${text.length} / 2000. Type [pause 2] anywhere for two seconds of silence, up to 10. @ picks a voice, / adds a pause${cuesOffered ? ' or a cue' : ''}, Ctrl+Enter generates.${cueHint}`}
         >
           <div className="relative">
             <Textarea ref={textBox} id="clone-text" rows={5} maxLength={2000} value={text} placeholder="Type what the voice should say…" {...prompt.inputProps} />
