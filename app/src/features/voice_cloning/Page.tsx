@@ -41,6 +41,7 @@ export default function Page() {
   const [cueNote, setCueNote] = useState('');
   const textBox = useRef<HTMLTextAreaElement>(null);
   const cuesHere = !!cues && cues.languages.includes(language);
+  const cuesOffered = cuesHere && cues.available;
   const cueHint = !cuesHere
     ? ''
     : cues.available
@@ -115,8 +116,12 @@ export default function Page() {
     sources: {
       '@': { title: 'Voices', items: (voices ?? []).map((v) => ({ label: v.name, hint: 'voice', pick: () => setVoiceId(v.id) })) },
       '/': {
-        title: 'Pauses',
-        items: PAUSES.map(([label, seconds]) => ({ label: `pause-${label.toLowerCase()}`, hint: `${seconds} s`, pick: (t, at) => withTag(t, `[pause ${seconds}]`, at, at) })),
+        title: cuesOffered ? 'Pauses and cues' : 'Pauses',
+        items: [
+          ...PAUSES.map(([label, seconds]) => ({ label: `pause-${label.toLowerCase()}`, hint: `${seconds} s`, pick: (t: string, at: number) => withTag(t, `[pause ${seconds}]`, at, at) })),
+          // Typed words can't hold spaces, so "clear throat" is found as "clear-throat".
+          ...(cuesOffered ? cues.groups.flatMap((g) => g.tags.map(({ tag }) => ({ label: tag.replaceAll(' ', '-'), hint: g.label, pick: (t: string, at: number) => withTag(t, `[${tag}]`, at, at) }))) : []),
+        ],
       },
     },
   });
@@ -198,7 +203,7 @@ export default function Page() {
         <Field
           label="Text"
           htmlFor="clone-text"
-          hint={`${text.length} / 2000. Type [pause 2] anywhere for two seconds of silence, up to 10. @ picks a voice, / adds a pause, Ctrl+Enter generates.${cueHint}`}
+          hint={`${text.length} / 2000. Type [pause 2] anywhere for two seconds of silence, up to 10. @ picks a voice, / adds a pause${cuesOffered ? ' or a cue' : ''}, Ctrl+Enter generates.${cueHint}`}
         >
           <div className="relative">
             <Textarea ref={textBox} id="clone-text" rows={5} maxLength={2000} value={text} placeholder="Type what the voice should say…" {...prompt.inputProps} />
