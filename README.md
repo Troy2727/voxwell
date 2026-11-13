@@ -172,7 +172,7 @@ Voxwell is **MIT licensed**, and every model it runs allows commercial use ([one
 
 | Feature | What it does |
 | --- | --- |
-| **Voice agents** | Talk with a local AI model, live or push-to-talk. It answers in a saved voice and can use a few safe, read-only tools: the time, a calculator and your saved voices. With **Language follow** on, it answers in whichever of its languages you switch to when you talk to it, in the same voice. In a live conversation, **Flow replies** speaks each sentence as soon as it is written, instead of after the whole answer, and with **Cut-in** you can talk over it to stop it. |
+| **Voice agents** | Talk with a local AI model, live or push-to-talk. It answers in a saved voice and can use a few safe, read-only tools: the time, a calculator and your saved voices. With **Language follow** on, it answers in whichever of its languages you switch to when you talk to it, in the same voice. In a live conversation, **Flow replies** speaks each sentence as soon as it is written, instead of after the whole answer, and with **Cut-in** you can talk over it to stop it. With **Mood match** on, its voice follows the mood of what you say. |
 | **AI direction** | Describe how a line should sound, and a local AI model sets the delivery. |
 | **Voice tools** | Convert a recording to another voice, isolate a voice from music and noise, compare voices, fit audio to a length, inspect media files. |
 | **Projects** | Everything you make, in one list. |

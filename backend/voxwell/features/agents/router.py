@@ -10,7 +10,7 @@ from fastapi import APIRouter, HTTPException, WebSocket
 from pydantic import BaseModel, Field
 
 from voxwell import live_audio
-from voxwell.features.agents import conversation, language, store, tools
+from voxwell.features.agents import conversation, language, mood, store, tools
 from voxwell.features.voice_cloning.engine import LANGUAGES
 
 log = logging.getLogger(__name__)
@@ -34,6 +34,7 @@ class AgentSettings(BaseModel):
     language: str = "en"
     tools: list[str] = Field(default_factory=list)
     follow_languages: list[str] = Field(default_factory=list)
+    mood_match: bool = False
 
 
 def _get(agent_id: str) -> store.Agent:
@@ -133,6 +134,8 @@ async def live(ws: WebSocket, agent_id: str):
         stream = config.get("stream_reply", False)
         if not isinstance(stream, bool):
             raise ValueError("stream_reply must be true or false.")
+        if agent.mood_match:  # streamed or not, its first tempo change shouldn't wait for the library
+            mood.warm_up()
         guard = threading.Lock()  # history and turns: held only briefly, never during model work
         turns: dict[int, _Turn] = {}
 
@@ -143,7 +146,11 @@ async def live(ws: WebSocket, agent_id: str):
                 for old in [i for i in turns if i < index - KEEP_TURNS]:
                     del turns[old]
                 earlier = list(history)
-            result = conversation.run_turn(agent, earlier, text, _TurnEmit(emit, turn.cut), current, started)
+            chosen = mood.choose_mood(text) if agent.mood_match else None  # once, before the first sentence
+            delivery = mood.delivery_for(chosen) if chosen else None
+            result = conversation.run_turn(agent, earlier, text, _TurnEmit(emit, turn.cut), current, started, delivery)
+            if chosen and not turn.cut.is_set():  # a reply the user cut off shows no mood
+                result["mood"] = chosen
             sentences = result.pop("sentences")
             with guard:
                 turn.sentences = sentences

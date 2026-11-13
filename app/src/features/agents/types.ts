@@ -6,6 +6,7 @@ export interface Agent {
   language: string;
   tools: string[];
   follow_languages: string[];
+  mood_match: boolean;
 }
 
 export interface AgentStatus {

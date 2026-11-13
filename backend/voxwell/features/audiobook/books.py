@@ -166,9 +166,11 @@ def _join(parts: list[tuple[bytes, float]]) -> bytes:
 
 
 def render_text(
-    paragraphs: list[list[str]], language: str, reference: Path | None, progress=None, deliveries: list | None = None
+    paragraphs: list[list[str]], language: str, reference: Path | None, progress=None,
+    deliveries: list | None = None, settings: dict | None = None,
 ) -> bytes:
-    """`deliveries`, one tone.Delivery per paragraph, sets how each is read; without it the engine's defaults."""
+    """How the text is read: `deliveries`, one tone.Delivery per paragraph, or `settings` for every
+    synthesize() call (e.g. exaggeration); with neither, the engine's defaults."""
     parts, skipped = [], 0
     total = sum(len(p) for p in paragraphs)
     for p_index, paragraph in enumerate(paragraphs):
@@ -176,9 +178,9 @@ def render_text(
             if progress:
                 progress(len(parts), total)
             last_in_paragraph = c_index == len(paragraph) - 1
-            settings = tone.engine_args(deliveries[p_index]) if deliveries else {}
+            chunk_settings = tone.engine_args(deliveries[p_index]) if deliveries else (settings or {})
             try:
-                clip = engine.synthesize(chunk, language, reference, **settings)
+                clip = engine.synthesize(chunk, language, reference, **chunk_settings)
             except engine.NothingToSay:  # only cue tags in this chunk; the rest of the text goes on
                 clip, skipped = engine.silent_clip(), skipped + 1
             parts.append((clip, PARAGRAPH_PAUSE if last_in_paragraph else SENTENCE_PAUSE))

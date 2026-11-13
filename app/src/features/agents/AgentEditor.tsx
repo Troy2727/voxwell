@@ -28,6 +28,7 @@ export default function AgentEditor({ agent, status, voices, onSaved, onDeleted,
   const [language, setLanguage] = useState(agent?.language ?? 'en');
   const [tools, setTools] = useState<string[]>(agent?.tools ?? []);
   const [follow, setFollow] = useState<string[]>(agent?.follow_languages ?? []);
+  const [moodMatch, setMoodMatch] = useState(agent?.mood_match ?? false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -39,7 +40,7 @@ export default function AgentEditor({ agent, status, voices, onSaved, onDeleted,
     setBusy(true);
     setError('');
     try {
-      const body = { name, system_prompt: prompt, voice, language, tools, follow_languages: follow.filter((c) => c !== language) };
+      const body = { name, system_prompt: prompt, voice, language, tools, follow_languages: follow.filter((c) => c !== language), mood_match: moodMatch };
       const saved = agent
         ? await sendJson<Agent>(`/api/agents/agents/${agent.id}`, 'PUT', body)
         : await sendJson<Agent>('/api/agents/agents', 'POST', body);
@@ -108,6 +109,13 @@ export default function AgentEditor({ agent, status, voices, onSaved, onDeleted,
           ))}
         </div>
       </Field>
+      <label className="flex items-start gap-2 text-sm">
+        <Checkbox className="mt-0.5" checked={moodMatch} disabled={busy} onCheckedChange={(on) => setMoodMatch(on === true)} aria-label="Mood match" />
+        <span>
+          <span className="font-medium">Mood match</span>
+          <span className="text-muted-foreground block">Adjusts how the agent sounds to match how you sound.</span>
+        </span>
+      </label>
       <div role="alert">
         <ErrorAlert message={error} />
       </div>

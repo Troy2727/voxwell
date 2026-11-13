@@ -7,7 +7,7 @@ import { installMockBackend } from './mock-backend';
 // whole reply has played. Mock backend only: the test scripts the server's messages.
 test.skip(({ mode }) => mode !== 'mock', 'scripts the live session');
 
-const AGENT = { id: 'ag-1', name: 'Alpha', system_prompt: '', voice: '', language: 'en', tools: [], follow_languages: [] };
+const AGENT = { id: 'ag-1', name: 'Alpha', system_prompt: '', voice: '', language: 'en', tools: [], follow_languages: [], mood_match: false };
 
 /** A short WAV tone, base64. */
 function tone(seconds: number): string {

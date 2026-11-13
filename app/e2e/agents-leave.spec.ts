@@ -8,8 +8,8 @@ import { installMockBackend } from './mock-backend';
 test.skip(({ mode }) => mode !== 'mock', 'holds steps of a conversation open');
 
 const AGENTS = [
-  { id: 'ag-1', name: 'Alpha', system_prompt: '', voice: '', language: 'en', tools: [], follow_languages: [] },
-  { id: 'ag-2', name: 'Bravo', system_prompt: '', voice: '', language: 'en', tools: [], follow_languages: [] },
+  { id: 'ag-1', name: 'Alpha', system_prompt: '', voice: '', language: 'en', tools: [], follow_languages: [], mood_match: false },
+  { id: 'ag-2', name: 'Bravo', system_prompt: '', voice: '', language: 'en', tools: [], follow_languages: [], mood_match: false },
 ];
 
 /** Runs in the page: the microphone waits for `__grantMic()`, and what the page opens is counted. */
