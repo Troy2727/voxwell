@@ -4,7 +4,7 @@ import { NO_MICROPHONE } from '@/lib/microphone';
 
 /** A message from a live session; the protocol is described in backend/voxwell/live_audio.py. */
 export interface LiveMessage {
-  type: 'ready' | 'speaking' | 'turn_end' | 'turn' | 'warning' | 'error' | 'done' | 'reply_start' | 'reply_text' | 'reply_audio';
+  type: 'ready' | 'speaking' | 'turn_end' | 'turn' | 'warning' | 'error' | 'done' | 'reply_start' | 'reply_text' | 'reply_audio' | 'cut_ack';
   index?: number | null;
   message?: string;
   [field: string]: unknown;
@@ -14,6 +14,10 @@ export type LiveStatus = 'idle' | 'connecting' | 'listening' | 'finishing';
 
 const RATE = 16000; // what the server expects: 16 kHz mono PCM16
 const SEND_SAMPLES = 1600; // 100 ms per message
+const LEVEL_WINDOW_MS = 20; // the microphone level is reported per window this long
+// Microphone audio kept while paused and sent first on resume(true): enough for speech that began just as
+// a sentence started playing (the cut-in grace, then its minimum run, plus slack).
+const PRE_ROLL_SAMPLES = (RATE * 600) / 1000;
 
 // Runs on the audio thread and hands the page blocks of microphone samples.
 const TAP = `class VoxwellTap extends AudioWorkletProcessor {
@@ -65,6 +69,7 @@ interface Session {
   stream: MediaStream;
   ctx: AudioContext;
   flush: () => void;
+  feed: (pcm: Int16Array) => void;
   ending: boolean;
 }
 
@@ -72,7 +77,10 @@ interface Session {
  * Streams the microphone to a live endpoint (e.g. '/api/dictation/live') and passes every
  * server message to `onMessage`. `start(config)` opens a session; `stop()` lets the server
  * finish the last turn (status 'finishing' until it says 'done'); `cancel()` drops it now.
- * While `pause(true)`, silence is sent instead of the microphone, e.g. during playback.
+ * While `pause(true)`, silence is sent instead of the microphone, e.g. during playback; the last
+ * moment of real microphone audio is kept, and `resume(true)` sends it first so no words are lost.
+ * `watchLevel(fn)` reports the microphone level (RMS per short window), paused or not, and
+ * `send(message)` sends a JSON control message to the server.
  */
 export function useLiveAudio(path: string, onMessage: (message: LiveMessage) => void) {
   const [status, setStatus] = useState<LiveStatus>('idle');
@@ -82,6 +90,8 @@ export function useLiveAudio(path: string, onMessage: (message: LiveMessage) => 
   const handler = useRef(onMessage);
   handler.current = onMessage;
   const paused = useRef(false);
+  const preRoll = useRef<Int16Array[]>([]);
+  const level = useRef<((rms: number, now: number, ms: number) => void) | null>(null);
   // A start() still waiting for the microphone or the audio worklet. stop(), cancel() and unmounting
   // clear it, so that start gives up instead of opening a session nobody is left to close.
   const starting = useRef<object | null>(null);
@@ -171,23 +181,49 @@ export function useLiveAudio(path: string, onMessage: (message: LiveMessage) => 
           if (filled && ws.readyState === WebSocket.OPEN) ws.send(chunk.slice(0, filled).buffer);
           filled = 0;
         },
+        feed: (pcm: Int16Array) => {
+          for (let i = 0; i < pcm.length; i++) {
+            chunk[filled++] = pcm[i];
+            if (filled === SEND_SAMPLES) {
+              ws.send(chunk.buffer);
+              chunk = new Int16Array(SEND_SAMPLES);
+              filled = 0;
+            }
+          }
+        },
       };
+      const windowSamples = Math.max(1, Math.round((ctx.sampleRate * LEVEL_WINDOW_MS) / 1000));
+      const windowMs = (windowSamples / ctx.sampleRate) * 1000;
+      let carry = new Float32Array(0); // microphone samples not yet in a level window
       session.current = s;
       let opened = false;
       let failed = false;
 
       tap.port.onmessage = (ev: MessageEvent<Float32Array>) => {
         if (ws.readyState !== WebSocket.OPEN || s.ending) return;
-        const pcm = toPcm(ev.data);
-        if (paused.current) pcm.fill(0);
-        for (let i = 0; i < pcm.length; i++) {
-          chunk[filled++] = pcm[i];
-          if (filled === SEND_SAMPLES) {
-            ws.send(chunk.buffer);
-            chunk = new Int16Array(SEND_SAMPLES);
-            filled = 0;
+        const watch = level.current;
+        if (watch) {
+          // Whole windows only; the samples left over wait for the next block, so every sample is measured.
+          const block = new Float32Array(carry.length + ev.data.length);
+          block.set(carry);
+          block.set(ev.data, carry.length);
+          const now = performance.now();
+          let start = 0;
+          for (; start + windowSamples <= block.length; start += windowSamples) {
+            let sum = 0;
+            for (let i = start; i < start + windowSamples; i++) sum += block[i] * block[i];
+            watch(Math.sqrt(sum / windowSamples), now - ((block.length - start) / ctx.sampleRate) * 1000, windowMs);
           }
+          carry = block.slice(start);
         }
+        const pcm = toPcm(ev.data);
+        if (paused.current) {
+          preRoll.current.push(pcm.slice());
+          let kept = preRoll.current.reduce((n, b) => n + b.length, 0);
+          while (kept - preRoll.current[0].length >= PRE_ROLL_SAMPLES) kept -= preRoll.current.shift()!.length;
+          pcm.fill(0);
+        }
+        s.feed(pcm);
       };
       ws.onopen = () => {
         opened = true;
@@ -245,7 +281,22 @@ export function useLiveAudio(path: string, onMessage: (message: LiveMessage) => 
   }, [close, abandonStart]);
 
   const pause = useCallback((on: boolean) => {
+    if (on && !paused.current) preRoll.current = []; // a new pause; staying paused keeps what was kept
     paused.current = on;
+  }, []);
+  /** Stop sending silence; with `withPreRoll`, first send the microphone audio kept while paused. */
+  const resume = useCallback((withPreRoll: boolean) => {
+    const s = session.current;
+    paused.current = false;
+    if (withPreRoll && s && s.ws.readyState === WebSocket.OPEN && !s.ending) for (const block of preRoll.current) s.feed(block);
+    preRoll.current = [];
+  }, []);
+  const watchLevel = useCallback((fn: ((rms: number, now: number, ms: number) => void) | null) => {
+    level.current = fn;
+  }, []);
+  const send = useCallback((message: Record<string, unknown>) => {
+    const s = session.current;
+    if (s && s.ws.readyState === WebSocket.OPEN && !s.ending) s.ws.send(JSON.stringify(message));
   }, []);
 
   useEffect(() => () => {
@@ -253,5 +304,5 @@ export function useLiveAudio(path: string, onMessage: (message: LiveMessage) => 
     if (session.current) close(session.current);
   }, [close, abandonStart]);
 
-  return { status, speaking, error, start, stop, cancel, pause };
+  return { status, speaking, error, start, stop, cancel, pause, resume, watchLevel, send };
 }

@@ -291,7 +291,10 @@ def run_turn(agent: Agent, history: list[dict], message: str, emit, language: st
 
     timing["total_ms"] = ms()
     log.info("Agent turn timing (ms): %s", timing)
-    result = {"reply": " ".join(spoken), "tool_calls": calls, "language": language, "streamed": True, "parts": len(spoken), "timing": timing}
+    result = {
+        "reply": " ".join(spoken), "tool_calls": calls, "language": language, "streamed": True, "parts": len(spoken),
+        "timing": timing, "sentences": spoken,  # sentences: for the caller (cut-in), not the client
+    }
     if failed:
         result["warning"] = SPEAK_WARNING
     return result

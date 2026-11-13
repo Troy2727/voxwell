@@ -16,6 +16,7 @@ export class StreamPlayer {
   private sources = new Set<AudioBufferSourceNode>();
   private decoding = 0; // sentences received but not yet decoded
   private generation = 0; // bumped by clear() and newReply(), so decodes that finish afterwards are dropped
+  private timeline: { seq: number; at: number; duration: number }[] = []; // this reply's sentences
 
   /** `onStart(seq)` runs when a sentence starts playing; `onIdle()` when the last one scheduled ends. */
   constructor(private onStart: (seq: number) => void, private onIdle: () => void) {}
@@ -25,6 +26,15 @@ export class StreamPlayer {
     this.generation++;
     this.next = 0;
     this.ready.clear();
+    this.timeline = [];
+  }
+
+  /** What of this reply has been heard: the last sentence that started playing (null: none), and ms played. */
+  heard(): { seq: number | null; ms: number } {
+    const now = this.ctx?.currentTime ?? 0;
+    const started = this.timeline.filter((s) => s.at <= now);
+    const ms = started.reduce((sum, s) => sum + Math.min(s.duration, now - s.at), 0) * 1000;
+    return { seq: started.length ? Math.max(...started.map((s) => s.seq)) : null, ms: Math.round(ms) };
   }
 
   /** True while a sentence plays, is scheduled, or is still decoding or waiting for an earlier one. */
@@ -90,6 +100,7 @@ export class StreamPlayer {
     this.sources.add(source);
     source.start(startAt);
     this.end = startAt + buffer.duration;
+    this.timeline.push({ seq, at: startAt, duration: buffer.duration });
     const generation = this.generation;
     window.setTimeout(() => generation === this.generation && this.onStart(seq), Math.max(0, (startAt - ctx.currentTime) * 1000));
   }

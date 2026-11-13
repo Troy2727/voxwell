@@ -711,6 +711,170 @@ def test_a_tool_call_after_a_spoken_sentence_is_run_not_read_aloud(stream, monke
     assert messages[-1]["tool_calls"][0]["result"] == "42" and "tool_call" not in messages[-1]["reply"]
 
 
+# --- Cut-in -----------------------------------------------------------------------------------------
+
+
+def live_session(agent_id, heard_texts, monkeypatch):
+    """A streamed live session; heard_texts are what Whisper hears, one per turn sent with say()."""
+    heard = iter(heard_texts)
+    monkeypatch.setattr(stt, "transcribe", lambda path, language=None: stt.Transcript(next(heard), "en", []))
+    ws = client.websocket_connect(f"ws://127.0.0.1/api/agents/agents/{agent_id}/live")
+    session = ws.__enter__()
+    session.send_json({"type": "start", "config": {"silence_ms": 400, "stream_reply": True}})
+    assert session.receive_json()["type"] == "ready"
+    return ws, session
+
+
+def say_turn(session):
+    session.send_bytes(speech(600) + bytes(500 * 32))
+
+
+def until(session, kind, seen=None):
+    """Messages up to and including the first of type `kind`."""
+    seen = [] if seen is None else seen
+    while True:
+        m = session.receive_json()
+        seen.append(m)
+        if m["type"] == kind:
+            return seen
+
+
+def finish(ws, session):
+    session.send_json({"type": "end"})
+    rest = until(session, "done")
+    ws.__exit__(None, None, None)
+    return rest
+
+
+def test_cut_during_a_running_turn_stops_it(stream, monkeypatch):
+    import threading
+
+    from voxwell.features.tools import direction
+
+    never = threading.Event()
+    stream.rounds = [["The first sentence is right here. ", never, "This part is never said."], ["A fresh answer to the new question."]]
+    ws, session = live_session(make_agent()["id"], ["first", "second"], monkeypatch)
+    say_turn(session)
+    until(session, "reply_audio")
+    session.send_json({"type": "cut", "index": 0, "heard_seq": 0, "heard_ms": 900})
+    turn = until(session, "turn")
+    assert stream.cancelled_seen.wait(2)
+    assert not [m for m in turn if m["type"] == "reply_text"]  # nothing more for the cut turn
+    assert turn[-1]["cut"] is True and turn[-1]["reply"] == "The first sentence is right here."
+    assert direction._lock.acquire(timeout=1)
+    direction._lock.release()
+    say_turn(session)
+    rest = finish(ws, session)
+    second = [m for m in rest if m["type"] == "turn"][0]
+    assert second["reply"] == "A fresh answer to the new question." and "cut" not in second
+    assert [m["content"] for m in stream.seen[1][1:]] == ["first", "The first sentence is right here.", "second"]
+
+
+def test_cut_after_a_finished_turn_keeps_only_what_was_heard(stream, monkeypatch):
+    stream.rounds = [THREE, ["Next answer, long enough to stand alone."]]
+    ws, session = live_session(make_agent()["id"], ["three", "again"], monkeypatch)
+    say_turn(session)
+    until(session, "turn")
+    session.send_json({"type": "cut", "index": 0, "heard_seq": 1, "heard_ms": 3000})
+    ack = until(session, "cut_ack")[-1]
+    assert ack == {"type": "cut_ack", "index": 0, "reply": "The first sentence is right here. Then a second sentence follows it closely."}
+    session.send_json({"type": "cut", "index": 0, "heard_seq": 0, "heard_ms": 10})  # a repeat changes nothing
+    say_turn(session)
+    rest = finish(ws, session)
+    assert not [m for m in rest if m["type"] == "cut_ack"]
+    assert [m["content"] for m in stream.seen[1][1:]] == ["three", ack["reply"], "again"]
+
+
+def test_cut_before_anything_was_heard_drops_the_reply_from_history(stream, monkeypatch):
+    stream.rounds = [THREE, ["Next answer, long enough to stand alone."]]
+    ws, session = live_session(make_agent()["id"], ["three", "again"], monkeypatch)
+    say_turn(session)
+    until(session, "turn")
+    session.send_json({"type": "cut", "index": 0, "heard_seq": None, "heard_ms": 0})
+    assert until(session, "cut_ack")[-1]["reply"] == ""
+    say_turn(session)
+    finish(ws, session)
+    assert [m["content"] for m in stream.seen[1][1:]] == ["three", "again"]
+
+
+def test_a_cut_for_an_unknown_turn_is_ignored(stream, monkeypatch):
+    ws, session = live_session(make_agent()["id"], [], monkeypatch)
+    session.send_json({"type": "cut", "index": 7, "heard_seq": 0, "heard_ms": 5})
+    assert [m["type"] for m in finish(ws, session)] == ["done"]
+
+
+@pytest.mark.parametrize("cut, message", [
+    ({"index": "0", "heard_seq": 0, "heard_ms": 1}, "index"),
+    ({"index": 0, "heard_seq": -1, "heard_ms": 1}, "heard_seq"),
+    ({"index": 0, "heard_ms": 1}, "heard_seq"),
+    ({"index": 0, "heard_seq": 0, "heard_ms": -5}, "heard_ms"),
+    ({"index": True, "heard_seq": 0, "heard_ms": 1}, "index"),
+])
+def test_malformed_cuts_end_the_session(stream, monkeypatch, cut, message):
+    ws, session = live_session(make_agent()["id"], [], monkeypatch)
+    session.send_json({"type": "cut", **cut})
+    error = session.receive_json()
+    assert error["type"] == "error" and message in error["message"] and "index" not in error
+    ws.__exit__(None, None, None)
+
+
+def test_other_control_messages_are_still_unknown(stream, monkeypatch):
+    ws, session = live_session(make_agent()["id"], [], monkeypatch)
+    session.send_json({"type": "rewind"})
+    assert session.receive_json() == {"type": "error", "message": "Unknown message type 'rewind'."}
+    ws.__exit__(None, None, None)
+
+
+def test_dictation_still_rejects_a_cut():
+    with client.websocket_connect("ws://127.0.0.1/api/dictation/live") as ws:
+        ws.send_json({"type": "start", "config": {}})
+        assert ws.receive_json()["type"] == "ready"
+        ws.send_json({"type": "cut", "index": 0, "heard_seq": 0, "heard_ms": 1})
+        assert ws.receive_json() == {"type": "error", "message": "Unknown message type 'cut'."}
+
+
+def test_a_sentence_being_spoken_when_cut_is_never_sent(stream, monkeypatch):
+    import threading
+
+    started, release = threading.Event(), threading.Event()
+
+    def synth(text, language, reference=None, **k):
+        if text.startswith("Then"):
+            started.set()
+            release.wait(2)
+        return wav_bytes(0.25)
+
+    monkeypatch.setattr(tts, "synthesize", synth)
+    stream.rounds = [THREE]
+    ws, session = live_session(make_agent()["id"], ["three"], monkeypatch)
+    say_turn(session)
+    until(session, "reply_audio")
+    assert started.wait(2)
+    session.send_json({"type": "cut", "index": 0, "heard_seq": 0, "heard_ms": 500})
+    import time as _time
+
+    _time.sleep(0.1)  # the cut is read before the sentence finishes
+    release.set()
+    turn = until(session, "turn")
+    assert not [m for m in turn if m["type"] == "reply_audio"] and turn[-1]["cut"] is True
+    finish(ws, session)
+
+
+def test_a_cut_patches_its_own_turn_not_an_equal_earlier_reply(stream, monkeypatch):
+    same = ["Sure, I can do that for you right away."]
+    stream.rounds = [same, same, ["A third answer that is long enough here."]]
+    ws, session = live_session(make_agent()["id"], ["one", "two", "three"], monkeypatch)
+    say_turn(session)
+    until(session, "turn")
+    say_turn(session)
+    until(session, "turn")
+    session.send_json({"type": "cut", "index": 1, "heard_seq": None, "heard_ms": 0})
+    until(session, "cut_ack")
+    say_turn(session)
+    finish(ws, session)
+    assert [m["content"] for m in stream.seen[2][1:]] == ["one", same[0], "two", "three"]
+
+
 def test_text_in_the_same_piece_as_a_tool_call_is_still_spoken(stream, monkeypatch):
     stream.rounds = [
         ["Let me work that out for you right now. ", "Back in a moment. <tool_call>", '{"name": "calculator", "arguments": {"expression": "6*7"}}</tool_call>'],
