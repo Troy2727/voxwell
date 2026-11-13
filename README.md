@@ -386,6 +386,7 @@ Accounts only control who can open the app. Voices, audio and models stay on you
 <a href="https://ui.shadcn.com"><img alt="shadcn/ui" src="docs/readme/badges/shadcn-ui.svg" /></a>
 <a href="https://www.electronjs.org"><img alt="Electron 33" src="docs/readme/badges/electron-33.svg" /></a>
 <a href="https://supabase.com"><img alt="Supabase (optional)" src="docs/readme/badges/supabase-optional.svg" /></a>
+
 The job loader, task rows, page search, prompt menu, approval card and agent tool chips are adapted from [Beautiful UI](https://beautifului.dev) (MIT, Shane Levine).
 
 **CI**<br/>
