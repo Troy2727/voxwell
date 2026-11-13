@@ -44,7 +44,7 @@ function track(status: string, progress: number) {
 
 function book(state: string, done: boolean, include = [true, true]) {
   return {
-    id: 'b-1', title: 'The Lighthouse', created: NOW, language: 'en', voice: 'default', state, step: 'Chapter 1 of 1', percent: done ? 100 : 40, error: null,
+    id: 'b-1', title: 'The Lighthouse', created: NOW, language: 'en', voice: 'default', tone_memory: false, state, step: 'Chapter 1 of 1', percent: done ? 100 : 40, error: null,
     chapters: [
       { title: 'The Storm', chars: 300, include: include[0], status: done && include[0] ? 'done' : 'pending', audio_url: done && include[0] ? TONE_URL : null },
       { title: 'Morning', chars: 250, include: include[1], status: done && include[1] ? 'done' : 'pending', audio_url: done && include[1] ? TONE_URL : null },
@@ -62,6 +62,7 @@ function routes(): [string | RegExp, Reply][] {
   let trackJob = job([track('generating', 0.5), track('done', 1)]);
   let books: object[] = [];
   let include = [true, true];
+  let toneMemory = false;
   let rendering: (() => object) | null = null;
   let transcribed: (() => object) | null = null;
   let entries: object[] = [];
@@ -138,7 +139,8 @@ function routes(): [string | RegExp, Reply][] {
     ['PATCH /api/audiobook/books/b-1', (_url: URL, request: Request) => {
       const chapters: { include: boolean }[] | undefined = request.postDataJSON().chapters;
       if (chapters) include = chapters.map((c) => c.include);
-      books = [book('draft', false, include)];
+      toneMemory = request.postDataJSON().tone_memory ?? toneMemory;
+      books = [{ ...book('draft', false, include), tone_memory: toneMemory }];
       return books[0];
     }],
     ['POST /api/audiobook/books/b-1/preview', { url: TONE_URL }],
