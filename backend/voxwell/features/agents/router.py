@@ -2,6 +2,7 @@
 
 import importlib.util
 import logging
+import time
 from dataclasses import asdict
 
 from fastapi import APIRouter, HTTPException, WebSocket
@@ -109,6 +110,10 @@ async def live(ws: WebSocket, agent_id: str):
     Each turn's result has the transcript, the reply, its tool calls, the spoken reply and the language
     it answered in. The session adds every exchange to its history, so later turns remember earlier ones.
     An agent with follow_languages detects the language of each turn and follows the user (see language).
+
+    With stream_reply true in the config (Flow replies), a turn's reply is sent sentence by sentence
+    while it is written: reply_start, then reply_text and reply_audio per sentence, then the turn
+    without "audio" (see conversation.run_turn).
     """
 
     def open_session(config: dict):
@@ -119,9 +124,13 @@ async def live(ws: WebSocket, agent_id: str):
         history = conversation.clean_history(config.get("history", []))
         allowed = language.allowed(agent)
         current = config.get("language") if config.get("language") in allowed else agent.language
+        stream = config.get("stream_reply", False)
+        if not isinstance(stream, bool):
+            raise ValueError("stream_reply must be true or false.")
 
-        def process(pcm: bytes, index: int) -> dict:
+        def process(pcm: bytes, index: int, emit) -> dict:
             nonlocal current
+            started = time.monotonic()
             if len(allowed) == 1:
                 heard = live_audio.transcribe_turn(pcm, agent.language)
             else:
@@ -135,7 +144,12 @@ async def live(ws: WebSocket, agent_id: str):
                     current = chosen
             if not heard.text:
                 return {"transcript": ""}
-            result = conversation.reply_and_speak(agent, history, heard.text, language=current)
+            if stream:
+                stt_ms = round((time.monotonic() - started) * 1000)
+                result = conversation.run_turn(agent, history, heard.text, emit, current, started)
+                result["timing"] = {"stt_ms": stt_ms, **result["timing"]}
+            else:
+                result = conversation.reply_and_speak(agent, history, heard.text, language=current)
             history.extend([{"role": "user", "content": heard.text}, {"role": "assistant", "content": result["reply"]}])
             del history[: -conversation.MAX_HISTORY]
             return {"transcript": heard.text, **result}
