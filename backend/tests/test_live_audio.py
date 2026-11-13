@@ -172,3 +172,39 @@ def test_a_turn_error_shows_voxwells_own_messages_and_hides_the_rest(caplog):
     assert live_audio.turn_error_message(TranslationError("Cannot translate from jw.")) == "Cannot translate from jw."
     hidden = live_audio.turn_error_message(RuntimeError("CUDA error at C:/internal/path"))
     assert hidden == live_audio.TURN_FAILED and "C:/internal/path" in caplog.text
+
+
+def test_a_process_can_send_messages_while_its_turn_runs():
+    def process(pcm, index, emit):
+        assert emit({"type": "progress", "step": 1}) is True and not emit.cancelled
+        return {"text": "done"}
+
+    _, sent = _run_worker(process, 2)
+    assert [(m["type"], m["index"]) for m in sent] == [("progress", 0), ("turn", 0), ("progress", 1), ("turn", 1)]
+
+
+def test_a_process_sees_the_session_end():
+    seen = []
+
+    def process(pcm, index, emit):
+        time.sleep(0.15)  # the session is cancelled meanwhile
+        seen.append((emit.cancelled, emit({"type": "late"})))
+        return {"text": "unseen"}
+
+    _run_worker(process, 1, cancel_after=0.05)
+    assert seen == [(True, False)]
+
+
+def test_an_emitter_whose_loop_is_gone_reads_as_cancelled():
+    import threading
+
+    from voxwell.live_audio import Emitter
+
+    loop = asyncio.new_event_loop()
+    loop.close()
+
+    async def send(message):
+        return True
+
+    emit = Emitter(send, loop, 0, threading.Event())
+    assert emit({"type": "late"}) is False and emit.cancelled

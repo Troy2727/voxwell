@@ -12,6 +12,8 @@ Server -> client:
   {"type": "speaking"}                the current turn has enough voiced audio to count
   {"type": "turn_end", "index": n}    the speaker paused (or hit max_turn_s); n is null if skipped
   {"type": "turn", "index": n, ...}   turn n's result; results always arrive in turn order
+  {"type": ..., "index": n, ...}      sent by turn n while it runs, before its "turn" (a feature's own
+                                      messages, e.g. the agents' reply_start, reply_text and reply_audio)
   {"type": "warning", "message": m}   e.g. a turn skipped because the model is still busy
   {"type": "error", "message": m}     with "index": that turn failed; without: the session is over
   {"type": "done"}                    after "end", once every turn is answered; then the socket closes
@@ -20,6 +22,8 @@ Closing the socket without "end" drops the turns still waiting.
 """
 
 import asyncio
+import concurrent.futures
+import inspect
 import io
 import json
 import logging
@@ -27,6 +31,7 @@ import math
 import os
 import sys
 import tempfile
+import threading
 import wave
 from array import array
 from collections import deque
@@ -50,9 +55,10 @@ MAX_CONTROL_BYTES = 8 * 1024
 # Turns allowed to wait behind the one being processed. A model that falls further behind skips
 # new turns with a warning instead of letting them pile up.
 QUEUE_SIZE = 2
+EMIT_TIMEOUT_S = 10.0  # a mid-turn message not sent by then: the session is treated as gone
 
 # A finished turn's result fields, from its PCM and index. Runs in a worker thread.
-Process = Callable[[bytes, int], dict]
+Process = Callable[..., dict]  # (pcm, index) or (pcm, index, emit): see Emitter
 
 
 @dataclass(frozen=True)
@@ -170,11 +176,41 @@ def turn_error_message(exc: Exception) -> str:
     return TURN_FAILED
 
 
+class Emitter:
+    """Given to a process that takes a third argument: it sends messages while its turn runs.
+
+    Call it from the turn's thread with a message; it is sent before the turn's result, tagged with
+    the turn index, and the call returns once it is sent (False when the client is gone). `cancelled`
+    turns true when the session ends, so a long turn can stop early.
+    """
+
+    def __init__(self, send: Callable[[dict], Awaitable[bool]], loop: asyncio.AbstractEventLoop, index: int, closed: threading.Event):
+        self._send, self._loop, self._index, self._closed = send, loop, index, closed
+
+    def __call__(self, message: dict) -> bool:
+        if self._closed.is_set():
+            return False
+        try:
+            future = asyncio.run_coroutine_threadsafe(self._send({**message, "index": self._index}), self._loop)
+            sent = future.result(timeout=EMIT_TIMEOUT_S)
+        except (RuntimeError, TimeoutError, concurrent.futures.CancelledError):
+            sent = False
+        if not sent:
+            self._closed.set()
+        return sent
+
+    @property
+    def cancelled(self) -> bool:
+        return self._closed.is_set()
+
+
 class TurnWorker:
     """Processes turns one at a time, so results come out in turn order, with a bounded backlog."""
 
     def __init__(self, process: Process, send: Callable[[dict], Awaitable[bool]]):
         self._process = process
+        self._emits = len(inspect.signature(process).parameters) >= 3
+        self._closed = threading.Event()
         self._send = send
         self._queue: asyncio.Queue = asyncio.Queue()  # bounded by submit()
         self._next = 0
@@ -195,14 +231,20 @@ class TurnWorker:
         await self._task
 
     def cancel(self) -> None:
-        """Stop now; queued turns are dropped (a turn already in a model call is left to finish unseen)."""
+        """Stop now; queued turns are dropped (a turn already in a model call is left to finish unseen,
+        but one that takes an Emitter sees it cancelled)."""
+        self._closed.set()
         self._task.cancel()
 
     async def _run(self) -> None:
         while (item := await self._queue.get()) is not None:
             index, pcm = item
             try:
-                result = await asyncio.to_thread(self._process, pcm, index)
+                if self._emits:
+                    emit = Emitter(self._send, asyncio.get_running_loop(), index, self._closed)
+                    result = await asyncio.to_thread(self._process, pcm, index, emit)
+                else:
+                    result = await asyncio.to_thread(self._process, pcm, index)
                 message = {**result, "type": "turn", "index": index}
             except Exception as exc:
                 message = {"type": "error", "index": index, "message": turn_error_message(exc)}

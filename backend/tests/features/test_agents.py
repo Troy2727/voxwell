@@ -477,3 +477,235 @@ def test_live_an_empty_retranscription_keeps_the_turn(llm, heard, spoken):
 def test_allowed_ignores_languages_the_engine_does_not_speak():
     agent = store.Agent(id="x", name="x", system_prompt="", language="en", follow_languages=["ja", "es", "zz"])
     assert language.allowed(agent) == ["en", "es"]
+# --- Flow replies ---------------------------------------------------------------------------------
+
+
+@pytest.fixture
+def stream(monkeypatch):
+    """A scripted streaming model: `stream.rounds` holds each round's pieces (a threading.Event in the
+    list makes it wait there until set); `stream.seen` holds each chat it was given."""
+    import threading
+
+    class Fake:
+        rounds: list = []
+        seen: list = []
+        cancelled_seen = threading.Event()
+
+        def __call__(self, messages, tools=None, cancelled=lambda: False):
+            self.seen.append([dict(m) for m in messages])
+            for piece in self.rounds.pop(0) if self.rounds else ["Done and dusted, nothing else to say."]:
+                if isinstance(piece, threading.Event):
+                    while not piece.wait(0.02):
+                        if cancelled():
+                            self.cancelled_seen.set()
+                            return
+                    continue
+                yield piece
+
+    fake = Fake()
+    fake.rounds, fake.seen = [], []
+    monkeypatch.setattr(conversation, "_stream_chat", fake)
+    monkeypatch.setattr(tts, "synthesize", lambda text, language, reference=None, **k: wav_bytes(0.25))
+    return fake
+
+
+def streamed_turn(agent_id, heard_text, monkeypatch, config=None, turns=1):
+    monkeypatch.setattr(stt, "transcribe", lambda path, language=None: stt.Transcript(heard_text, "en", []))
+    with client.websocket_connect(f"ws://127.0.0.1/api/agents/agents/{agent_id}/live") as ws:
+        ws.send_json({"type": "start", "config": {"silence_ms": 400, "stream_reply": True, **(config or {})}})
+        assert ws.receive_json()["type"] == "ready"
+        for _ in range(turns):
+            ws.send_bytes(speech(600) + bytes(500 * 32))
+        ws.send_json({"type": "end"})
+        messages = []
+        while (m := ws.receive_json())["type"] != "done":
+            if m["type"] not in ("speaking", "turn_end"):
+                messages.append(m)
+    return messages
+
+
+THREE = ["The first sentence is right here. ", "Then a second sentence ", "follows it closely. And the third one ends it."]
+
+
+def test_flow_reply_streams_sentence_by_sentence(stream, monkeypatch):
+    slow = {"done": False}
+
+    def synth(text, language, reference=None, **k):
+        if not slow["done"]:
+            slow["done"] = True
+            time.sleep(0.1)  # the first sentence is the slowest to speak
+        return wav_bytes(0.25)
+
+    monkeypatch.setattr(tts, "synthesize", synth)
+    stream.rounds = [THREE]
+    messages = streamed_turn(make_agent()["id"], "tell me three things", monkeypatch)
+    kinds = [(m["type"], m.get("seq")) for m in messages]
+    assert kinds == [("reply_start", None), ("reply_text", 0), ("reply_audio", 0), ("reply_text", 1), ("reply_audio", 1),
+                     ("reply_text", 2), ("reply_audio", 2), ("turn", None)]
+    assert all(m["index"] == 0 for m in messages)
+    texts = [m["text"] for m in messages if m["type"] == "reply_text"]
+    assert texts == ["The first sentence is right here.", "Then a second sentence follows it closely.", "And the third one ends it."]
+    audio = [m for m in messages if m["type"] == "reply_audio"]
+    assert all(base64.b64decode(m["audio"])[:4] == b"RIFF" and m["duration_ms"] == 250 for m in audio)
+    turn = messages[-1]
+    assert turn["streamed"] is True and turn["parts"] == 3 and "audio" not in turn and turn["reply"] == " ".join(texts)
+    assert turn["transcript"] == "tell me three things" and set(turn["timing"]) >= {"stt_ms", "first_text_ms", "first_audio_ms", "total_ms"}
+
+
+def test_first_sentence_is_spoken_before_the_model_finishes(stream, monkeypatch):
+    import threading
+
+    release = threading.Event()
+    stream.rounds = [["The first sentence is right here. ", release, "And the rest arrives much later."]]
+    agent = make_agent()
+    monkeypatch.setattr(stt, "transcribe", lambda path, language=None: stt.Transcript("go", "en", []))
+    with client.websocket_connect(f"ws://127.0.0.1/api/agents/agents/{agent['id']}/live") as ws:
+        ws.send_json({"type": "start", "config": {"silence_ms": 400, "stream_reply": True}})
+        ws.receive_json()
+        ws.send_bytes(speech(600) + bytes(500 * 32))
+        seen = []
+        while not any(m["type"] == "reply_audio" for m in seen):
+            seen.append(ws.receive_json())
+        assert not release.is_set()  # the first sentence was spoken while the model was still waiting
+        release.set()
+        ws.send_json({"type": "end"})
+        while (m := ws.receive_json())["type"] != "done":
+            seen.append(m)
+    assert [m["seq"] for m in seen if m["type"] == "reply_text"] == [0, 1]
+
+
+def test_tool_rounds_are_never_spoken(stream, monkeypatch):
+    stream.rounds = [
+        ["Let me see. <tool", '_call>{"name": "calculator", "arguments": {"expression": "2+2"}}</tool_call>'],
+        ["Two plus two makes four, as it happens."],
+    ]
+    messages = streamed_turn(make_agent()["id"], "what is two plus two", monkeypatch)
+    texts = [m["text"] for m in messages if m["type"] == "reply_text"]
+    assert texts == ["Two plus two makes four, as it happens."]
+    start = next(m for m in messages if m["type"] == "reply_start")
+    assert start["tool_calls"][0]["result"] == "4" and messages[-1]["tool_calls"][0]["tool"] == "calculator"
+
+
+def test_out_of_tool_rounds_gives_the_fallback(stream, monkeypatch):
+    call = '{"tool": "calculator", "arguments": {"expression": "1+1"}}'
+    stream.rounds = [[call]] * (conversation.MAX_TOOL_ROUNDS + 1)
+    messages = streamed_turn(make_agent()["id"], "loop", monkeypatch)
+    assert [m["text"] for m in messages if m["type"] == "reply_text"] == [conversation.FALLBACK_REPLY]
+
+
+def test_a_reply_with_a_brace_but_no_call_is_spoken(stream, monkeypatch):
+    stream.rounds = [["Sets are written like {1, 2} in maths, you see."]]
+    messages = streamed_turn(make_agent()["id"], "sets", monkeypatch)
+    assert [m["text"] for m in messages if m["type"] == "reply_text"] == ["Sets are written like {1, 2} in maths, you see."]
+
+
+def test_an_empty_reply_speaks_the_fallback(stream, monkeypatch):
+    stream.rounds = [[""]]
+    messages = streamed_turn(make_agent()["id"], "hm", monkeypatch)
+    assert messages[-1]["reply"] == conversation.FALLBACK_REPLY and messages[-1]["parts"] == 1
+
+
+def test_a_sentence_that_cannot_be_spoken_does_not_end_the_turn(stream, monkeypatch, caplog):
+    def synth(text, language, reference=None, **k):
+        if text.startswith("Then"):
+            raise RuntimeError("secret GPU detail")
+        return wav_bytes(0.25)
+
+    monkeypatch.setattr(tts, "synthesize", synth)
+    stream.rounds = [THREE]
+    messages = streamed_turn(make_agent()["id"], "three", monkeypatch)
+    audio = [m for m in messages if m["type"] == "reply_audio"]
+    assert [m["audio"] is None for m in audio] == [False, True, False] and audio[1]["error"]
+    assert messages[-1]["warning"] == conversation.SPEAK_WARNING
+    assert "secret" not in json.dumps(messages) and "secret GPU detail" in caplog.text
+
+
+def test_streamed_reply_goes_into_history(stream, monkeypatch):
+    stream.rounds = [["My first answer is this one here."], ["And my second answer is this one."]]
+    streamed_turn(make_agent()["id"], "again", monkeypatch, turns=2)
+    assert [m["content"] for m in stream.seen[1][1:]] == ["again", "My first answer is this one here.", "again"]
+
+
+def test_stream_reply_must_be_a_bool():
+    with client.websocket_connect(f"ws://127.0.0.1/api/agents/agents/{make_agent()['id']}/live") as ws:
+        ws.send_json({"type": "start", "config": {"stream_reply": "yes"}})
+        assert ws.receive_json() == {"type": "error", "message": "stream_reply must be true or false."}
+
+
+def test_closing_the_session_stops_the_reply(stream, monkeypatch):
+    import threading
+
+    never = threading.Event()
+    spoken = []
+    monkeypatch.setattr(tts, "synthesize", lambda text, language, reference=None, **k: spoken.append(text) or wav_bytes(0.25))
+    monkeypatch.setattr(stt, "transcribe", lambda path, language=None: stt.Transcript("go", "en", []))
+    stream.rounds = [["The first sentence is right here. ", never, "This one is never spoken at all."]]
+    with client.websocket_connect(f"ws://127.0.0.1/api/agents/agents/{make_agent()['id']}/live") as ws:
+        ws.send_json({"type": "start", "config": {"silence_ms": 400, "stream_reply": True}})
+        ws.receive_json()
+        ws.send_bytes(speech(600) + bytes(500 * 32))
+        while ws.receive_json()["type"] != "reply_audio":
+            pass
+    assert stream.cancelled_seen.wait(2)
+    time.sleep(0.1)
+    assert spoken == ["The first sentence is right here."]
+
+
+class StubTokenizer:
+    eos_token_id = 0
+
+    def apply_chat_template(self, messages, **kwargs):
+        return "prompt"
+
+    def __call__(self, prompt, return_tensors=None):
+        import torch
+
+        class Inputs(dict):
+            def to(self, device):
+                return self
+
+        return Inputs(input_ids=torch.tensor([[1, 2]]))
+
+    def decode(self, ids, **kwargs):
+        return "".join(chr(i) for i in ids)
+
+
+class StubModel:
+    device = "cpu"
+
+    def generate(self, input_ids, streamer, stopping_criteria, max_new_tokens, **kwargs):
+        import torch
+
+        streamer.put(input_ids)  # the prompt, which the streamer skips
+        for c in "One word after another, forever and ever. " * 20:
+            if bool(stopping_criteria(input_ids, None).any()):
+                break
+            streamer.put(torch.tensor([ord(c)]))
+            time.sleep(0.001)
+        streamer.end()
+
+
+def test_the_streaming_model_releases_its_lock(monkeypatch):
+    from voxwell.features.tools import direction
+
+    monkeypatch.setattr(direction, "_load", lambda: (StubModel(), StubTokenizer()))
+    pieces = conversation._stream_chat([{"role": "user", "content": "hi"}])
+    assert any(next(pieces) for _ in range(50))  # read a little (empty pieces until a word is whole), then stop early
+    pieces.close()
+    assert direction._lock.acquire(timeout=1)
+    direction._lock.release()
+    stopped = list(conversation._stream_chat([{"role": "user", "content": "hi"}], cancelled=lambda: True))
+    assert "".join(stopped) == ""  # cancelled before the first piece
+    assert direction._lock.acquire(timeout=1)
+    direction._lock.release()
+
+
+def test_a_tool_call_after_a_spoken_sentence_is_run_not_read_aloud(stream, monkeypatch):
+    stream.rounds = [
+        ["Let me work that out for you right now. ", '<tool_call>{"name": "calculator", "arguments": {"expression": "6*7"}}</tool_call>'],
+        ["Six times seven comes to forty two."],
+    ]
+    messages = streamed_turn(make_agent()["id"], "six times seven", monkeypatch)
+    texts = [m["text"] for m in messages if m["type"] == "reply_text"]
+    assert texts == ["Let me work that out for you right now.", "Six times seven comes to forty two."]
+    assert messages[-1]["tool_calls"][0]["result"] == "42" and "tool_call" not in messages[-1]["reply"]

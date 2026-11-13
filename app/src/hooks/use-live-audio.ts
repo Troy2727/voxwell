@@ -4,7 +4,7 @@ import { NO_MICROPHONE } from '@/lib/microphone';
 
 /** A message from a live session; the protocol is described in backend/voxwell/live_audio.py. */
 export interface LiveMessage {
-  type: 'ready' | 'speaking' | 'turn_end' | 'turn' | 'warning' | 'error' | 'done';
+  type: 'ready' | 'speaking' | 'turn_end' | 'turn' | 'warning' | 'error' | 'done' | 'reply_start' | 'reply_text' | 'reply_audio';
   index?: number | null;
   message?: string;
   [field: string]: unknown;
