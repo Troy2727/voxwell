@@ -7,6 +7,7 @@ test('voice cloning: upload a clip, then speak in that voice', async ({ app: pag
   await dropFile(page, 'speech.wav');
   await expect(page.getByText('speech.wav')).toBeVisible();
   await page.getByRole('button', { name: 'Upload voice' }).click();
+  await page.getByRole('button', { name: "It's my own voice" }).click();
   await expect(page.getByText('Saved "E2E voice"')).toBeVisible();
 
   await page.getByLabel('Text').fill('Hello from the end to end test.');

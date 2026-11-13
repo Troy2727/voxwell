@@ -463,6 +463,7 @@ test.describe('errors the user can see', () => {
     await page.getByLabel('Name').fill('Too big');
     await dropFile(page, 'speech.wav');
     await page.getByRole('button', { name: 'Upload voice' }).click();
+    await page.getByRole('button', { name: "It's my own voice" }).click();
     await expect(page.getByRole('alert').filter({ hasText: 'The file is too large. The limit is 50 MB.' })).toBeVisible();
   });
 
