@@ -3,10 +3,13 @@ import { Bot, Mic, Radio, Send, Square, Trash2, Wrench } from 'lucide-react';
 import { sendJson } from '@/api';
 import { EmptyState, ErrorAlert, Field, message, Muted, Section } from '@/components/page';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { MicSelector } from '@/components/ui/mic-selector';
 import { type LiveMessage, useLiveAudio } from '@/hooks/use-live-audio';
+import { usePersisted } from '@/lib/persisted';
 import { cn } from '@/lib/utils';
+import { CutInDetector } from './cutIn';
 import { StreamPlayer } from './streamPlayer';
 import type { Agent, ToolCall } from './types';
 
@@ -19,6 +22,7 @@ interface Message {
   failed?: boolean; // an error shown in the conversation, never sent back as history
   language?: string; // the language an assistant reply was given in
   turn?: string; // the live session and turn a streamed reply belongs to (turn numbers restart per session)
+  interrupted?: boolean; // the user spoke over it; the text is what they heard
 }
 
 interface Reply {
@@ -68,11 +72,17 @@ export default function Conversation({ agent }: { agent: Agent }) {
   const left = useRef(false); // this conversation is gone (another agent, the editor, another page)
   const bottom = useRef<HTMLDivElement>(null);
   // Flow replies (live mode): the reply being streamed, and whether its final "turn" has arrived.
-  const streaming = useRef<{ turn: string; done: boolean } | null>(null);
+  const streaming = useRef<{ turn: string; index: number; done: boolean } | null>(null);
   const session = useRef(0); // counts live sessions, so their turn numbers don't collide
   const turnKey = (index: unknown) => `${session.current}:${String(index)}`;
   const turnEndAt = useRef(0);
   const player = useRef<StreamPlayer | null>(null);
+  // Cut-in: speaking over a streamed reply stops it; later messages for a cut turn are ignored.
+  const detector = useRef(new CutInDetector());
+  // Some setups (loud speakers, no echo cancellation) cut in on the agent's own voice: it can be turned off.
+  const [cutInOn, setCutInOn] = usePersisted('voxwell.agents.cutIn', true, (saved) => saved !== false);
+  const cutTurns = useRef(new Set<string>());
+  const unfinishedCuts = useRef(new Set<string>()); // cut before their final message arrived
 
   // The language of the last reply, so a new session (each push-to-talk press) carries on in it.
   // An edit may have removed it from the agent's languages since.
@@ -80,7 +90,7 @@ export default function Conversation({ agent }: { agent: Agent }) {
   // An older backend (the website can talk to one) sends agents without follow_languages.
   const follows = agent.follow_languages ?? [];
   const lastLanguage = last && [agent.language, ...follows].includes(last) ? last : agent.language;
-  const history = () => messages.filter((m) => !m.failed).slice(-HISTORY).map(({ role, content }) => ({ role, content }));
+  const history = () => messages.filter((m) => !m.failed && m.content).slice(-HISTORY).map(({ role, content }) => ({ role, content }));
   const add = (...items: Omit<Message, 'id'>[]) => setMessages((list) => [...list, ...items.map((m) => ({ ...m, id: nextId.current++ }))]);
 
   // Replies play in order; the microphone sends silence meanwhile, so the agent does not hear itself.
@@ -116,11 +126,29 @@ export default function Conversation({ agent }: { agent: Agent }) {
   const streamPlayer = () =>
     (player.current ??= new StreamPlayer(
       (seq) => {
+        detector.current.grace(performance.now()); // each sentence starts from silence
         setPlaying(true);
         if (seq === 0 && import.meta.env.DEV) console.debug(`Flow replies: first audio ${Math.round(performance.now() - turnEndAt.current)} ms after turn_end`);
       },
       () => streamIdle(),
     ));
+  // The user spoke over the reply: stop it at once, tell the server what was heard, and listen,
+  // starting with the audio from just before, so the first words are not lost.
+  const cutIn = (turn: string, index: number) => {
+    const heard = player.current?.heard() ?? { seq: null, ms: 0 };
+    player.current?.clear();
+    cutTurns.current.add(turn);
+    if (streaming.current && !streaming.current.done) {
+      unfinishedCuts.current.add(turn); // its final message is still to come: stop waiting for it now
+      setPending((p) => Math.max(0, p - 1));
+    }
+    streaming.current = null;
+    detector.current.reset();
+    setPlaying(false);
+    setMessages((list) => list.map((x) => (x.turn === turn ? { ...x, interrupted: true } : x)));
+    live.send({ type: 'cut', index, heard_seq: heard.seq, heard_ms: heard.ms });
+    live.resume(true);
+  };
   const stopPlayback = () => {
     player.current?.clear();
     streaming.current = null;
@@ -138,28 +166,33 @@ export default function Conversation({ agent }: { agent: Agent }) {
     } else if (m.type === 'reply_start') {
       const turn = turnKey(m.index);
       add({ role: 'user', content: String(m.transcript ?? '') }, { role: 'assistant', content: '', toolCalls: m.tool_calls as ToolCall[], turn });
-      streaming.current = { turn, done: false };
+      streaming.current = { turn, index: Number(m.index), done: false };
       streamPlayer().newReply();
-    } else if (m.type === 'reply_text') {
+    } else if (m.type === 'reply_text' && !cutTurns.current.has(turnKey(m.index))) {
       const turn = turnKey(m.index);
       setMessages((list) => list.map((x) => (x.turn === turn ? { ...x, content: x.content ? `${x.content} ${m.text}` : String(m.text) } : x)));
     } else if (m.type === 'reply_audio' && streaming.current?.turn === turnKey(m.index) && !left.current) {
       live.pause(true);
       void streamPlayer().enqueue(Number(m.seq), typeof m.audio === 'string' ? m.audio : null);
     } else if (m.type === 'turn' && m.streamed) {
-      setPending((p) => Math.max(0, p - 1));
+      if (!unfinishedCuts.current.delete(turnKey(m.index))) setPending((p) => Math.max(0, p - 1));
       const r = m as unknown as Reply;
       const turn = turnKey(m.index);
+      // A turn cut before it ended reports the heard text; one cut after it ended gets a cut_ack instead.
+      const cut = cutTurns.current.has(turn);
+      const content = (x: Message) => (cut && !m.cut ? x.content : r.reply);
       // The final turn also carries tool calls made after the first sentence was spoken.
-      setMessages((list) => list.map((x) => (x.turn === turn ? { ...x, content: r.reply, toolCalls: r.tool_calls, warning: r.warning, language: r.language } : x)));
+      setMessages((list) => list.map((x) => (x.turn === turn ? { ...x, content: content(x), toolCalls: r.tool_calls, warning: r.warning, language: r.language } : x)));
       const current = streaming.current;
       if (current && current.turn === turn) {
         current.done = true;
         if (!player.current?.playing) streamIdle();
       }
+    } else if (m.type === 'cut_ack') {
+      setMessages((list) => list.map((x) => (x.turn === turnKey(m.index) && x.role === 'assistant' ? { ...x, content: String(m.reply ?? ''), interrupted: true } : x)));
     } else if (m.type === 'warning') setWarning(m.message ?? '');
     else if (m.type === 'error' && m.index != null) {
-      setPending((p) => Math.max(0, p - 1));
+      if (!unfinishedCuts.current.delete(turnKey(m.index))) setPending((p) => Math.max(0, p - 1));
       const current = streaming.current;
       if (current && current.turn === turnKey(m.index)) {
         current.done = true; // a turn that failed after it started streaming is over
@@ -177,6 +210,14 @@ export default function Conversation({ agent }: { agent: Agent }) {
   };
   const live = useLiveAudio(`/api/agents/agents/${agent.id}/live`, onMessage);
   const active = live.status !== 'idle';
+  // While a streamed reply plays, the microphone level decides whether the user is cutting in.
+  useEffect(() => {
+    live.watchLevel((rms, now, ms) => {
+      const current = streaming.current;
+      if (cutInOn && current && player.current?.playing && detector.current.feed(rms, now, ms)) cutIn(current.turn, current.index);
+    });
+    return () => live.watchLevel(null);
+  });
 
   useEffect(() => {
     if (!active) {
@@ -217,6 +258,8 @@ export default function Conversation({ agent }: { agent: Agent }) {
     setWarning('');
     setMode('live');
     session.current++;
+    cutTurns.current.clear(); // keys are per session: the last session's can go
+    unfinishedCuts.current.clear();
     void live.start({ history: history(), language: lastLanguage, stream_reply: true }, device || undefined);
   };
   // Hold to talk: one session per press. A long trailing-silence window keeps a pause inside one turn;
@@ -276,6 +319,7 @@ export default function Conversation({ agent }: { agent: Agent }) {
                   {languageNames.of(m.language) ?? m.language}
                 </Muted>
               )}
+              {m.interrupted && <Muted className="text-xs">Interrupted</Muted>}
               {m.toolCalls && m.toolCalls.length > 0 && <ToolCalls calls={m.toolCalls} />}
               {m.warning && <Muted className="text-xs">{m.warning}</Muted>}
             </div>
@@ -326,9 +370,13 @@ export default function Conversation({ agent }: { agent: Agent }) {
           </span>
         )}
       </div>
-      <Field label="Microphone" hint={muted ? 'Muted: unmute it to talk.' : 'The microphone pauses while the agent speaks.'}>
+      <Field label="Microphone" hint={muted ? 'Muted: unmute it to talk.' : cutInOn ? 'In a live conversation, start talking to interrupt the agent.' : 'The microphone pauses while the agent speaks.'}>
         <MicSelector value={device} onValueChange={setDevice} muted={muted} onMutedChange={setMuted} disabled={active} className="w-full justify-start border sm:w-full" />
       </Field>
+      <label className="flex items-center gap-2 text-sm">
+        <Checkbox checked={cutInOn} onCheckedChange={(on) => setCutInOn(on === true)} aria-label="Talk over the agent to interrupt it" />
+        Talk over the agent to interrupt it
+      </label>
       {warning && <Muted className="text-xs">{warning}</Muted>}
       <div role="alert">
         <ErrorAlert message={error || live.error} />

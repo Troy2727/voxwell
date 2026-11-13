@@ -7,6 +7,8 @@ Client -> server:
   {"type": "start", "config": {...}}  first message: TurnSettings fields plus the feature's options
   binary messages                     16 kHz mono PCM16 little-endian, at most MAX_FRAME_BYTES each
   {"type": "end"}                     finish: the last turn counts and every queued turn is answered
+  {"type": ..., ...}                  any other control message, for a feature whose session takes it
+                                      (see Session), e.g. the agents' {"type": "cut", ...}
 Server -> client:
   {"type": "ready"}                   set up; audio may follow
   {"type": "speaking"}                the current turn has enough voiced audio to count
@@ -59,6 +61,19 @@ EMIT_TIMEOUT_S = 10.0  # a mid-turn message not sent by then: the session is tre
 
 # A finished turn's result fields, from its PCM and index. Runs in a worker thread.
 Process = Callable[..., dict]  # (pcm, index) or (pcm, index, emit): see Emitter
+
+
+@dataclass
+class Session:
+    """What open_session returns when the feature also takes control messages (else just `process`).
+
+    `control(message)` runs on the event loop as soon as the message is read, even while a turn is
+    being processed, so it must be quick. It returns a message to send back or None; ValueError ends
+    the session with its message.
+    """
+
+    process: Process
+    control: Callable[[dict], dict | None]
 
 
 @dataclass(frozen=True)
@@ -309,7 +324,8 @@ async def run_session(ws: WebSocket, open_session: Callable[[dict], Process]) ->
     """Serve one live session on `ws`.
 
     `open_session(config)` gets the start message's config, checks the feature's own options
-    (ValueError with a message for the user) and returns the `process` function for each turn.
+    (ValueError with a message for the user) and returns the `process` function for each turn, or
+    a Session when the feature also takes control messages.
     """
     if not websocket_origin_allowed(ws.headers.get("origin")):
         await ws.close(code=1008)  # before accept(): the handshake is refused with HTTP 403
@@ -342,7 +358,8 @@ async def run_session(ws: WebSocket, open_session: Callable[[dict], Process]) ->
         if not isinstance(config, dict):
             raise ValueError("config must be an object.")
         detector = TurnDetector(settings_from(config))
-        process = open_session(config)
+        opened = open_session(config)
+        process, control = (opened.process, opened.control) if isinstance(opened, Session) else (opened, None)
     except ValueError as exc:
         await fail(str(exc))
         return
@@ -377,6 +394,14 @@ async def run_session(ws: WebSocket, open_session: Callable[[dict], Process]) ->
                 await send({"type": "done"})
                 await _close(ws)
                 return
+            elif control is not None and item["type"] != "start":
+                try:
+                    answer = control(item)
+                except ValueError as exc:
+                    await fail(str(exc))
+                    return
+                if answer is not None:
+                    await send(answer)
             else:
                 await fail(f"Unknown message type '{item['type']}'.")
                 return

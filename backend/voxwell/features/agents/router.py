@@ -2,8 +2,9 @@
 
 import importlib.util
 import logging
+import threading
 import time
-from dataclasses import asdict
+from dataclasses import asdict, dataclass, field
 
 from fastapi import APIRouter, HTTPException, WebSocket
 from pydantic import BaseModel, Field
@@ -114,6 +115,11 @@ async def live(ws: WebSocket, agent_id: str):
     With stream_reply true in the config (Flow replies), a turn's reply is sent sentence by sentence
     while it is written: reply_start, then reply_text and reply_audio per sentence, then the turn
     without "audio" (see conversation.run_turn).
+
+    Cut-in: {"type": "cut", "index": n, "heard_seq": s, "heard_ms": ms} says the user spoke over turn
+    n after hearing its sentences up to seq s (null: none). A running turn stops and ends with a turn
+    marked "cut"; a finished one gets {"type": "cut_ack", "index": n, "reply": heard}. Either way the
+    session history keeps only the heard sentences.
     """
 
     def open_session(config: dict):
@@ -127,6 +133,50 @@ async def live(ws: WebSocket, agent_id: str):
         stream = config.get("stream_reply", False)
         if not isinstance(stream, bool):
             raise ValueError("stream_reply must be true or false.")
+        guard = threading.Lock()  # history and turns: held only briefly, never during model work
+        turns: dict[int, _Turn] = {}
+
+        def stream_turn(index: int, text: str, emit, started: float) -> dict:
+            turn = _Turn()
+            with guard:
+                turns[index] = turn
+                for old in [i for i in turns if i < index - KEEP_TURNS]:
+                    del turns[old]
+                earlier = list(history)
+            result = conversation.run_turn(agent, earlier, text, _TurnEmit(emit, turn.cut), current, started)
+            sentences = result.pop("sentences")
+            with guard:
+                turn.sentences = sentences
+                if turn.cut.is_set():
+                    result.update(reply=_heard(sentences, turn.heard_seq), cut=True)
+                history.append({"role": "user", "content": text})
+                if result["reply"]:
+                    turn.entry = {"role": "assistant", "content": result["reply"]}
+                    history.append(turn.entry)
+                del history[: -conversation.MAX_HISTORY]
+            return result
+
+        def control(message: dict) -> dict | None:
+            if message["type"] != "cut":
+                raise ValueError(f"Unknown message type '{message['type']}'.")
+            index, heard_seq, heard_ms = _cut_fields(message)
+            with guard:
+                turn = turns.get(index)
+                if turn is None or turn.cut.is_set():
+                    return None  # not a streamed turn of this session, or already cut
+                log.info("Cut-in on turn %s after %s ms (sentence %s)", index, heard_ms, heard_seq)
+                turn.heard_seq = heard_seq
+                turn.cut.set()
+                if turn.sentences is None:
+                    return None  # still running: it stops and reports the cut in its own turn message
+                heard = _heard(turn.sentences, heard_seq)
+                at = next((i for i, entry in enumerate(history) if entry is turn.entry), None)
+                if at is not None:  # still in the history (not trimmed away)
+                    if heard:
+                        history[at]["content"] = heard
+                    else:
+                        del history[at]
+                return {"type": "cut_ack", "index": index, "reply": heard}
 
         def process(pcm: bytes, index: int, emit) -> dict:
             nonlocal current
@@ -146,14 +196,61 @@ async def live(ws: WebSocket, agent_id: str):
                 return {"transcript": ""}
             if stream:
                 stt_ms = round((time.monotonic() - started) * 1000)
-                result = conversation.run_turn(agent, history, heard.text, emit, current, started)
+                result = stream_turn(index, heard.text, emit, started)
                 result["timing"] = {"stt_ms": stt_ms, **result["timing"]}
-            else:
-                result = conversation.reply_and_speak(agent, history, heard.text, language=current)
+                return {"transcript": heard.text, **result}
+            result = conversation.reply_and_speak(agent, history, heard.text, language=current)
             history.extend([{"role": "user", "content": heard.text}, {"role": "assistant", "content": result["reply"]}])
             del history[: -conversation.MAX_HISTORY]
             return {"transcript": heard.text, **result}
 
-        return process
+        return live_audio.Session(process, control)
 
     await live_audio.run_session(ws, open_session)
+
+
+KEEP_TURNS = 4  # streamed turns a session remembers for cut-in
+
+
+@dataclass
+class _Turn:
+    """A streamed turn, for cut-in: what was sent, and what the user heard of it."""
+
+    cut: threading.Event = field(default_factory=threading.Event)
+    heard_seq: int | None = None
+    sentences: list[str] | None = None  # set when the turn has ended
+    entry: dict | None = None  # its assistant message in the session history
+
+
+class _TurnEmit:
+    """A turn's Emitter that goes quiet, and reads as cancelled, once the user cuts in on the turn."""
+
+    def __init__(self, emit, cut: threading.Event):
+        self._emit, self._cut = emit, cut
+
+    def __call__(self, message: dict) -> bool:
+        return False if self._cut.is_set() else self._emit(message)
+
+    @property
+    def cancelled(self) -> bool:
+        return self._cut.is_set() or self._emit.cancelled
+
+
+def _heard(sentences: list[str], heard_seq: int | None) -> str:
+    return "" if heard_seq is None else " ".join(sentences[: heard_seq + 1])
+
+
+def _whole(value) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
+def _cut_fields(message: dict) -> tuple[int, int | None, float]:
+    """A cut message's index, heard_seq and heard_ms; ValueError when one is missing or wrong."""
+    index, heard_seq, heard_ms = message.get("index"), message.get("heard_seq"), message.get("heard_ms")
+    if not _whole(index):
+        raise ValueError("A cut needs index: the number of the turn.")
+    if "heard_seq" not in message or not (heard_seq is None or _whole(heard_seq)):
+        raise ValueError("A cut needs heard_seq: a whole number of at least 0, or null.")
+    if isinstance(heard_ms, bool) or not isinstance(heard_ms, (int, float)) or heard_ms < 0:
+        raise ValueError("A cut needs heard_ms: a number of at least 0.")
+    return index, heard_seq, heard_ms
