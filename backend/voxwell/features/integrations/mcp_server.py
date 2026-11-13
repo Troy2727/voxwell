@@ -183,7 +183,7 @@ TOOLS = [
             "action": {"type": "string", "enum": ["list", "add", "remove"]},
             "word": {"type": "string", "description": "The word as written (add, remove)."},
             "respelling": {"type": "string", "description": "How to write it so it is spoken right (add)."},
-            "language": {**_LANGUAGE, "description": "ISO 639-1 code. Default en."},
+            "language": {**_LANGUAGE, "description": "ISO 639-1 code, or all for a word used in every language (a language's own entry wins there). Default en."},
             "case_sensitive": {"type": "boolean", "description": "Match only this capitalization (add). Default false."},
             "whole_word": {"type": "boolean", "description": "Match whole words only (add). Default true."},
         }, ["action"]),
