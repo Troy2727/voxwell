@@ -69,7 +69,9 @@ export default function Conversation({ agent }: { agent: Agent }) {
   // The language of the last reply, so a new session (each push-to-talk press) carries on in it.
   // An edit may have removed it from the agent's languages since.
   const last = [...messages].reverse().find((m) => m.language)?.language;
-  const lastLanguage = last && [agent.language, ...agent.follow_languages].includes(last) ? last : agent.language;
+  // An older backend (the website can talk to one) sends agents without follow_languages.
+  const follows = agent.follow_languages ?? [];
+  const lastLanguage = last && [agent.language, ...follows].includes(last) ? last : agent.language;
   const history = () => messages.filter((m) => !m.failed).slice(-HISTORY).map(({ role, content }) => ({ role, content }));
   const add = (...items: Omit<Message, 'id'>[]) => setMessages((list) => [...list, ...items.map((m) => ({ ...m, id: nextId.current++ }))]);
 
@@ -212,7 +214,7 @@ export default function Conversation({ agent }: { agent: Agent }) {
               >
                 {m.content}
               </p>
-              {m.language && agent.follow_languages.length > 0 && (
+              {m.language && follows.length > 0 && (
                 <Muted className={cn('text-xs', m.language !== (messages.slice(0, i).reverse().find((x) => x.language)?.language ?? agent.language) && 'text-primary font-medium')}>
                   {languageNames.of(m.language) ?? m.language}
                 </Muted>

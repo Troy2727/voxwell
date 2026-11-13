@@ -5,6 +5,8 @@ allowed and the turn is clear enough to trust. Short or uncertain turns ("ok", a
 word) never move it, so it does not flip back and forth.
 """
 
+from voxwell.features.voice_cloning.engine import LANGUAGES
+
 MIN_CONFIDENCE = 0.75  # Whisper's probability for the detected language
 MIN_SWITCH_SECONDS = 1.5  # audio length of the turn
 MIN_SWITCH_CHARS = 4  # non-space characters in the transcript
@@ -12,8 +14,10 @@ MIN_SWITCH_CHARS = 4  # non-space characters in the transcript
 
 def allowed(agent) -> list[str]:
     """The agent's primary language, then the languages it may follow the user into."""
-    # Saving tidies follow_languages, but a hand-edited file may still repeat the primary.
-    return [agent.language, *(code for code in dict.fromkeys(agent.follow_languages) if code != agent.language)]
+    # Saving tidies follow_languages, but a hand-edited file may repeat the primary or name a
+    # language the voice engine does not speak.
+    follows = (code for code in dict.fromkeys(agent.follow_languages) if code != agent.language and code in LANGUAGES)
+    return [agent.language, *follows]
 
 
 def choose(allowed_codes: list[str], current: str, detected: str, confidence: float, seconds: float, text: str) -> str:

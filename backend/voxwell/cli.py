@@ -451,11 +451,12 @@ def cmd_chat(client: Client, args) -> tuple[str, dict]:
         names = ", ".join(a["name"] for a in saved) or "none yet (create one on the Voice agents page)"
         raise CliError(f"Unknown agent '{args.agent}'. Saved agents: {names}.")
     body = {"message": message.strip(), "speak": False}
-    if getattr(args, "language", None):  # the MCP bridge builds args without it
+    if args.language:
         body["language"] = args.language
     result = json.loads(client.post_json(f"/api/agents/agents/{agent['id']}/chat", body))
     lines = [f"[{c['tool'] or 'tool'}: {c.get('result', c.get('error'))}]" for c in result["tool_calls"]]
-    reply = result["reply"] if result["language"] == agent["language"] else f"[{result['language']}] {result['reply']}"
+    answered = result.get("language", agent["language"])  # a server older than Language follow sends none
+    reply = result["reply"] if answered == agent["language"] else f"[{answered}] {result['reply']}"
     return "\n".join([*lines, reply]), {"agent": agent["name"], **result}
 
 

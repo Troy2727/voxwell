@@ -472,3 +472,8 @@ def test_live_an_empty_retranscription_keeps_the_turn(llm, heard, spoken):
     heard.script = [("fr", 0.95, "bonjour tout le monde"), ("en", 1.0, "")]
     [turn] = live(agent["id"], [2000])
     assert turn["transcript"] == "bonjour tout le monde" and turn["language"] == "en"
+
+
+def test_allowed_ignores_languages_the_engine_does_not_speak():
+    agent = store.Agent(id="x", name="x", system_prompt="", language="en", follow_languages=["ja", "es", "zz"])
+    assert language.allowed(agent) == ["en", "es"]
