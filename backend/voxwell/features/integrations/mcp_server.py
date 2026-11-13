@@ -210,6 +210,7 @@ TOOLS = [
         "inputSchema": _schema({
             "agent": {"type": "string", "description": "A saved agent's name or id."},
             "message": {"type": "string", "description": "What to say to the agent."},
+            "language": {**_LANGUAGE, "description": "ISO 639-1 code to answer in; one of the agent's languages. Default: its own."},
         }, ["agent", "message"]),
     },
     {
@@ -388,7 +389,7 @@ def chat_with_agent(args: dict) -> str:
     message = _required(args, "message")
     if message == "-":  # the CLI reads "-" from stdin, which is this server's protocol stream
         raise ToolError("message is required.")
-    return _run(cli.cmd_chat, agent=_required(args, "agent"), message=message)
+    return _run(cli.cmd_chat, agent=_required(args, "agent"), message=message, language=args.get("language"))
 
 
 HANDLERS = {

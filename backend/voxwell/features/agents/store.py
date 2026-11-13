@@ -3,7 +3,7 @@
 import json
 import re
 import uuid
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, fields
 
 from voxwell import voices
 from voxwell.features.agents.tools import TOOLS
@@ -27,6 +27,7 @@ class Agent:
     voice: str = ""  # a saved voice id; "" for the default voice
     language: str = "en"  # what it listens and speaks in
     tools: list[str] = field(default_factory=list)
+    follow_languages: list[str] = field(default_factory=list)  # other languages it may answer in
 
 
 def _path(agent_id: str):
@@ -35,13 +36,18 @@ def _path(agent_id: str):
     return child_path(data_dir("agents"), f"{agent_id}.json")
 
 
-def validate(name: str, system_prompt: str, voice: str, language: str, tools: list[str]) -> None:
+def validate(
+    name: str, system_prompt: str, voice: str, language: str, tools: list[str], follow_languages: list[str] = ()
+) -> None:
     if not name.strip() or len(name) > MAX_NAME:
         raise AgentError(f"Give the agent a name of 1 to {MAX_NAME} characters.")
     if len(system_prompt) > MAX_PROMPT:
         raise AgentError(f"The instructions are too long ({MAX_PROMPT} characters max).")
     if language not in LANGUAGES:
         raise AgentError(f"Unsupported language '{language}'.")
+    for code in follow_languages:
+        if code not in LANGUAGES:
+            raise AgentError(f"Unsupported language '{code}'.")
     if voice:
         try:
             voices.voice_audio_path(voice)
@@ -54,8 +60,9 @@ def validate(name: str, system_prompt: str, voice: str, language: str, tools: li
 
 def save(agent: Agent) -> Agent:
     agent.name = agent.name.strip()
-    validate(agent.name, agent.system_prompt, agent.voice, agent.language, agent.tools)
+    validate(agent.name, agent.system_prompt, agent.voice, agent.language, agent.tools, agent.follow_languages)
     agent.tools = [t for t in TOOLS if t in agent.tools]  # allowlist order, no duplicates
+    agent.follow_languages = sorted(set(agent.follow_languages) - {agent.language})
     _path(agent.id).write_text(json.dumps(asdict(agent)), encoding="utf-8")
     return agent
 
@@ -64,16 +71,22 @@ def create(**settings) -> Agent:
     return save(Agent(id=uuid.uuid4().hex[:12], **settings))
 
 
+def _load(path) -> Agent:
+    """An agent file; keys this version doesn't know are ignored and missing ones get their defaults."""
+    known = {f.name for f in fields(Agent)}
+    return Agent(**{k: v for k, v in json.loads(path.read_text(encoding="utf-8")).items() if k in known})
+
+
 def get(agent_id: str) -> Agent:
     """KeyError if unknown or malformed."""
     path = _path(agent_id)
     if not path.exists():
         raise KeyError(agent_id)
-    return Agent(**json.loads(path.read_text(encoding="utf-8")))
+    return _load(path)
 
 
 def list_agents() -> list[Agent]:
-    agents = [Agent(**json.loads(p.read_text(encoding="utf-8"))) for p in data_dir("agents").glob("*.json")]
+    agents = [_load(p) for p in data_dir("agents").glob("*.json")]
     return sorted(agents, key=lambda a: a.name.lower())
 
 

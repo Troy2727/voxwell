@@ -61,7 +61,7 @@ def test_live_turns_skip_silence_and_noise_too(monkeypatch):
     seen = []
 
     class Info:
-        duration, language = 1.0, "en"
+        duration, language, language_probability = 1.0, "en", 0.9
 
     class Model:
         def transcribe(self, path, language=None, vad_filter=False):
@@ -117,7 +117,7 @@ def test_engine_transcribe_with_fake_model(monkeypatch, tmp_path):
         start, end, text = 0.0, 1.5, " hi there "
 
     class Info:
-        language = "en"
+        language, language_probability = "en", 0.9
 
     class Model:
         vad_filter = None

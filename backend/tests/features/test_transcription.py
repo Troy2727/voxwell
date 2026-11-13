@@ -181,7 +181,7 @@ def test_running_transcript_cannot_be_deleted(fake, monkeypatch):
 def test_engine_reports_progress(monkeypatch):
     """The real engine calls on_progress with the fraction of audio done after each segment."""
     segs = [SimpleNamespace(start=0.0, end=5.0, text=" a "), SimpleNamespace(start=5.0, end=10.0, text="b")]
-    model = SimpleNamespace(transcribe=lambda path, language=None, vad_filter=False: (iter(segs), SimpleNamespace(duration=10.0, language="en")))
+    model = SimpleNamespace(transcribe=lambda path, language=None, vad_filter=False: (iter(segs), SimpleNamespace(duration=10.0, language="en", language_probability=0.9)))
     monkeypatch.setattr(engine, "_load_model", lambda: model)
     seen = []
     t = engine.transcribe(__import__("pathlib").Path("x.wav"), on_progress=seen.append)

@@ -27,6 +27,7 @@ export default function AgentEditor({ agent, status, voices, onSaved, onDeleted,
   const [voice, setVoice] = useState(agent?.voice ?? '');
   const [language, setLanguage] = useState(agent?.language ?? 'en');
   const [tools, setTools] = useState<string[]>(agent?.tools ?? []);
+  const [follow, setFollow] = useState<string[]>(agent?.follow_languages ?? []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -38,7 +39,7 @@ export default function AgentEditor({ agent, status, voices, onSaved, onDeleted,
     setBusy(true);
     setError('');
     try {
-      const body = { name, system_prompt: prompt, voice, language, tools };
+      const body = { name, system_prompt: prompt, voice, language, tools, follow_languages: follow.filter((c) => c !== language) };
       const saved = agent
         ? await sendJson<Agent>(`/api/agents/agents/${agent.id}`, 'PUT', body)
         : await sendJson<Agent>('/api/agents/agents', 'POST', body);
@@ -75,9 +76,23 @@ export default function AgentEditor({ agent, status, voices, onSaved, onDeleted,
           <VoiceSelect voices={voices} value={voice} onChange={setVoice} disabled={busy} />
         </Field>
         <Field label="Language" hint="What it listens for and speaks.">
-          <ChoiceSelect options={languages} value={language} disabled={busy} onChange={setLanguage} />
+          <ChoiceSelect options={languages} value={language} disabled={busy} onChange={(c) => { setLanguage(c); setFollow((list) => list.filter((x) => x !== c)); }} />
         </Field>
       </div>
+      <Field label="Also follow the user into" hint="When you switch to one of these mid-conversation, the agent answers in it with the same voice. None: it stays in its main language.">
+        <div className="flex flex-wrap gap-x-4 gap-y-2">
+          {languages.filter(([c]) => c !== language).map(([c, label]) => (
+            <label key={c} className="flex items-center gap-2 text-sm">
+              <Checkbox
+                checked={follow.includes(c)}
+                disabled={busy}
+                onCheckedChange={(on) => setFollow((list) => (on ? [...list, c] : list.filter((x) => x !== c)))}
+              />
+              {label}
+            </label>
+          ))}
+        </div>
+      </Field>
       <Field label="Tools" hint="Read-only helpers the agent may use. It cannot run anything else.">
         <div className="flex flex-col gap-2">
           {status.tools.map((t) => (
