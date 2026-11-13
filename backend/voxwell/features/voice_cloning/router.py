@@ -11,7 +11,7 @@ from pydantic import BaseModel
 
 from voxwell import voices
 from voxwell.features.audio_effects.dsp import Effects
-from voxwell.features.voice_cloning import engine, history
+from voxwell.features.voice_cloning import cues, engine, history
 from voxwell.paths import child_path, data_dir
 
 log = logging.getLogger(__name__)
@@ -32,7 +32,11 @@ class SynthesizeRequest(BaseModel):
 
 @router.get("/status")
 def status():
-    return {"ready": importlib.util.find_spec("chatterbox") is not None, "languages": engine.LANGUAGES}
+    return {
+        "ready": importlib.util.find_spec("chatterbox") is not None,
+        "languages": engine.LANGUAGES,
+        "cues": {**cues.status(), "available": engine.turbo_available()},
+    }
 
 
 @router.post("/voices")
@@ -85,13 +89,18 @@ def synthesize(req: SynthesizeRequest):
     try:
         extra = {"effects": req.effects} if req.effects else {}
         wav = engine.synthesize(text, req.language, reference, **extra)
+    except engine.NothingToSay:
+        raise HTTPException(422, "Nothing to say after removing cue tags.")
     except Exception as exc:
         log.exception("Speech synthesis failed")
         raise HTTPException(500, "Speech synthesis failed; see the Voxwell log.") from exc
     audio_id = uuid.uuid4().hex
     (data_dir("voice_cloning") / f"{audio_id}.wav").write_bytes(wav)
     history.record(audio_id, text, req.language, voice_name)
-    return {"id": audio_id, "url": f"/api/voice_cloning/audio/{audio_id}"}
+    body = {"id": audio_id, "url": f"/api/voice_cloning/audio/{audio_id}"}
+    if engine.cues_ignored(text, req.language, reference):
+        body["cues_ignored"] = True
+    return body
 
 
 @router.get("/audio/{audio_id}")

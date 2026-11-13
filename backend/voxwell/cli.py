@@ -564,7 +564,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(run=cmd_collection)
 
     p = sub.add_parser("speak", parents=[common], help="turn text into speech (WAV)")
-    p.add_argument("text", help="what to say, up to 4096 characters; - reads it from stdin")
+    p.add_argument("text", help="what to say, up to 4096 characters; - reads it from stdin. In English, cue tags "
+                   "such as [laugh] or [sigh] send the text to the Chatterbox-Turbo model (other languages leave them out); the list is under "
+                   "\"cues\" in GET /api/voice_cloning/status")
     p.add_argument("-v", "--voice", help="saved voice name or id (default: the built-in voice)")
     p.add_argument("-l", "--language", default="en", help="ISO 639-1 code, e.g. en, es, fr (default en)")
     p.add_argument("--speed", type=float, default=1.0, help="0.5 to 2.0 (default 1.0)")

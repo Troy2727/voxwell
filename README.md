@@ -148,7 +148,7 @@ Voxwell is **MIT licensed**, and every model it runs allows commercial use ([one
 | **Stories** | A script with a different voice for each speaker, or an SRT subtitle file spoken in one voice, each line at its time, with <img src="docs/readme/labels/generate-from-subtitles.svg" alt="Generate from subtitles" height="24" align="absmiddle" />. |
 | **Audiobook** | Drop in an EPUB, <img src="docs/readme/labels/pdf.svg" alt="PDF" height="24" align="absmiddle" />, <img src="docs/readme/labels/word-docx.svg" alt="Word (.docx)" height="24" align="absmiddle" />, TXT or Markdown file and narrate it chapter by chapter. You can stop and resume. Scanned PDFs can't be read. With **Tone memory** on, a local AI keeps the narration's tone steady from paragraph to paragraph. |
 | **Effects** | Use the <img src="docs/readme/labels/speed.svg" alt="Speed" height="24" align="absmiddle" /> and <img src="docs/readme/labels/pitch.svg" alt="Pitch" height="24" align="absmiddle" /> sliders, or add reverb, distance, background noise or stereo pan, to any recording or while generating in Voice cloning and Stories. |
-| **Pauses** | Put `[pause]` or `[pause 2.5]` in any text to add silence, up to 10 seconds. The Voice cloning page has <img src="docs/readme/labels/short.svg" alt="Short" height="24" align="absmiddle" />, <img src="docs/readme/labels/medium.svg" alt="Medium" height="24" align="absmiddle" /> and <img src="docs/readme/labels/long.svg" alt="Long" height="24" align="absmiddle" /> buttons for it. |
+| **Pauses** | Put `[pause]` or `[pause 2.5]` in any text to add silence, up to 10 seconds. The Voice cloning page has <img src="docs/readme/labels/short.svg" alt="Short" height="24" align="absmiddle" />, <img src="docs/readme/labels/medium.svg" alt="Medium" height="24" align="absmiddle" /> and <img src="docs/readme/labels/long.svg" alt="Long" height="24" align="absmiddle" /> buttons for it. In English, text with cue tags such as `[laugh]` or `[sigh]` is spoken by Chatterbox-Turbo, the model that defines them; its Cues menu inserts them. |
 | **Sound effects** | Describe a sound and generate it with Stable Audio Open. Needs a free Hugging Face token and accepting the model's terms. |
 | **Music** | Songs with sung lyrics, or instrumentals, from a description (ACE-Step 1.5). AI can write the lyrics; regenerate any section, follow a style reference, or split a track into vocals and instrumental. Installs once from the Music page (about 12 GB). |
 
@@ -326,6 +326,7 @@ Every model runs locally. Its license is recorded in its feature's `backend/voxw
 | Model | Used for | License |
 | --- | --- | --- |
 | [Chatterbox Multilingual](https://huggingface.co/ResembleAI/chatterbox) | Voice cloning, speech, dubbing, voice conversion, voice remix | MIT |
+| [Chatterbox-Turbo](https://huggingface.co/ResembleAI/chatterbox-turbo) | Cue tags in English speech (same `chatterbox-tts==0.1.6` package) | MIT |
 | [Parler-TTS Mini v1](https://huggingface.co/parler-tts/parler-tts-mini-v1) | Voice design, voice remix | Apache-2.0 |
 | [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (Whisper small) | Dictation, transcription | MIT |
 | [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) with pyannote segmentation and 3D-Speaker | Speaker labels | Apache-2.0, MIT |
