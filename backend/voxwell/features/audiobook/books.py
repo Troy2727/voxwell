@@ -169,18 +169,21 @@ def render_text(
     paragraphs: list[list[str]], language: str, reference: Path | None, progress=None, deliveries: list | None = None
 ) -> bytes:
     """`deliveries`, one tone.Delivery per paragraph, sets how each is read; without it the engine's defaults."""
-    parts = []
+    parts, skipped = [], 0
     total = sum(len(p) for p in paragraphs)
     for p_index, paragraph in enumerate(paragraphs):
         for c_index, chunk in enumerate(paragraph):
             if progress:
                 progress(len(parts), total)
             last_in_paragraph = c_index == len(paragraph) - 1
-            if deliveries:
-                clip = engine.synthesize(chunk, language, reference, **tone.engine_args(deliveries[p_index]))
-            else:
-                clip = engine.synthesize(chunk, language, reference)
+            settings = tone.engine_args(deliveries[p_index]) if deliveries else {}
+            try:
+                clip = engine.synthesize(chunk, language, reference, **settings)
+            except engine.NothingToSay:  # only cue tags in this chunk; the rest of the text goes on
+                clip, skipped = engine.silent_clip(), skipped + 1
             parts.append((clip, PARAGRAPH_PAUSE if last_in_paragraph else SENTENCE_PAUSE))
+    if total and skipped == total:
+        raise engine.NothingToSay("Nothing to say after removing cue tags.")
     return _join(parts)
 
 
@@ -222,7 +225,10 @@ def _work(book: Book) -> None:
                     book.step += " (reading the tone)"
                     deliveries, raw = tone.plan_chapter(paragraphs)
                     log.info("Tone memory for %r: raw %s, smoothed %s", ch.title, tone.stats(raw), tone.stats(deliveries))
-                audio = render_text(paragraphs, book.language, reference, progress, deliveries)
+                try:
+                    audio = render_text(paragraphs, book.language, reference, progress, deliveries)
+                except engine.NothingToSay:  # a chapter of only cue tags: a short silence, not a book stuck in error
+                    audio = engine.silent_clip()
                 chapter_audio(book, index).write_bytes(audio)
                 ch.status = "done"
                 save(book)  # resume point

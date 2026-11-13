@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { usePersisted } from '@/lib/persisted';
+import { CuePicker, Cues } from './CuePicker';
 import { LANGUAGES } from './languages';
 
 const PAUSES: [string, number][] = [['Short', 0.5], ['Medium', 1], ['Long', 2]];
@@ -28,7 +29,15 @@ export default function Page() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [audioUrl, setAudioUrl] = useState('');
+  const [cues, setCues] = useState<Cues | null>(null);
+  const [cueNote, setCueNote] = useState('');
   const textBox = useRef<HTMLTextAreaElement>(null);
+  const cuesHere = !!cues && cues.languages.includes(language);
+  const cueHint = !cuesHere
+    ? ''
+    : cues.available
+      ? ' Cues such as [laugh] ask the voice for that sound or manner.'
+      : ' Cues are unavailable: their model (Chatterbox-Turbo) is missing or failed to load; see the Voxwell log.';
 
   const refresh = () =>
     listVoices().then(setVoices, (e: Error) => {
@@ -37,6 +46,8 @@ export default function Page() {
     });
   useEffect(() => {
     void refresh();
+    // Without it (an older backend), the page just offers no cues.
+    api<{ cues?: Cues }>('/api/voice_cloning/status').then((s) => setCues(s.cues ?? null), () => setCues(null));
   }, []);
 
   // A remembered voice may have been deleted since.
@@ -45,11 +56,12 @@ export default function Page() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [voices]);
 
-  function insertPause(seconds: number) {
+  /** Put `tag` ("[pause 1]", "[laugh]") at the cursor, in place of any selection, spaced from its neighbors. */
+  function insertTag(tag: string) {
     const start = textBox.current?.selectionStart ?? text.length;
     const end = textBox.current?.selectionEnd ?? text.length;
     const before = text.slice(0, start);
-    const tag = `${before && !before.endsWith(' ') ? ' ' : ''}[pause ${seconds}] `;
+    tag = `${before && !before.endsWith(' ') ? ' ' : ''}${tag} `;
     setText(before + tag + text.slice(end).trimStart());
     // After React has put the new text in the box, so the cursor isn't reset by it.
     requestAnimationFrame(() => {
@@ -83,13 +95,19 @@ export default function Page() {
     setBusy(true);
     setError('');
     setAudioUrl('');
+    setCueNote('');
     try {
-      const res = await api<{ id: string; url: string }>('/api/voice_cloning/synthesize', {
+      const res = await api<{ id: string; url: string; cues_ignored?: boolean }>('/api/voice_cloning/synthesize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text, language, voice_id: voiceId || null, effects: isNeutral(fx) ? null : fx }),
       });
       setAudioUrl(apiUrl(res.url));
+      if (res.cues_ignored) {
+        setCueNote(cuesHere
+          ? 'The cues were left out this time: they need a voice clip longer than five seconds and the cue model, which could not be used. See the Voxwell log.'
+          : 'Cues work in English only, so they were left out.');
+      }
     } catch (e) {
       setError(message(e));
     } finally {
@@ -122,15 +140,20 @@ export default function Page() {
             <ChoiceSelect id="clone-language" options={LANGUAGES} value={language} onChange={setLanguage} />
           </Field>
         </div>
-        <Field label="Text" htmlFor="clone-text" hint={`${text.length} / 2000. Type [pause 2] anywhere for two seconds of silence, up to 10.`}>
+        <Field
+          label="Text"
+          htmlFor="clone-text"
+          hint={`${text.length} / 2000. Type [pause 2] anywhere for two seconds of silence, up to 10.${cueHint}`}
+        >
           <Textarea ref={textBox} id="clone-text" rows={5} maxLength={2000} value={text} onChange={(e) => setText(e.target.value)} placeholder="Type what the voice should say…" />
         </Field>
         <div className="flex flex-wrap items-center gap-2">
           {PAUSES.map(([label, seconds]) => (
-            <Button key={label} variant="outline" size="sm" aria-label={`${label} pause`} disabled={busy} onClick={() => insertPause(seconds)}>
+            <Button key={label} variant="outline" size="sm" aria-label={`${label} pause`} disabled={busy} onClick={() => insertTag(`[pause ${seconds}]`)}>
               <Pause /> {label}
             </Button>
           ))}
+          {cuesHere && <CuePicker groups={cues.groups} disabled={busy || !cues.available} onPick={insertTag} />}
         </div>
         <EffectsControls value={fx} onChange={setFx} disabled={busy} resettable />
         <div>
@@ -139,6 +162,7 @@ export default function Page() {
           </Button>
         </div>
         <ErrorAlert message={error} />
+        {cueNote && <p className="text-sm text-muted-foreground">{cueNote}</p>}
         {audioUrl && <AudioResult src={audioUrl} download="voxwell-speech.wav" />}
       </Section>
     </PageLayout>

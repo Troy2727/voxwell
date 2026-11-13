@@ -274,3 +274,51 @@ def test_voice_remix_s3gen_calls_match_installed_api():
     assert "self.tokenizer" in inspect.getsource(s3gen_module.S3Token2Mel.__init__)
     assert vc_module.ChatterboxVC.DEC_COND_LEN > 0
     assert "self.watermarker" in inspect.getsource(vc_module.ChatterboxVC.__init__)
+
+
+def test_chatterbox_turbo_calls_match_installed_api(monkeypatch):
+    """Cue tags: Turbo is loaded from a token-free snapshot and called with only the voice clip."""
+    turbo_module = pytest.importorskip("chatterbox.tts_turbo")
+    import inspect
+
+    import huggingface_hub
+    import numpy as np
+
+    from voxwell.features.voice_cloning import engine
+
+    Turbo = turbo_module.ChatterboxTurboTTS
+    assert "audio_prompt_path" in inspect.signature(Turbo.generate).parameters
+    assert list(inspect.signature(Turbo.from_local).parameters) == ["ckpt_dir", "device"]
+
+    model = mock.create_autospec(Turbo, instance=True)
+    model.sr = 24000
+    model.generate.return_value = np.zeros(10, dtype="float32")
+    from_local = mock.create_autospec(Turbo.from_local, return_value=model)
+    download = mock.create_autospec(huggingface_hub.snapshot_download, return_value="turbo-folder")
+    monkeypatch.setattr(Turbo, "from_local", from_local)
+    monkeypatch.setattr(huggingface_hub, "snapshot_download", download)
+    monkeypatch.setattr(engine, "_turbo", None)
+    monkeypatch.setattr(engine, "_turbo_state", None)
+    monkeypatch.setattr(engine, "_pick_device", lambda: "cpu")
+
+    assert engine.synthesize("Hello [laugh]", "en")[:4] == b"RIFF"
+    assert download.call_args.kwargs["token"] is False
+    assert download.call_args.kwargs["repo_id"] == engine.TURBO_REPO
+    model.generate.assert_called_once_with("Hello [laugh]")
+    # A skipped line's silence is joined to both models' clips, so it must share their rate.
+    assert engine.SAMPLE_RATE == turbo_module.S3GEN_SR == pytest.importorskip("chatterbox.mtl_tts").S3GEN_SR
+
+
+def test_cue_vocabulary_matches_the_turbo_tokenizer():
+    """Runs only where the Turbo files are already downloaded; never downloads them."""
+    huggingface_hub = pytest.importorskip("huggingface_hub")
+    import json
+
+    from voxwell.features.voice_cloning import cues, engine
+
+    added = huggingface_hub.try_to_load_from_cache(engine.TURBO_REPO, "added_tokens.json")
+    if not isinstance(added, str):
+        pytest.skip("Chatterbox-Turbo is not downloaded on this machine.")
+    with open(added, encoding="utf-8") as f:
+        tokens = json.load(f)
+    assert {f"[{tag}]" for tag in cues.VOCABULARY} == set(tokens)

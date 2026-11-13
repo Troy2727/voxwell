@@ -143,6 +143,8 @@ def speak(req: SpeakRequest):
             raise HTTPException(422, "Unknown voice.")
     try:
         wav = cloning_engine.synthesize(text, req.language, reference)
+    except cloning_engine.NothingToSay as exc:
+        raise HTTPException(422, str(exc)) from exc
     except Exception as exc:
         log.exception("Speech synthesis failed")
         raise HTTPException(500, "Speech synthesis failed; see the Voxwell log.") from exc
@@ -199,6 +201,8 @@ def directed_speak(req: DirectedSpeakRequest):
         wav = cloning_engine.synthesize(
             text, req.language, reference, exaggeration=exaggeration_for(req.intensity), cfg_weight=PACE_CFG[req.pace]
         )
+    except cloning_engine.NothingToSay as exc:
+        raise HTTPException(422, str(exc)) from exc
     except Exception as exc:
         log.exception("Speech synthesis failed")
         raise HTTPException(500, "Speech synthesis failed; see the Voxwell log.") from exc

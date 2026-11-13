@@ -2,6 +2,8 @@
 
 import re
 
+from voxwell.features.voice_cloning import cues
+
 MAX_CHARS = 250  # Chatterbox drifts on long inputs; a sentence or two at a time sounds best
 MIN_STANDALONE = 40  # shorter paragraphs are joined to the next one (see chapter_chunks)
 
@@ -11,13 +13,43 @@ MIN_STANDALONE = 40  # shorter paragraphs are joined to the next one (see chapte
 _SENTENCE_END = re.compile(r"(?<=[.!?…])\s+|(?<=[.!?…][\"'”’)\]])\s+")
 
 
+def _last_space(part: str) -> int:
+    """Where to cut an over-long piece: the last space within MAX_CHARS that is neither inside a
+    cue tag ("[clear throat]") nor right before one, so a cue stays with the word it follows."""
+    tags = cues.spans(part)
+    cut = part.rfind(" ", 0, MAX_CHARS)
+    while cut > 0 and any(start - 1 <= cut < end for start, end in tags):
+        cut = part.rfind(" ", 0, cut)
+    if cut > 0:
+        return cut
+    for start, end in tags:  # no safe space: a hard cut, but at a tag's edge, never inside it
+        if start < MAX_CHARS < end:
+            return start if start > 0 else end
+    return MAX_CHARS
+
+
+def _bare_cue(piece: str) -> bool:
+    """A piece with cue tags and nothing else to say ("[laugh]."), which must not stand alone."""
+    return bool(cues.find(piece)) and not cues.has_speech(piece)
+
+
+def _attach_bare_cues(pieces: list[str]) -> list[str]:
+    """Join each bare-cue piece to the piece before it (or, at the start, to the one after)."""
+    out: list[str] = []
+    for piece in pieces:
+        if out and (_bare_cue(piece) or _bare_cue(out[-1])):
+            out[-1] = f"{out[-1]} {piece}"
+        else:
+            out.append(piece)
+    return out
+
+
 def _split_long(sentence: str) -> list[str]:
     """Break an over-long sentence at commas/semicolons, then at spaces, into <= MAX_CHARS."""
     pieces, current = [], ""
     for part in re.split(r"(?<=[,;:])\s+", sentence):
         while len(part) > MAX_CHARS:  # no punctuation to break on: cut at the last space
-            cut = part.rfind(" ", 0, MAX_CHARS)
-            cut = cut if cut > 0 else MAX_CHARS
+            cut = _last_space(part)
             if current:
                 pieces.append(current)
                 current = ""
@@ -52,7 +84,7 @@ def chunks(paragraph: str) -> list[str]:
             current = f"{current} {sentence}".strip()
     if current:
         out.append(current)
-    return out
+    return _attach_bare_cues(out)
 
 
 def chapter_chunks(text: str) -> list[list[str]]:

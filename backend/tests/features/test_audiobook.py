@@ -410,3 +410,20 @@ def test_projects_list_rename_delete(fake):
     assert client.patch(path, json={"title": "Keeper"}).json()["title"] == "Keeper"
     assert client.delete(path).status_code == 200
     assert client.get("/api/projects/items").json() == []
+
+
+def test_a_chapter_of_only_cue_tags_becomes_silence_and_the_book_finishes(fake, monkeypatch):
+    def synth(text, language, reference_audio=None):
+        if text.strip("[] .").lower() == "laugh":
+            raise engine.NothingToSay("Nothing to say after removing cue tags.")
+        fake.append((text, language, None))
+        return wav_bytes()
+
+    monkeypatch.setattr(engine, "synthesize", synth)
+    book = client.post("/api/audiobook/books", files={"file": ("book.txt", b"CHAPTER 1\nBonjour, mon ami, comment vas-tu ce soir?\n\nCHAPTER 2\n[laugh]", "text/plain")}).json()
+    client.patch(f"/api/audiobook/books/{book['id']}", json={"language": "fr"})
+    done = client.post(f"/api/audiobook/books/{book['id']}/render").json()
+    assert done["state"] == "done" and done["error"] is None
+    assert [c["status"] for c in done["chapters"]] == ["done", "done"]
+    assert client.get(done["chapters"][-1]["audio_url"]).content[:4] == b"RIFF"
+    assert [t for t, _, _ in fake] == ["Bonjour, mon ami, comment vas-tu ce soir?"]
