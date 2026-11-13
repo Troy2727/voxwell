@@ -37,7 +37,8 @@ def context_tail(text: str, limit: int = CONTEXT_CHARS) -> str:
     if len(text) <= limit:
         return text
     cut = text[-limit:]
-    return cut.split(" ", 1)[1] if " " in cut else cut
+    whole = cut.split(" ", 1)[1] if " " in cut else cut
+    return whole or cut  # a space only at the very edge would leave nothing
 
 
 def context_head(text: str, limit: int = CONTEXT_CHARS) -> str:
@@ -45,7 +46,8 @@ def context_head(text: str, limit: int = CONTEXT_CHARS) -> str:
     if len(text) <= limit:
         return text
     cut = text[:limit]
-    return cut.rsplit(" ", 1)[0] if " " in cut else cut
+    whole = cut.rsplit(" ", 1)[0] if " " in cut else cut
+    return whole or cut
 
 
 # Where a smoothed intensity stops being described as the level below or above medium: halfway, with a
@@ -65,8 +67,9 @@ def describe(delivery: Delivery | None) -> str:
 
 def build_request(paragraph: str, previous: str, following: str, held: Delivery | None) -> str:
     """The model's input for one paragraph; the book text goes in only as quoted data."""
-    # Book text can't close the quotes early: its own triple quotes become single ones (same length).
-    paragraph, previous, following = (t.replace('"""', "'''") for t in (paragraph, previous, following))
+    # Book text can't touch the quotes around it: its own double quotes become single ones (same length;
+    # dialogue reads the same for judging tone).
+    paragraph, previous, following = (t.replace('"', "'") for t in (paragraph, previous, following))
     parts = [f"Delivery so far: {describe(held)}"]
     if previous:
         parts.append(f'Text just before (context only):\n"""{context_tail(previous)}"""')

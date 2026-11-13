@@ -286,3 +286,12 @@ def test_preview_reads_like_the_full_render(synth, model):
     model.replies = list(script)
     client.post(f"/api/audiobook/books/{book['id']}/render")
     assert previewed and previewed == synth[: len(previewed)]
+
+
+def test_dialogue_quotes_never_touch_the_fences():
+    request = tone.build_request('"Stop."', 'He said "" no', '', None)
+    assert request.count(chr(34)) == 12  # only the fences: two triple quotes for each of the two regions
+
+
+def test_context_cuts_never_come_back_empty():
+    assert tone.context_tail("x" * 299 + " " + "y", 300) and tone.context_head(" " + "x" * 400, 300)
