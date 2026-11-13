@@ -5,6 +5,7 @@ import { api, apiUrl, listVoices, Voice } from '../../api';
 import { AudioResult } from '@/components/audio-result';
 import { ChoiceSelect } from '@/components/choice-select';
 import { EffectsControls, isNeutral, NO_EFFECTS, reviveEffects } from '@/components/effects-controls';
+import { ApprovalCard } from '@/components/approval-card';
 import { FileDrop } from '@/components/file-drop';
 import { ErrorAlert, Field, message, Page as PageLayout, Section } from '@/components/page';
 import { VoiceSelect } from '@/components/voice-select';
@@ -17,12 +18,18 @@ import { LANGUAGES } from './languages';
 
 const PAUSES: [string, number][] = [['Short', 0.5], ['Medium', 1], ['Long', 2]];
 
+const CONSENT_MINE = "It's my own voice";
+const CONSENT_AGREED = 'Someone who agreed to be cloned';
+const CONSENT_NO = "Someone who hasn't agreed";
+
 export default function Page() {
   const [voices, setVoices] = useState<Voice[] | null>(null);
   const [voiceId, setVoiceId] = usePersisted('voxwell.voice_cloning.voice', '');
   const [name, setName] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [askingConsent, setAskingConsent] = useState(false);
+  const [refused, setRefused] = useState(false);
   const [text, setText] = useState('');
   const [language, setLanguage] = usePersisted('voxwell.voice_cloning.language', 'en');
   const [fx, setFx] = usePersisted('voxwell.voice_cloning.effects', NO_EFFECTS, reviveEffects);
@@ -124,11 +131,36 @@ export default function Page() {
         <Field label="Reference clip">
           <FileDrop file={file} onFile={setFile} accept=".wav,.mp3,.flac,.ogg,audio/*" disabled={uploading} />
         </Field>
-        <div>
-          <Button disabled={uploading || !file || !name.trim()} onClick={upload}>
-            <Upload /> {uploading ? 'Uploading…' : 'Upload voice'}
-          </Button>
-        </div>
+        {askingConsent ? (
+          <ApprovalCard
+            title="Before cloning this voice"
+            questions={[{ question: 'Whose voice is in this clip?', options: [CONSENT_MINE, CONSENT_AGREED, CONSENT_NO] }]}
+            onCancel={() => setAskingConsent(false)}
+            onDone={([answer]) => {
+              setAskingConsent(false);
+              if (answer === CONSENT_NO) setRefused(true);
+              else void upload();
+            }}
+          />
+        ) : (
+          <div>
+            <Button
+              disabled={uploading || !file || !name.trim()}
+              onClick={() => {
+                setRefused(false);
+                setAskingConsent(true);
+              }}
+            >
+              <Upload /> {uploading ? 'Uploading…' : 'Upload voice'}
+            </Button>
+          </div>
+        )}
+        {refused && (
+          <p role="alert" className="text-sm">
+            Voxwell only clones a voice with the speaker's permission, so this clip was not uploaded. Ask them first, or make a new voice
+            in Voice design.
+          </p>
+        )}
       </Section>
 
       <Section title="Generate speech">
