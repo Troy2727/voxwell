@@ -57,7 +57,16 @@ def _strip(text: str, names: frozenset[str]) -> str:
 
     # The tag is found by itself and the spaces around it are stepped over by hand: a regex with
     # optional spaces before the bracket would be quadratic on long runs of spaces.
-    out, pos = [], 0
+    # `gap`: removed tags sit right after a word, so the next kept text may need one space before it
+    # ("word[laugh]word" -> "word word"). Decided only once that text is known, so runs of adjacent
+    # tags ("[laugh][sigh]") leave none at an edge, before punctuation or after an opening bracket.
+    out, pos, last, gap = [], 0, "", False
+
+    def keep(kept: str) -> None:
+        if gap and kept and not kept[0].isspace() and kept[0] not in _CLOSING:
+            out.append(" ")
+        out.append(kept)
+
     for m in _BRACKET.finditer(text):
         if _key(m[1]) not in names:
             continue
@@ -66,13 +75,12 @@ def _strip(text: str, names: frozenset[str]) -> str:
             start -= 1
         while end < len(text) and text[end] in " \t":
             end += 1
-        before = text[start - 1] if start > 0 else ""
-        after = text[end] if end < len(text) else ""
-        # One space between two words ("word[laugh]word" -> "word word"); none at an edge or before punctuation.
-        between_words = before and not before.isspace() and after and not after.isspace()
-        out += [text[pos:start], " " if between_words and after not in _CLOSING and before not in _OPENING else ""]
+        if start > pos:
+            keep(text[pos:start])
+            last = text[start - 1]
+        gap = bool(last) and not last.isspace() and last not in _OPENING
         pos = end
-    out.append(text[pos:])
+    keep(text[pos:])
     return "".join(out)
 
 

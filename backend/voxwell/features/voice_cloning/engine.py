@@ -35,7 +35,8 @@ TURBO_REPO = "ResembleAI/chatterbox-turbo"
 TURBO_FILES = ["ve.safetensors", "t3_turbo_v1.safetensors", "s3gen_meanflow.safetensors", "conds.pt", "*.json", "*.txt"]
 TURBO_MIN_REFERENCE = 5.0  # seconds; Turbo refuses a reference clip that isn't longer than this
 _turbo = None
-_turbo_state: str | None = None  # "failed": not retried in this process; "oom": retried on the next call
+_turbo_state: str | None = None  # "failed": Turbo is not tried again in this process
+_turbo_rejected: set[str] = set()  # voices (str of the reference path) Turbo failed to speak with
 
 # On CUDA, a model is loaded next to the other one only with at least this much free GPU memory;
 # below it the other model is released first. 0 (never release) until both models' needs are
@@ -207,33 +208,50 @@ def _out_of_memory(exc: BaseException) -> bool:
     return isinstance(exc, MemoryError) or "out of memory" in str(exc).lower()
 
 
-def _turbo_from_hub(device: str):
-    """Download Turbo without a Hugging Face token and load it from that folder.
+def _turbo_download() -> str:
+    """Download Turbo's files (or find them cached) without a Hugging Face token; their folder.
 
     The package's own from_pretrained sends token=True, which fails for anyone without a Hugging
     Face login; the repo is public (MIT), so no token is needed.
     """
-    from chatterbox.tts_turbo import ChatterboxTurboTTS
     from huggingface_hub import snapshot_download
 
-    folder = snapshot_download(repo_id=TURBO_REPO, token=False, allow_patterns=TURBO_FILES)
+    return snapshot_download(repo_id=TURBO_REPO, token=False, allow_patterns=TURBO_FILES)
+
+
+def _turbo_from_folder(folder: str, device: str):
+    from chatterbox.tts_turbo import ChatterboxTurboTTS
+
     with _torch_load_to_cpu():
         return ChatterboxTurboTTS.from_local(folder, device)
 
 
+def _turbo_failed(exc: Exception) -> None:
+    """Stop trying Turbo for this process. Also after running out of memory: on a GPU that fits one
+    model, each retry would free Multilingual, fail again and reload it, request after request."""
+    global _turbo_state
+    _turbo_state = "failed"
+    log.warning("Chatterbox-Turbo could not be loaded (%s); cue tags are left out of the speech.", exc)
+
+
 def _load_turbo():
     """Load and cache Turbo for this process; None when it can't be loaded (cues are then left out)."""
-    global _turbo, _turbo_state
+    global _turbo
+    if _turbo is not None or _turbo_state == "failed":
+        return _turbo
+    try:
+        folder = _turbo_download()  # outside _lock: a first download takes minutes, and speech goes on meanwhile
+    except Exception as exc:
+        _turbo_failed(exc)
+        return None
     with _lock:
         if _turbo is None and _turbo_state != "failed":
             device = _pick_device()
             _make_room(device, "multilingual")
             try:
-                _turbo = _keep_default_voice(_load_or_free(_turbo_from_hub, device, "multilingual"))
-                _turbo_state = None
+                _turbo = _keep_default_voice(_load_or_free(lambda d: _turbo_from_folder(folder, d), device, "multilingual"))
             except Exception as exc:
-                _turbo_state = "oom" if _out_of_memory(exc) else "failed"
-                log.warning("Chatterbox-Turbo could not be loaded (%s); cue tags are left out of the speech.", exc)
+                _turbo_failed(exc)
         return _turbo
 
 
@@ -256,11 +274,16 @@ def _long_enough_for_turbo(reference: Path | None) -> bool:
         return False
 
 
+def _turbo_accepts(reference: Path | None) -> bool:
+    """Whether to try Turbo with this voice: long enough, and Turbo hasn't already failed on it."""
+    return str(reference) not in _turbo_rejected and _long_enough_for_turbo(reference)
+
+
 def cues_ignored(text: str, language: str, reference: Path | None = None) -> bool:
     """Whether `text` has cue tags that synthesize() leaves out instead of voicing."""
     if not cue_tags.find(text):
         return False
-    voiced = language in cue_tags.VOICED_LANGUAGES and _long_enough_for_turbo(reference) and _turbo_state is None
+    voiced = language in cue_tags.VOICED_LANGUAGES and _turbo_accepts(reference) and _turbo_state is None
     return not voiced
 
 
@@ -330,14 +353,28 @@ def synthesize(
     """
     if language not in LANGUAGES:
         raise ValueError(f"Unsupported language '{language}'.")
+
+    out = None
+    if cues and language in cue_tags.VOICED_LANGUAGES and cue_tags.find(text):
+        if not _turbo_accepts(reference_audio):
+            log.warning("This voice can't be used with cue tags (its clip must be longer than %s seconds); they are left out.", TURBO_MIN_REFERENCE)
+        elif (turbo := _load_turbo()) is not None:
+            try:
+                out = _speak(text, language, reference_audio, turbo, {})
+            except Exception:
+                # E.g. a clip just over the limit by its header but not after Turbo resamples it.
+                log.exception("Chatterbox-Turbo could not speak this; cue tags are left out.")
+                _turbo_rejected.add(str(reference_audio))
+    if out is None:
+        multilingual = {"language_id": language, "exaggeration": exaggeration, "cfg_weight": cfg_weight}
+        out = _speak(text, language, reference_audio, None, multilingual)
+    return apply_to_wav(out, effects) if effects is not None else out
+
+
+def _speak(text: str, language: str, reference_audio: Path | None, turbo, kwargs: dict) -> bytes:
+    """synthesize() with Turbo (`turbo`, the loaded model) or, when it is None, Multilingual."""
     import numpy as np
 
-    turbo = None
-    if cues and language in cue_tags.VOICED_LANGUAGES and cue_tags.find(text):
-        if _long_enough_for_turbo(reference_audio):
-            turbo = _load_turbo()
-        else:
-            log.warning("The voice's clip is %s seconds or shorter, too short for cue tags; they are left out.", TURBO_MIN_REFERENCE)
     parts = split_pauses(text)
     plan = []
     for part in parts:
@@ -352,9 +389,8 @@ def synthesize(
 
     model = turbo if turbo is not None else _load_model()
     # Turbo has no language, exaggeration or cfg_weight (it warns when they are set).
-    kwargs = {} if turbo is not None else {"language_id": language, "exaggeration": exaggeration, "cfg_weight": cfg_weight}
     if reference_audio is not None:
-        kwargs["audio_prompt_path"] = str(reference_audio)
+        kwargs = {**kwargs, "audio_prompt_path": str(reference_audio)}
     audio = []
     for part in plan:
         if isinstance(part, str):
@@ -366,8 +402,7 @@ def synthesize(
                 audio.append(_flat(model.generate(part, **kwargs)))
         else:
             audio.append(np.zeros(int(part * model.sr), dtype=np.float32))
-    out = _to_wav(np.concatenate(audio), model.sr)
-    return apply_to_wav(out, effects) if effects is not None else out
+    return _to_wav(np.concatenate(audio), model.sr)
 
 
 SAMPLE_RATE = 24000  # both Chatterbox models' output rate (their .sr); see test_model_api_contracts

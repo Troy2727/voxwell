@@ -225,7 +225,10 @@ def _work(book: Book) -> None:
                     book.step += " (reading the tone)"
                     deliveries, raw = tone.plan_chapter(paragraphs)
                     log.info("Tone memory for %r: raw %s, smoothed %s", ch.title, tone.stats(raw), tone.stats(deliveries))
-                audio = render_text(paragraphs, book.language, reference, progress, deliveries)
+                try:
+                    audio = render_text(paragraphs, book.language, reference, progress, deliveries)
+                except engine.NothingToSay:  # a chapter of only cue tags: a short silence, not a book stuck in error
+                    audio = engine.silent_clip()
                 chapter_audio(book, index).write_bytes(audio)
                 ch.status = "done"
                 save(book)  # resume point

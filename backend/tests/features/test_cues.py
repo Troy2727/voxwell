@@ -81,18 +81,26 @@ class FakeModel:
 @pytest.fixture
 def models(monkeypatch):
     multi, turbo = FakeModel(0.1), FakeModel(0.2)
-    hub = {"loads": 0, "error": None}
+    hub = {"downloads": 0, "loads": 0, "download_error": None, "error": None}
 
-    def from_hub(device):
+    def download():
+        hub["downloads"] += 1
+        if hub["download_error"]:
+            raise hub["download_error"]
+        return "turbo-folder"
+
+    def from_folder(folder, device):
         hub["loads"] += 1
         if hub["error"]:
             raise hub["error"]
         return turbo
 
     monkeypatch.setattr(engine, "_load_model", lambda: multi)
-    monkeypatch.setattr(engine, "_turbo_from_hub", from_hub)
+    monkeypatch.setattr(engine, "_turbo_download", download)
+    monkeypatch.setattr(engine, "_turbo_from_folder", from_folder)
     monkeypatch.setattr(engine, "_turbo", None)
     monkeypatch.setattr(engine, "_turbo_state", None)
+    monkeypatch.setattr(engine, "_turbo_rejected", set())
     monkeypatch.setattr(engine, "_pick_device", lambda: "cpu")
     return multi, turbo, hub
 
@@ -164,23 +172,24 @@ def test_short_reference_falls_back_with_cues_left_out(models, tmp_path, monkeyp
 
 def test_turbo_that_cannot_load_falls_back_and_is_not_retried(models):  # T11
     multi, turbo, hub = models
-    hub["error"] = OSError("offline")
+    hub["download_error"] = OSError("offline")
     engine.synthesize("Hi [laugh] there", "en")
     engine.synthesize("Again [sigh]", "en")
     assert [c[0] for c in multi.calls] == ["Hi there", "Again"]
-    assert hub["loads"] == 1 and engine.cues_ignored("Again [sigh]", "en")
+    assert hub["downloads"] == 1 and hub["loads"] == 0 and engine.cues_ignored("Again [sigh]", "en")
     assert engine.turbo_available() is False
 
 
-def test_turbo_out_of_memory_frees_retries_once_and_tries_again_next_call(models, monkeypatch):
+def test_turbo_out_of_memory_frees_retries_once_then_stops_trying(models, monkeypatch):
     multi, turbo, hub = models
     monkeypatch.setattr(engine, "_model", multi)
     hub["error"] = RuntimeError("CUDA out of memory")
     engine.synthesize("Hi [laugh] there", "en")
     assert hub["loads"] == 2 and engine._model is None  # freed, retried once
     hub["error"] = None
-    engine.synthesize("Hi [laugh] there", "en")
-    assert hub["loads"] == 3 and turbo.calls == [("Hi [laugh] there", {})]
+    engine.synthesize("Hi [laugh] there", "en")  # no more freeing and reloading, request after request
+    assert hub["loads"] == 2 and turbo.calls == [] and [c[0] for c in multi.calls] == ["Hi there", "Hi there"]
+    assert engine.cues_ignored("Hi [laugh] there", "en")
 
 
 def test_pronunciation_never_rewrites_a_cue(models):  # T12
@@ -194,7 +203,7 @@ def test_the_two_models_never_generate_at_the_same_time(monkeypatch, models):  #
     multi, turbo, _ = models
     shared = FakeModel(0.1)  # one object for both, so any overlap between the calls is seen
     monkeypatch.setattr(engine, "_load_model", lambda: shared)
-    monkeypatch.setattr(engine, "_turbo_from_hub", lambda device: shared)
+    monkeypatch.setattr(engine, "_turbo_from_folder", lambda folder, device: shared)
     threads = [threading.Thread(target=engine.synthesize, args=(t, "en")) for t in ["A [laugh]. B. [pause] C."] * 3 + ["A. [pause] B. [pause] C."] * 3]
     for t in threads:
         t.start()
@@ -275,7 +284,7 @@ class VoiceModel(FakeModel):
 
 def test_no_voice_after_a_cloned_one_gets_the_built_in_voice_again(models, monkeypatch, tmp_path):
     turbo, multi = VoiceModel(), VoiceModel()
-    monkeypatch.setattr(engine, "_turbo_from_hub", lambda device: turbo)
+    monkeypatch.setattr(engine, "_turbo_from_folder", lambda folder, device: turbo)
     monkeypatch.setattr(engine, "_multilingual_from_hub", lambda device: multi)
     monkeypatch.setattr(engine, "_load_model", REAL_LOAD_MODEL)
     monkeypatch.setattr(engine, "_model", None)
@@ -358,3 +367,51 @@ def test_stripping_is_fast_on_long_runs_of_spaces():
     text = " " * 50_000 + "x" + "\t" * 50_000 + "[laugh]"
     assert cues.strip_known(text) == " " * 50_000 + "x"
     assert time.monotonic() - start < 1
+
+
+# Second review
+
+
+def test_turbo_downloads_outside_the_lock_and_loads_inside_it(models, monkeypatch):
+    _, turbo, _ = models
+    seen = []
+
+    def download():
+        seen.append(("download", engine._lock.locked()))
+        return "turbo-folder"
+
+    def from_folder(folder, device):
+        seen.append(("load", engine._lock.locked()))
+        return turbo
+
+    monkeypatch.setattr(engine, "_turbo_download", download)
+    monkeypatch.setattr(engine, "_turbo_from_folder", from_folder)
+    engine.synthesize("Hi [laugh]", "en")
+    assert seen == [("download", False), ("load", True)]
+
+
+def test_turbo_failing_to_speak_falls_back_without_cues(models, monkeypatch, tmp_path):
+    multi, turbo, _ = models
+    from voxwell import voices
+
+    def refuse(text, **kwargs):
+        turbo.calls.append(text)
+        raise AssertionError("Audio prompt must be longer than 5 seconds!")
+
+    monkeypatch.setattr(turbo, "generate", refuse)
+    voice = voices.save_voice("Just over", clip(tmp_path, 5.01).read_bytes(), "upload")
+    r = client.post("/api/voice_cloning/synthesize", json={"text": "Hi [laugh] there", "language": "en", "voice_id": voice.id})
+    assert r.status_code == 200 and r.json()["cues_ignored"] is True
+    assert turbo.calls == ["Hi [laugh] there"] and multi.calls[0][0] == "Hi there"
+    client.post("/api/voice_cloning/synthesize", json={"text": "Again [sigh]", "language": "en", "voice_id": voice.id})
+    assert turbo.calls == ["Hi [laugh] there"]  # that voice isn't tried with Turbo again
+    engine.synthesize("Built-in voice [laugh]", "en")
+    assert turbo.calls[-1] == "Built-in voice [laugh]"  # other voices still are
+
+
+def test_adjacent_tags_leave_no_stray_space():
+    assert cues.strip_known("[laugh][sigh] Hello") == "Hello"
+    assert cues.strip_known("Hi [laugh][sigh] there") == "Hi there"
+    assert cues.strip_known("Hi [laugh][sigh].") == "Hi."
+    assert cues.strip_known("Hi[laugh][sigh]there") == "Hi there"
+    assert cues.strip_known("Hello [laugh] [sigh]") == "Hello"
