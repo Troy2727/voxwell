@@ -72,6 +72,7 @@ async function openLive(page: Page) {
     ws.onMessage((data) => {
       if (typeof data === 'string') {
         const m = JSON.parse(data);
+        if (m.type === 'end') ws.send(JSON.stringify({ type: 'done' }));
         if (m.type === 'start') {
           config = m.config;
           ws.send(JSON.stringify({ type: 'ready' }));
@@ -147,4 +148,24 @@ test('the microphone stays silenced while the last sentence is still decoding', 
   expect(during.length).toBeGreaterThan(0);
   expect(during.every((f) => f.silent)).toBe(true);
   await expect(main.getByText('Listening…')).toBeVisible({ timeout: 3000 });
+});
+
+test('a new live session never rewrites an earlier session reply', async ({ page }) => {
+  const { main, say } = await openLive(page);
+  say({ type: 'turn_end' });
+  say({ type: 'reply_start', transcript: 'first question', tool_calls: [] });
+  say({ type: 'reply_text', seq: 0, text: 'The first answer stays as it is.' });
+  say({ type: 'reply_audio', seq: 0, audio: null });
+  say({ type: 'turn', transcript: 'first question', reply: 'The first answer stays as it is.', tool_calls: [], streamed: true, parts: 1, language: 'en', timing: {} });
+  await expect(main.getByText('The first answer stays as it is.', { exact: true })).toBeVisible();
+  await main.getByRole('button', { name: 'End conversation' }).click();
+  await main.getByRole('button', { name: 'Live conversation' }).click();
+  await expect(main.getByText('Listening…')).toBeVisible();
+  say({ type: 'turn_end' }); // turn numbers start at 0 again in the new session
+  say({ type: 'reply_start', transcript: 'second question', tool_calls: [] });
+  say({ type: 'reply_text', seq: 0, text: 'A second answer.' });
+  say({ type: 'reply_audio', seq: 0, audio: null });
+  say({ type: 'turn', transcript: 'second question', reply: 'A second answer.', tool_calls: [], streamed: true, parts: 1, language: 'en', timing: {} });
+  await expect(main.getByText('A second answer.', { exact: true })).toBeVisible();
+  await expect(main.getByText('The first answer stays as it is.', { exact: true })).toBeVisible();
 });

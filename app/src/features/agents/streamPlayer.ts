@@ -57,6 +57,13 @@ export class StreamPlayer {
     if (!this.playing) this.onIdle(); // e.g. the last sentence had no audio
   }
 
+  /** Stop, and let go of the audio device (the player can't be used again). */
+  close() {
+    this.clear();
+    void this.ctx?.close();
+    this.ctx = null;
+  }
+
   /** Stop at once and forget everything queued. */
   clear() {
     this.generation++;
@@ -78,7 +85,7 @@ export class StreamPlayer {
     source.connect(ctx.destination);
     source.onended = () => {
       this.sources.delete(source);
-      if (!this.sources.size) this.onIdle();
+      if (!this.playing) this.onIdle(); // not while a later sentence is still decoding or waiting
     };
     this.sources.add(source);
     source.start(startAt);

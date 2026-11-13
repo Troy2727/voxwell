@@ -709,3 +709,13 @@ def test_a_tool_call_after_a_spoken_sentence_is_run_not_read_aloud(stream, monke
     texts = [m["text"] for m in messages if m["type"] == "reply_text"]
     assert texts == ["Let me work that out for you right now.", "Six times seven comes to forty two."]
     assert messages[-1]["tool_calls"][0]["result"] == "42" and "tool_call" not in messages[-1]["reply"]
+
+
+def test_text_in_the_same_piece_as_a_tool_call_is_still_spoken(stream, monkeypatch):
+    stream.rounds = [
+        ["Let me work that out for you right now. ", "Back in a moment. <tool_call>", '{"name": "calculator", "arguments": {"expression": "6*7"}}</tool_call>'],
+        ["Six times seven comes to forty two."],
+    ]
+    messages = streamed_turn(make_agent()["id"], "six times seven", monkeypatch)
+    texts = [m["text"] for m in messages if m["type"] == "reply_text"]
+    assert texts == ["Let me work that out for you right now.", "Back in a moment.", "Six times seven comes to forty two."]

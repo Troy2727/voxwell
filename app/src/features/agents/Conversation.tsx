@@ -18,7 +18,7 @@ interface Message {
   warning?: string;
   failed?: boolean; // an error shown in the conversation, never sent back as history
   language?: string; // the language an assistant reply was given in
-  turn?: number; // the live turn a streamed reply belongs to
+  turn?: string; // the live session and turn a streamed reply belongs to (turn numbers restart per session)
 }
 
 interface Reply {
@@ -68,7 +68,9 @@ export default function Conversation({ agent }: { agent: Agent }) {
   const left = useRef(false); // this conversation is gone (another agent, the editor, another page)
   const bottom = useRef<HTMLDivElement>(null);
   // Flow replies (live mode): the reply being streamed, and whether its final "turn" has arrived.
-  const streaming = useRef<{ turn: number; done: boolean } | null>(null);
+  const streaming = useRef<{ turn: string; done: boolean } | null>(null);
+  const session = useRef(0); // counts live sessions, so their turn numbers don't collide
+  const turnKey = (index: unknown) => `${session.current}:${String(index)}`;
   const turnEndAt = useRef(0);
   const player = useRef<StreamPlayer | null>(null);
 
@@ -134,30 +136,33 @@ export default function Conversation({ agent }: { agent: Agent }) {
       turnEndAt.current = performance.now();
       setPending((p) => p + 1);
     } else if (m.type === 'reply_start') {
-      const turn = Number(m.index);
+      const turn = turnKey(m.index);
       add({ role: 'user', content: String(m.transcript ?? '') }, { role: 'assistant', content: '', toolCalls: m.tool_calls as ToolCall[], turn });
       streaming.current = { turn, done: false };
       streamPlayer().newReply();
     } else if (m.type === 'reply_text') {
-      const turn = Number(m.index);
+      const turn = turnKey(m.index);
       setMessages((list) => list.map((x) => (x.turn === turn ? { ...x, content: x.content ? `${x.content} ${m.text}` : String(m.text) } : x)));
-    } else if (m.type === 'reply_audio' && streaming.current && !left.current) {
+    } else if (m.type === 'reply_audio' && streaming.current?.turn === turnKey(m.index) && !left.current) {
       live.pause(true);
       void streamPlayer().enqueue(Number(m.seq), typeof m.audio === 'string' ? m.audio : null);
     } else if (m.type === 'turn' && m.streamed) {
       setPending((p) => Math.max(0, p - 1));
       const r = m as unknown as Reply;
-      setMessages((list) => list.map((x) => (x.turn === m.index ? { ...x, content: r.reply, warning: r.warning, language: r.language } : x)));
+      const turn = turnKey(m.index);
+      // The final turn also carries tool calls made after the first sentence was spoken.
+      setMessages((list) => list.map((x) => (x.turn === turn ? { ...x, content: r.reply, toolCalls: r.tool_calls, warning: r.warning, language: r.language } : x)));
       const current = streaming.current;
-      if (current && current.turn === m.index) {
+      if (current && current.turn === turn) {
         current.done = true;
         if (!player.current?.playing) streamIdle();
       }
     } else if (m.type === 'warning') setWarning(m.message ?? '');
     else if (m.type === 'error' && m.index != null) {
       setPending((p) => Math.max(0, p - 1));
-      if (streaming.current?.turn === m.index) {
-        streaming.current.done = true; // a turn that failed after it started streaming is over
+      const current = streaming.current;
+      if (current && current.turn === turnKey(m.index)) {
+        current.done = true; // a turn that failed after it started streaming is over
         if (!player.current?.playing) streamIdle();
       }
       add({ role: 'assistant', content: m.message ?? 'That turn failed.', failed: true });
@@ -187,6 +192,7 @@ export default function Conversation({ agent }: { agent: Agent }) {
     return () => {
       left.current = true;
       stopPlayback();
+      player.current?.close();
     };
   }, []);
 
@@ -210,6 +216,7 @@ export default function Conversation({ agent }: { agent: Agent }) {
   const startLive = () => {
     setWarning('');
     setMode('live');
+    session.current++;
     void live.start({ history: history(), language: lastLanguage, stream_reply: true }, device || undefined);
   };
   // Hold to talk: one session per press. A long trailing-silence window keeps a pause inside one turn;

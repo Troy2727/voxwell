@@ -275,7 +275,9 @@ def run_turn(agent: Agent, history: list[dict], message: str, emit, language: st
             call, problem = parse_tool_call((text[fed:] if spoken else text).strip())
             if call or problem:
                 if spoken:  # what came before the call is being said: finish saying it
-                    for sentence in splitter.finish():
+                    tail = text[fed:]
+                    starts = [at for at in (tail.find(marker) for marker in TOOL_MARKERS) if at >= 0]
+                    for sentence in [*splitter.feed(tail[: min(starts)]), *splitter.finish()]:
                         say(sentence)
                 if round_ == MAX_TOOL_ROUNDS:
                     break  # out of tool rounds: the fallback below (when nothing was said)
