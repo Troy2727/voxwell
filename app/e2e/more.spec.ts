@@ -55,7 +55,7 @@ test('voice agents: make an agent with the calculator and ask it a sum', async (
   // The spoken reply says the answer, and the tool call it made is shown under it.
   try {
     await expect(page.locator('p').filter({ hasText: /391/ }).first()).toBeVisible({ timeout: 3 * 60_000 });
-    await expect(page.getByText(/^calculator\(/)).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Called calculator/ })).toBeVisible();
   } finally {
     if (mode === 'real') {
       const agents: { id: string; name: string }[] = await (await page.request.get(`${BACKEND}/api/agents/agents`)).json();
