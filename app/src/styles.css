@@ -140,3 +140,28 @@
     @apply w-full rounded-lg;
   }
 }
+
+/* JobProgress loader (components/job-progress.tsx), adapted from Beautiful UI, MIT. */
+@keyframes pixel-on {
+  0%, 100% { opacity: 0.15; }
+  18%, 42% { opacity: 1; }
+  62% { opacity: 0.15; }
+}
+@keyframes shimmer-text {
+  from { background-position: 150% center; }
+  to { background-position: -50% center; }
+}
+.pixel-on {
+  animation: pixel-on 650ms ease-in-out infinite;
+}
+.shimmer-text {
+  background-image: linear-gradient(90deg, var(--muted-foreground) 35%, var(--foreground) 50%, var(--muted-foreground) 65%);
+  background-size: 200% 100%;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer-text 1.4s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pixel-on { animation: none; }
+  .shimmer-text { animation: none; color: var(--foreground); }
+}
