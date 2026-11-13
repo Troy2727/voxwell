@@ -40,7 +40,7 @@ export function usePromptMenu({ box, text, setText, sources, onSubmit }: {
 
   const source = trigger ? sources[trigger.char] : undefined;
   const items = source && trigger
-    ? source.items.filter((i) => i.label.toLowerCase().startsWith(trigger.query.toLowerCase())).slice(0, 8)
+    ? source.items.filter((i) => i.label.toLowerCase().startsWith(trigger.query.toLowerCase()))
     : [];
   const open = items.length > 0;
 
@@ -104,11 +104,13 @@ export function usePromptMenu({ box, text, setText, sources, onSubmit }: {
   const menu = open ? (
     <div className="bg-popover text-popover-foreground absolute top-full left-0 z-20 mt-1 w-full max-w-xs rounded-md border p-1 shadow-md">
       <p className="text-muted-foreground px-2 pt-1 pb-1.5 text-xs font-medium">{source!.title}</p>
-      <ul id={listId} role="listbox" aria-label={source!.title}>
+      <ul id={listId} role="listbox" aria-label={source!.title} className="max-h-64 overflow-y-auto">
         {items.map((item, i) => (
           <li
             key={`${item.label}-${i}`}
             id={`${listId}-${i}`}
+            // Arrow keys can move past the visible rows: keep the active one in view.
+            ref={i === active ? (el) => el?.scrollIntoView({ block: 'nearest' }) : undefined}
             role="option"
             aria-selected={i === active}
             className={cn('flex cursor-pointer items-baseline justify-between gap-3 rounded-sm px-2 py-1.5 text-sm', i === active && 'bg-accent text-accent-foreground')}

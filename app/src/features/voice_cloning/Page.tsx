@@ -8,7 +8,7 @@ import { EffectsControls, isNeutral, NO_EFFECTS, reviveEffects } from '@/compone
 import { ApprovalCard } from '@/components/approval-card';
 import { FileDrop } from '@/components/file-drop';
 import { ErrorAlert, Field, message, Page as PageLayout, Section } from '@/components/page';
-import { usePromptMenu } from '@/components/prompt-menu';
+import { usePromptMenu, type PromptItem } from '@/components/prompt-menu';
 import { VoiceSelect } from '@/components/voice-select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -72,6 +72,9 @@ export default function Page() {
     return { text: before + tag + source.slice(end).trimStart(), cursor: start + tag.length };
   }
 
+  /** A / menu entry that puts `tag` where the typed word was. */
+  const tagItem = (label: string, hint: string, tag: string): PromptItem => ({ label, hint, pick: (t, at) => withTag(t, tag, at, at) });
+
   /** Put `tag` at the cursor, in place of any selection. */
   function insertTag(tag: string) {
     const start = textBox.current?.selectionStart ?? text.length;
@@ -118,9 +121,9 @@ export default function Page() {
       '/': {
         title: cuesOffered ? 'Pauses and cues' : 'Pauses',
         items: [
-          ...PAUSES.map(([label, seconds]) => ({ label: `pause-${label.toLowerCase()}`, hint: `${seconds} s`, pick: (t: string, at: number) => withTag(t, `[pause ${seconds}]`, at, at) })),
+          ...PAUSES.map(([label, seconds]) => tagItem(`pause-${label.toLowerCase()}`, `${seconds} s`, `[pause ${seconds}]`)),
           // Typed words can't hold spaces, so "clear throat" is found as "clear-throat".
-          ...(cuesOffered ? cues.groups.flatMap((g) => g.tags.map(({ tag }) => ({ label: tag.replaceAll(' ', '-'), hint: g.label, pick: (t: string, at: number) => withTag(t, `[${tag}]`, at, at) }))) : []),
+          ...(cuesOffered ? cues.groups.flatMap((g) => g.tags.map(({ tag }) => tagItem(tag.replaceAll(' ', '-'), g.label, `[${tag}]`))) : []),
         ],
       },
     },

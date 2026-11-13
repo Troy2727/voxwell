@@ -25,6 +25,15 @@ test('voice cloning text: @ picks a voice, / adds a pause, Ctrl+Enter generates'
   await text.press('Enter');
   await expect(text).toHaveValue('Hello there [pause 2] ');
 
+  // A bare / lists every pause and cue; the list scrolls, and the last one can be reached.
+  await text.pressSequentially('/');
+  await expect(menu.getByRole('option')).toHaveCount(3 + 19);
+  await text.press('ArrowUp');
+  await expect(menu.getByRole('option', { selected: true })).toContainText('advertisement');
+  await expect(menu.getByRole('option', { selected: true })).toBeInViewport();
+  await text.press('Backspace');
+  await expect(menu).toBeHidden();
+
   // / also offers the cue tags; a two-word cue is typed with a hyphen.
   await text.pressSequentially('/clear');
   await expect(menu.getByRole('option')).toHaveCount(1);
