@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pencil, Plus, Save, Trash2, Volume2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, apiUrl, listVoices, sendJson, Voice } from '../../api';
@@ -46,14 +46,22 @@ export default function Page() {
   const [hearError, setHearError] = useState('');
   const [audioUrl, setAudioUrl] = useState('');
 
-  const refresh = useCallback(
-    () =>
-      api<Entry[]>(`/api/pronunciation/entries?language=${language}`).then(setEntries, (e: Error) => {
+  // The list shown is the scope's that is selected now: a reply for a scope left meanwhile is dropped.
+  const shownScope = useRef(language);
+  shownScope.current = language;
+  const refresh = useCallback(() => {
+    const asked = language;
+    return api<Entry[]>(`/api/pronunciation/entries?language=${asked}`).then(
+      (list) => {
+        if (shownScope.current === asked) setEntries(list);
+      },
+      (e: Error) => {
+        if (shownScope.current !== asked) return;
         setEntries([]);
         setError(e.message);
-      }),
-    [language],
-  );
+      },
+    );
+  }, [language]);
   useEffect(() => {
     setEntries(null);
     setRewritten('');
@@ -144,7 +152,7 @@ export default function Page() {
             : 'Each language has its own list, and also uses the All languages words; its own entry wins.'
         }
       >
-        <ChoiceSelect options={SCOPES} value={language} onChange={setLanguage} disabled={editing !== null || saving} aria-label="Language" />
+        <ChoiceSelect options={SCOPES} value={language} onChange={setLanguage} disabled={editing !== null || saving || hearing} aria-label="Language" />
       </Section>
 
       <Section title={editing ? 'Edit word' : 'Add a word'} description="Write the respelling the way it should sound, e.g. Nguyen becomes win.">
@@ -214,7 +222,7 @@ export default function Page() {
         </Field>
         {language === 'all' && (
           <Field label="Speak in">
-            <ChoiceSelect options={LANGUAGES} value={hearLanguage} onChange={setHearLanguage} aria-label="Speak in" />
+            <ChoiceSelect options={LANGUAGES} value={hearLanguage} onChange={setHearLanguage} disabled={hearing} aria-label="Speak in" />
           </Field>
         )}
         <Field label="Sentence" htmlFor="pron-sample">
