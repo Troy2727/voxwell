@@ -450,9 +450,13 @@ def cmd_chat(client: Client, args) -> tuple[str, dict]:
     if agent is None:
         names = ", ".join(a["name"] for a in saved) or "none yet (create one on the Voice agents page)"
         raise CliError(f"Unknown agent '{args.agent}'. Saved agents: {names}.")
-    result = json.loads(client.post_json(f"/api/agents/agents/{agent['id']}/chat", {"message": message.strip(), "speak": False}))
+    body = {"message": message.strip(), "speak": False}
+    if getattr(args, "language", None):  # the MCP bridge builds args without it
+        body["language"] = args.language
+    result = json.loads(client.post_json(f"/api/agents/agents/{agent['id']}/chat", body))
     lines = [f"[{c['tool'] or 'tool'}: {c.get('result', c.get('error'))}]" for c in result["tool_calls"]]
-    return "\n".join([*lines, result["reply"]]), {"agent": agent["name"], **result}
+    reply = result["reply"] if result["language"] == agent["language"] else f"[{result['language']}] {result['reply']}"
+    return "\n".join([*lines, reply]), {"agent": agent["name"], **result}
 
 
 def cmd_translate(client: Client, args) -> tuple[str, dict]:
@@ -657,6 +661,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("chat", parents=[common], help="send a message to a saved voice agent and print its reply")
     p.add_argument("agent", help="saved agent name or id")
     p.add_argument("message", help="what to say; - reads it from stdin")
+    p.add_argument("-l", "--language", help="answer in this language, one the agent follows (default: its own)")
     p.set_defaults(run=cmd_chat)
 
     p = sub.add_parser("translate", parents=[common], help="translate text or a recording and speak it in another language (WAV)")

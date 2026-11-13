@@ -40,11 +40,11 @@ def _chat(messages: list[dict], tools: list[dict] | None = None) -> str:
     return tokenizer.decode(out[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True)
 
 
-def instructions(agent: Agent) -> str:
+def instructions(agent: Agent, language: str | None = None) -> str:
     # The tools themselves reach the model through its chat template (see respond). Asking here for
     # "short plain sentences" made the model answer sums from memory instead of calling the calculator.
     return (agent.system_prompt.strip() or "You are a helpful assistant.") + (
-        f"\n\nYour replies are spoken aloud, so never use markdown, lists or emoji. Answer in {LANGUAGES[agent.language]}."
+        f"\n\nYour replies are spoken aloud, so never use markdown, lists or emoji. Answer in {LANGUAGES[language or agent.language]}."
     )
 
 
@@ -87,13 +87,13 @@ def clean_history(history) -> list[dict]:
     return out
 
 
-def respond(agent: Agent, history: list[dict], message: str) -> dict:
+def respond(agent: Agent, history: list[dict], message: str, language: str | None = None) -> dict:
     """The agent's reply to `message`, using at most MAX_TOOL_ROUNDS tool calls.
 
     Returns {"reply", "tool_calls"}; each tool call has "tool", "arguments" and "result" or "error".
     """
     messages = [
-        {"role": "system", "content": instructions(agent)},
+        {"role": "system", "content": instructions(agent, language)},
         *clean_history(history),
         {"role": "user", "content": message[:MAX_MESSAGE]},
     ]
@@ -125,18 +125,24 @@ def respond(agent: Agent, history: list[dict], message: str) -> dict:
     return {"reply": FALLBACK_REPLY, "tool_calls": calls}
 
 
-def speak(agent: Agent, text: str) -> str:
+def speak(agent: Agent, text: str, language: str | None = None) -> str:
     """The reply spoken in the agent's voice, as base64 WAV."""
     reference = voices.voice_audio_path(agent.voice) if agent.voice else None
-    return base64.b64encode(render_text(chapter_chunks(text), agent.language, reference)).decode("ascii")
+    return base64.b64encode(render_text(chapter_chunks(text), language or agent.language, reference)).decode("ascii")
 
 
-def reply_and_speak(agent: Agent, history: list[dict], message: str, spoken: bool = True) -> dict:
-    """respond(), plus "audio" when `spoken`; a failed synthesis keeps the text and adds a warning."""
-    result = respond(agent, history, message)
+def reply_and_speak(
+    agent: Agent, history: list[dict], message: str, spoken: bool = True, language: str | None = None
+) -> dict:
+    """respond(), plus "audio" when `spoken`; a failed synthesis keeps the text and adds a warning.
+
+    `language` is the one to answer in (the agent's own by default); the result says which was used.
+    """
+    language = language or agent.language
+    result = {**respond(agent, history, message, language), "language": language}
     if spoken:
         try:
-            result["audio"] = speak(agent, result["reply"])
+            result["audio"] = speak(agent, result["reply"], language)
         except Exception:
             log.exception("Could not speak an agent reply")
             result["warning"] = "Could not speak the reply; see the Voxwell log."

@@ -5,6 +5,7 @@ export interface Agent {
   voice: string;
   language: string;
   tools: string[];
+  follow_languages: string[];
 }
 
 export interface AgentStatus {

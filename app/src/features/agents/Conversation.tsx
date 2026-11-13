@@ -16,6 +16,7 @@ interface Message {
   toolCalls?: ToolCall[];
   warning?: string;
   failed?: boolean; // an error shown in the conversation, never sent back as history
+  language?: string; // the language an assistant reply was given in
 }
 
 interface Reply {
@@ -23,7 +24,10 @@ interface Reply {
   tool_calls: ToolCall[];
   audio?: string;
   warning?: string;
+  language: string;
 }
+
+const languageNames = new Intl.DisplayNames(['en'], { type: 'language' });
 
 const HISTORY = 12; // messages sent back with each turn (the server uses at most this many)
 
@@ -62,6 +66,10 @@ export default function Conversation({ agent }: { agent: Agent }) {
   const left = useRef(false); // this conversation is gone (another agent, the editor, another page)
   const bottom = useRef<HTMLDivElement>(null);
 
+  // The language of the last reply, so a new session (each push-to-talk press) carries on in it.
+  // An edit may have removed it from the agent's languages since.
+  const last = [...messages].reverse().find((m) => m.language)?.language;
+  const lastLanguage = last && [agent.language, ...agent.follow_languages].includes(last) ? last : agent.language;
   const history = () => messages.filter((m) => !m.failed).slice(-HISTORY).map(({ role, content }) => ({ role, content }));
   const add = (...items: Omit<Message, 'id'>[]) => setMessages((list) => [...list, ...items.map((m) => ({ ...m, id: nextId.current++ }))]);
 
@@ -106,7 +114,7 @@ export default function Conversation({ agent }: { agent: Agent }) {
       const transcript = typeof m.transcript === 'string' ? m.transcript : '';
       if (!transcript) return;
       const r = m as unknown as Reply;
-      add({ role: 'user', content: transcript }, { role: 'assistant', content: r.reply, toolCalls: r.tool_calls, warning: r.warning });
+      add({ role: 'user', content: transcript }, { role: 'assistant', content: r.reply, toolCalls: r.tool_calls, warning: r.warning, language: r.language });
       play(r.audio);
     }
   };
@@ -136,9 +144,9 @@ export default function Conversation({ agent }: { agent: Agent }) {
     setSending(true);
     setError('');
     try {
-      const r = await sendJson<Reply>(`/api/agents/agents/${agent.id}/chat`, 'POST', { message: message_, history: history(), speak: true });
+      const r = await sendJson<Reply>(`/api/agents/agents/${agent.id}/chat`, 'POST', { message: message_, history: history(), speak: true, language: lastLanguage });
       setText('');
-      add({ role: 'user', content: message_ }, { role: 'assistant', content: r.reply, toolCalls: r.tool_calls, warning: r.warning });
+      add({ role: 'user', content: message_ }, { role: 'assistant', content: r.reply, toolCalls: r.tool_calls, warning: r.warning, language: r.language });
       play(r.audio);
     } catch (e) {
       setError(message(e));
@@ -150,7 +158,7 @@ export default function Conversation({ agent }: { agent: Agent }) {
   const startLive = () => {
     setWarning('');
     setMode('live');
-    void live.start({ history: history() }, device || undefined);
+    void live.start({ history: history(), language: lastLanguage }, device || undefined);
   };
   // Hold to talk: one session per press. A long trailing-silence window keeps a pause inside one turn;
   // letting go ends the session, which answers the last turn.
@@ -159,7 +167,7 @@ export default function Conversation({ agent }: { agent: Agent }) {
     setWarning('');
     stopPlayback();
     setMode('hold');
-    await live.start({ history: history(), silence_ms: 3000, max_turn_s: 30 }, device || undefined);
+    await live.start({ history: history(), language: lastLanguage, silence_ms: 3000, max_turn_s: 30 }, device || undefined);
     if (!held.current) live.stop();
   };
   const releaseTalk = () => {
@@ -194,7 +202,7 @@ export default function Conversation({ agent }: { agent: Agent }) {
             Type a message, hold the talk button, or start a live conversation.
           </EmptyState>
         ) : (
-          messages.map((m) => (
+          messages.map((m, i) => (
             <div key={m.id} className={cn('flex max-w-[85%] flex-col gap-1', m.role === 'user' ? 'self-end items-end' : 'self-start')}>
               <p
                 className={cn(
@@ -204,6 +212,11 @@ export default function Conversation({ agent }: { agent: Agent }) {
               >
                 {m.content}
               </p>
+              {m.language && agent.follow_languages.length > 0 && (
+                <Muted className={cn('text-xs', m.language !== (messages.slice(0, i).reverse().find((x) => x.language)?.language ?? agent.language) && 'text-primary font-medium')}>
+                  {languageNames.of(m.language) ?? m.language}
+                </Muted>
+              )}
               {m.toolCalls && m.toolCalls.length > 0 && <ToolCalls calls={m.toolCalls} />}
               {m.warning && <Muted className="text-xs">{m.warning}</Muted>}
             </div>

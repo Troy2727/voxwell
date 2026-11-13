@@ -19,6 +19,7 @@ class Transcript:
     text: str
     language: str  # ISO 639-1 code
     segments: list[Segment]
+    language_probability: float = 1.0  # Whisper's confidence in `language`; 1.0 when it was given
 
 
 class AudioError(ValueError):
@@ -80,7 +81,8 @@ def transcribe(
             raise AudioError(DECODE_ERROR) from exc
         raise
     text = " ".join(p.text for p in parts if p.text).strip()
-    return Transcript(text=text, language=info.language, segments=parts)
+    probability = 1.0 if language else info.language_probability
+    return Transcript(text=text, language=info.language, segments=parts, language_probability=probability)
 
 
 @dataclass

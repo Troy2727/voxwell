@@ -10,7 +10,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from voxwell import voices
-from voxwell.features.agents import conversation, store
+from voxwell.features.agents import conversation, language, store
+from voxwell.features.agents.language import choose
 from voxwell.features.agents.tools import ToolError, calculate
 from voxwell.features.dictation import engine as stt
 from voxwell.features.voice_cloning import engine as tts
@@ -298,3 +299,176 @@ def test_an_agent_crash_returns_a_fixed_500(llm, monkeypatch, caplog):
     monkeypatch.setattr(conversation, "reply_and_speak", crash)
     r = chat(make_agent()["id"], "hello")
     assert r.status_code == 500 and "secret detail" not in r.text and "secret detail" in caplog.text
+
+
+# --- language follow ------------------------------------------------------------------------------
+
+CLEAR = (0.9, 3.0, "hola, ¿qué tal?")  # confidence, seconds, text of a turn clear enough to switch on
+
+
+# --- the decision -------------------------------------------------------------------------------
+
+
+def test_a_clear_turn_in_an_allowed_language_switches():
+    assert choose(["en", "es"], "en", "es", *CLEAR) == "es"
+    assert choose(["en", "es"], "es", "en", 0.9, 3.0, "back to english") == "en"
+
+
+@pytest.mark.parametrize("confidence, seconds, text", [(0.5, 3.0, "hola, ¿qué tal?"), (0.9, 0.8, "hola, ¿qué tal?"), (0.9, 3.0, "sí")])
+def test_unclear_turns_never_switch(confidence, seconds, text):
+    assert choose(["en", "es"], "en", "es", confidence, seconds, text) == "en"
+    assert choose(["en", "es"], "es", "en", confidence, seconds, text) == "es"
+
+
+def test_other_languages_and_empty_turns_keep_the_current_one():
+    assert choose(["en", "es"], "es", "fr", *CLEAR) == "es"
+    assert choose(["en", "es"], "es", "en", 0.9, 3.0, "") == "es"
+    assert choose(["en", "es"], "es", "es", *CLEAR) == "es"
+
+
+def test_without_follow_languages_the_primary_always_wins():
+    assert choose(["en"], "en", "es", *CLEAR) == "en"
+
+
+def test_short_turns_never_move_it():
+    current, seen = "en", []
+    for detected, seconds, text in [("es", 3.0, "hola, ¿qué tal?"), ("en", 0.6, "ok"), ("es", 0.6, "sí"), ("en", 3.0, "thanks a lot")]:
+        current = choose(["en", "es"], current, detected, 0.9, seconds, text)
+        seen.append(current)
+    assert seen == ["es", "es", "es", "en"]
+
+
+# --- the store ----------------------------------------------------------------------------------
+
+
+def test_old_and_newer_agent_files_load():
+    folder = data_dir("agents")
+    old = {"id": "0123456789ab", "name": "Old", "system_prompt": "", "voice": "", "language": "en", "tools": []}
+    (folder / "0123456789ab.json").write_text(json.dumps(old), encoding="utf-8")
+    (folder / "ba9876543210.json").write_text(json.dumps({**old, "id": "ba9876543210", "name": "New", "mood": "x"}), encoding="utf-8")
+    assert store.get("0123456789ab").follow_languages == []
+    assert [a.name for a in store.list_agents()] == ["New", "Old"]
+
+
+def test_follow_languages_are_checked_and_tidied():
+    r = client.post("/api/agents/agents", json={"name": "x", "follow_languages": ["es", "es", "xx"]})
+    assert r.status_code == 422 and "'xx'" in r.json()["detail"]
+    assert client.post("/api/agents/agents", json={"name": "x", "follow_languages": ["ja"]}).status_code == 422
+    assert make_agent(follow_languages=["fr", "es", "es"])["follow_languages"] == ["es", "fr"]
+    assert make_agent(language="es", follow_languages=["es", "fr"])["follow_languages"] == ["fr"]
+
+
+def test_follow_languages_round_trip():
+    agent = make_agent(follow_languages=["es"])
+    assert client.get(f"/api/agents/agents/{agent['id']}").json()["follow_languages"] == ["es"]
+    body = {k: v for k, v in agent.items() if k not in ("id", "follow_languages")}
+    assert client.put(f"/api/agents/agents/{agent['id']}", json=body).json()["follow_languages"] == []
+
+
+# --- live and chat ------------------------------------------------------------------------------
+
+
+@pytest.fixture
+def heard(monkeypatch):
+    """A scripted Whisper: `heard.script` holds (detected, probability, text) per call; `heard.asked` the languages asked for."""
+
+    class Fake:
+        script: list = []
+        asked: list = []
+
+        def __call__(self, path, language=None):
+            self.asked.append(language)
+            detected, probability, text = self.script.pop(0)
+            return stt.Transcript(text, language or detected, [], 1.0 if language else probability)
+
+    fake = Fake()
+    fake.script, fake.asked = [], []
+    monkeypatch.setattr(stt, "transcribe", fake)
+    return fake
+
+
+@pytest.fixture
+def spoken(monkeypatch):
+    """The language each synthesis was asked for."""
+    languages = []
+    monkeypatch.setattr(tts, "synthesize", lambda text, language, reference=None, **k: languages.append(language) or wav_bytes())
+    return languages
+
+
+def live(agent_id, turns_ms, config=None):
+    with client.websocket_connect(f"ws://127.0.0.1/api/agents/agents/{agent_id}/live") as ws:
+        ws.send_json({"type": "start", "config": {"silence_ms": 400, **(config or {})}})
+        assert ws.receive_json()["type"] == "ready"
+        for ms in turns_ms:
+            audio = speech(ms) + bytes(500 * 32)
+            for i in range(0, len(audio), 32000):  # one message holds at most 2 s
+                ws.send_bytes(audio[i : i + 32000])
+        ws.send_json({"type": "end"})
+        turns = []
+        while (m := ws.receive_json())["type"] != "done":
+            if m["type"] == "turn":
+                turns.append(m)
+    return turns
+
+
+def test_live_without_follow_languages_stays_pinned(llm, heard, spoken):
+    agent = make_agent(language="en")
+    heard.script = [("fr", 0.99, "bonjour tout le monde")]
+    [turn] = live(agent["id"], [2000])
+    assert heard.asked == ["en"] and turn["language"] == "en" and spoken == ["en"]
+
+
+def test_live_follows_a_clear_turn_in_the_same_voice(llm, heard, spoken):
+    agent = make_agent(language="en", follow_languages=["es"])
+    heard.script = [("es", 0.95, "hola, ¿cómo estás hoy?")]
+    [turn] = live(agent["id"], [2000])
+    assert heard.asked == [None] and turn["language"] == "es" and spoken == ["es"]
+    assert "Spanish" in llm.seen[0][0]["content"]
+
+
+def test_live_retranscribes_a_turn_it_does_not_follow(llm, heard, spoken):
+    agent = make_agent(language="en", follow_languages=["es"])
+    heard.script = [("fr", 0.95, "bonjour tout le monde"), ("en", 1.0, "bonjour tout le monde")]
+    [turn] = live(agent["id"], [2000])
+    assert heard.asked == [None, "en"] and turn["language"] == "en"
+
+
+def test_live_short_turns_keep_the_language(llm, heard, spoken):
+    agent = make_agent(language="en", follow_languages=["es"])
+    heard.script = [("es", 0.95, "hola, ¿cómo estás hoy?"), ("en", 0.5, "ok"), ("es", 1.0, "ok"), ("en", 0.95, "thanks, that helps a lot")]
+    turns = live(agent["id"], [2000, 600, 2000])
+    assert [t["language"] for t in turns] == ["es", "es", "en"]
+
+
+@pytest.mark.parametrize("start, expected", [("es", "es"), ("fr", "en"), ("xx", "en"), (5, "en")])
+def test_live_session_starts_in_the_last_language(llm, heard, spoken, start, expected):
+    agent = make_agent(language="en", follow_languages=["es"])
+    heard.script = [("es", 0.4, "mmm vale"), (expected, 1.0, "mmm vale")] if expected == "en" else [("es", 0.4, "mmm vale")]
+    [turn] = live(agent["id"], [2000], {"language": start})
+    assert turn["language"] == expected
+
+
+def test_chat_language(llm, spoken):
+    agent = make_agent(language="en", follow_languages=["es"])
+    r = chat(agent["id"], "hola", language="es")
+    assert r.json()["language"] == "es" and spoken == ["es"] and "Spanish" in llm.seen[0][0]["content"]
+    r = chat(agent["id"], "salut", language="fr")
+    assert r.status_code == 422 and "en, es" in r.json()["detail"]
+    assert chat(agent["id"], "hi").json()["language"] == "en"
+    assert store.get(agent["id"]).follow_languages == ["es"]  # a switch never changes the saved agent
+
+
+def test_allowed_puts_the_primary_first():
+    assert language.allowed(store.Agent(id="x", name="x", system_prompt="", language="es", follow_languages=["en", "fr"])) == ["es", "en", "fr"]
+
+
+def test_a_hand_edited_follow_list_repeating_the_primary_stays_off():
+    agent = store.Agent(id="x", name="x", system_prompt="", language="en", follow_languages=["en", "en"])
+    assert language.allowed(agent) == ["en"]
+
+
+def test_live_an_empty_retranscription_keeps_the_turn(llm, heard, spoken):
+    agent = make_agent(language="en", follow_languages=["es"])
+    heard.script = [("fr", 0.95, "bonjour tout le monde"), ("en", 1.0, "")]
+    [turn] = live(agent["id"], [2000])
+    assert turn["transcript"] == "bonjour tout le monde" and turn["language"] == "en"
