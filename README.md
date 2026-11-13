@@ -130,6 +130,18 @@ Voxwell is **MIT licensed**, and every model it runs allows commercial use ([one
 
 ## <img src="docs/readme/icons/sparkles.svg" width="24" height="24" alt="" /> Features
 
+**New: more expressive, real-time voices**
+
+| Feature | Where | What it does |
+| --- | --- | --- |
+| **Flow replies** | Voice agents | In a live conversation the agent starts speaking after its first sentence, instead of after the whole answer. |
+| **Cut-in** | Voice agents | Talk over the agent and it stops; the chat keeps only what you heard. Turn it off for loud speakers. |
+| **Mood match** | Voice agents | The agent answers in a tone that fits the mood of what you said, and each reply shows that mood. |
+| **Language follow** | Voice agents | Switch language mid-conversation and the agent answers in it, in the same voice. |
+| **Cue tags** | Voice cloning | Write `[laugh]`, `[sigh]` or `[whispering]` in English text and the voice acts it out. Pick them from the Cues menu or type `/`. |
+| **Tone memory** | Audiobook | A local AI reads each paragraph with the ones around it, so the narration keeps a steady tone. |
+| **Shared words** | Pronunciation | Add a word once under All languages and every language says it your way. |
+
 **Voices**
 
 | Feature | What it does |
@@ -375,6 +387,8 @@ Accounts only control who can open the app. Voices, audio and models stay on you
 <a href="https://www.electronjs.org"><img alt="Electron 33" src="docs/readme/badges/electron-33.svg" /></a>
 <a href="https://supabase.com"><img alt="Supabase (optional)" src="docs/readme/badges/supabase-optional.svg" /></a>
 
+The job loader, task rows, page search, prompt menu, approval card and agent tool chips are adapted from [Beautiful UI](https://beautifului.dev) (MIT, Shane Levine).
+
 **CI**<br/>
 <a href="https://github.com/features/actions"><img alt="GitHub Actions" src="docs/readme/badges/github-actions.svg" /></a>
 Backend tests on Ubuntu, Windows and macOS, plus a frontend typecheck and build, on every pull request and every push to `main`.
@@ -410,7 +424,7 @@ voxwell/
 ├── app/
 │   ├── src/
 │   │   ├── features/<feature>/  # Page.tsx for each backend feature
-│   │   ├── components/          # shared page pieces + ui/ (shadcn/ui, ElevenLabs UI)
+│   │   ├── components/          # shared page pieces (some adapted from Beautiful UI) + ui/ (shadcn/ui, ElevenLabs UI)
 │   │   └── auth/                # optional Supabase sign-in
 │   └── electron/                # desktop shell: starts the backend, handles sign-in links
 │
