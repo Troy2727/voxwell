@@ -351,3 +351,10 @@ def test_tools_say_why_a_cue_only_text_is_not_spoken(monkeypatch, path, body):
     monkeypatch.setattr(engine, "synthesize", nothing)
     r = client.post(path, json=body)
     assert r.status_code == 422 and r.json()["detail"] == "Nothing to say after removing cue tags."
+
+
+def test_stripping_is_fast_on_long_runs_of_spaces():
+    start = time.monotonic()
+    text = " " * 50_000 + "x" + "\t" * 50_000 + "[laugh]"
+    assert cues.strip_known(text) == " " * 50_000 + "x"
+    assert time.monotonic() - start < 1

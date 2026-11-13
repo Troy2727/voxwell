@@ -28,7 +28,6 @@ RESERVED = frozenset({
 })
 
 _BRACKET = re.compile(r"\[([^\[\]]*)\]")
-_SPACED_BRACKET = re.compile(r"[ \t]*\[([^\[\]]*)\][ \t]*")  # a tag with the spaces around it
 _CLOSING = set(",.;:!?)]}…\"'”’")
 _OPENING = set("([{\"'“‘")
 
@@ -56,16 +55,25 @@ def canonical(text: str) -> str:
 def _strip(text: str, names: frozenset[str]) -> str:
     """Remove the bracket tags named in `names` with the spaces around them."""
 
-    def replace(m: re.Match) -> str:
+    # The tag is found by itself and the spaces around it are stepped over by hand: a regex with
+    # optional spaces before the bracket would be quadratic on long runs of spaces.
+    out, pos = [], 0
+    for m in _BRACKET.finditer(text):
         if _key(m[1]) not in names:
-            return m[0]
-        before = text[m.start() - 1] if m.start() > 0 else ""
-        after = text[m.end()] if m.end() < len(text) else ""
+            continue
+        start, end = m.start(), m.end()
+        while start > pos and text[start - 1] in " \t":
+            start -= 1
+        while end < len(text) and text[end] in " \t":
+            end += 1
+        before = text[start - 1] if start > 0 else ""
+        after = text[end] if end < len(text) else ""
         # One space between two words ("word[laugh]word" -> "word word"); none at an edge or before punctuation.
         between_words = before and not before.isspace() and after and not after.isspace()
-        return " " if between_words and after not in _CLOSING and before not in _OPENING else ""
-
-    return _SPACED_BRACKET.sub(replace, text)
+        out += [text[pos:start], " " if between_words and after not in _CLOSING and before not in _OPENING else ""]
+        pos = end
+    out.append(text[pos:])
+    return "".join(out)
 
 
 def strip_known(text: str) -> str:
