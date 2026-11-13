@@ -31,7 +31,7 @@ from voxwell.features.dubbing.ffmpeg import DubbingError, run_ffmpeg
 from voxwell.features.dubbing.fitting import build_srt, srt_time
 from voxwell.features.tools import engine as tools
 from voxwell.features.transcription import jobs as transcription_jobs
-from voxwell.features.voice_cloning.engine import LANGUAGES
+from voxwell.features.voice_cloning.engine import LANGUAGES, NothingToSay
 from voxwell.paths import data_dir
 
 router = APIRouter(tags=["openai-compatible"])
@@ -125,6 +125,8 @@ def speech(req: SpeechRequest):
                 tools.fit(src, seconds, seconds / req.speed, out)
                 wav = out.read_bytes()
         body = _encode(wav, req.response_format)
+    except NothingToSay:
+        return _error(400, "Nothing to say after removing cue tags.", "input")
     except DubbingError:  # ffmpeg missing or failed (other formats / speed need it)
         log.exception("ffmpeg failed for an OpenAI-compatible speech request")
         return _error(400, f"Converting the audio needs ffmpeg, which is missing or failed; see the Voxwell log. "

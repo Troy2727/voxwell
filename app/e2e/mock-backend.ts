@@ -16,6 +16,17 @@ const VOICES = [
   { id: 'v-remix', name: 'Zoë (remix)', source: 'remix' },
 ];
 
+/** The `cues` object of GET /api/voice_cloning/status, as the server builds it. */
+export const CUES = {
+  languages: ['en'],
+  available: true,
+  groups: [
+    { label: 'Sounds', tags: ['laugh', 'chuckle', 'sigh', 'gasp', 'cough', 'clear throat', 'sniff', 'groan', 'shush'] },
+    { label: 'Feelings and delivery', tags: ['happy', 'angry', 'sarcastic', 'surprised', 'fear', 'crying', 'whispering'] },
+    { label: 'Style', tags: ['narration', 'dramatic', 'advertisement'] },
+  ].map((g) => ({ label: g.label, tags: g.tags.map((tag) => ({ tag, label: tag[0].toUpperCase() + tag.slice(1) })) })),
+};
+
 /** A background job seen through polling: each look moves it one step, then it stays on the last. */
 function job<T>(steps: T[]) {
   let seen = 0;
@@ -44,7 +55,7 @@ function track(status: string, progress: number) {
 
 function book(state: string, done: boolean, include = [true, true]) {
   return {
-    id: 'b-1', title: 'The Lighthouse', created: NOW, language: 'en', voice: 'default', state, step: 'Chapter 1 of 1', percent: done ? 100 : 40, error: null,
+    id: 'b-1', title: 'The Lighthouse', created: NOW, language: 'en', voice: 'default', tone_memory: false, state, step: 'Chapter 1 of 1', percent: done ? 100 : 40, error: null,
     chapters: [
       { title: 'The Storm', chars: 300, include: include[0], status: done && include[0] ? 'done' : 'pending', audio_url: done && include[0] ? TONE_URL : null },
       { title: 'Morning', chars: 250, include: include[1], status: done && include[1] ? 'done' : 'pending', audio_url: done && include[1] ? TONE_URL : null },
@@ -62,6 +73,7 @@ function routes(): [string | RegExp, Reply][] {
   let trackJob = job([track('generating', 0.5), track('done', 1)]);
   let books: object[] = [];
   let include = [true, true];
+  let toneMemory = false;
   let rendering: (() => object) | null = null;
   let transcribed: (() => object) | null = null;
   let entries: object[] = [];
@@ -87,7 +99,14 @@ function routes(): [string | RegExp, Reply][] {
     [/^(PATCH|DELETE) \/api\/voices\/[^/]+$/, {}],
 
     ['POST /api/voice_cloning/voices', { id: 'v-new', name: 'E2E voice', source: 'upload' }],
-    ['POST /api/voice_cloning/synthesize', { id: 'a-1', url: TONE_URL }],
+    ['GET /api/voice_cloning/status', { ready: true, languages: { en: 'English', es: 'Spanish', fr: 'French' }, cues: CUES }],
+    // Like the server: cue tags in a language without cues come back flagged as left out.
+    ['POST /api/voice_cloning/synthesize', (_url: URL, request: Request) => {
+      const { text, language } = request.postDataJSON();
+      const tags = CUES.groups.flatMap((g) => g.tags.map((t) => `[${t.tag}]`));
+      const ignored = !CUES.languages.includes(language) && tags.some((tag) => text.toLowerCase().includes(tag));
+      return { id: 'a-1', url: TONE_URL, ...(ignored ? { cues_ignored: true } : {}) };
+    }],
 
     ['POST /api/voice_design/preview', { preview_id: 'p-1', url: TONE_URL }],
     ['POST /api/voice_design/save', { id: 'v-new', name: 'Designed', source: 'design' }],
@@ -138,7 +157,8 @@ function routes(): [string | RegExp, Reply][] {
     ['PATCH /api/audiobook/books/b-1', (_url: URL, request: Request) => {
       const chapters: { include: boolean }[] | undefined = request.postDataJSON().chapters;
       if (chapters) include = chapters.map((c) => c.include);
-      books = [book('draft', false, include)];
+      toneMemory = request.postDataJSON().tone_memory ?? toneMemory;
+      books = [{ ...book('draft', false, include), tone_memory: toneMemory }];
       return books[0];
     }],
     ['POST /api/audiobook/books/b-1/preview', { url: TONE_URL }],

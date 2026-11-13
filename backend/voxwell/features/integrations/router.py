@@ -17,7 +17,7 @@ from voxwell.features.audiobook.books import render_text
 from voxwell.features.audiobook.chunking import chapter_chunks
 from voxwell.features.integrations import phone
 from voxwell.features.integrations.openai_api import resolve_voice
-from voxwell.features.voice_cloning.engine import LANGUAGES
+from voxwell.features.voice_cloning.engine import LANGUAGES, NothingToSay
 
 log = logging.getLogger(__name__)
 
@@ -148,6 +148,8 @@ def render_greeting():
         wav = render_text(chapter_chunks(cfg["greeting_text"]), cfg["language"], resolve_voice(cfg["voice_id"]) if cfg["voice_id"] else None)
     except KeyError:
         raise HTTPException(422, "The greeting's voice was deleted. Pick another voice.")
+    except NothingToSay:
+        raise HTTPException(422, "Nothing to say after removing cue tags.")
     except Exception as exc:
         log.exception("Could not record the greeting")
         raise HTTPException(500, "Could not record the greeting; see the Voxwell log.") from exc

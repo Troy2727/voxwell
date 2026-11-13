@@ -12,6 +12,7 @@ import sys
 import traceback
 
 from voxwell import cli
+from voxwell.features.voice_cloning import cues
 
 PROTOCOL_VERSION = "2025-06-18"
 
@@ -43,7 +44,9 @@ TOOLS = [
     },
     {
         "name": "speak",
-        "description": "Turn text into speech with a Voxwell voice and save it as a WAV file. Returns the file path.",
+        "description": "Turn text into speech with a Voxwell voice and save it as a WAV file. Returns the file path. "
+        "In English, text with these cue tags is spoken by Chatterbox-Turbo, the model that defines them (other languages leave them out): "
+        + ", ".join(f"[{tag}]" for tag in sorted(cues.VOCABULARY)) + ".",
         "inputSchema": _schema({
             "text": {"type": "string", "description": "What to say (up to 4096 characters)."},
             "voice": {**_VOICE, "description": "A saved voice name or id. Omit for the built-in voice."},
@@ -183,7 +186,7 @@ TOOLS = [
             "action": {"type": "string", "enum": ["list", "add", "remove"]},
             "word": {"type": "string", "description": "The word as written (add, remove)."},
             "respelling": {"type": "string", "description": "How to write it so it is spoken right (add)."},
-            "language": {**_LANGUAGE, "description": "ISO 639-1 code. Default en."},
+            "language": {**_LANGUAGE, "description": "ISO 639-1 code, or all for a word used in every language (a language's own entry wins there). Default en."},
             "case_sensitive": {"type": "boolean", "description": "Match only this capitalization (add). Default false."},
             "whole_word": {"type": "boolean", "description": "Match whole words only (add). Default true."},
         }, ["action"]),

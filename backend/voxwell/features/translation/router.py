@@ -17,6 +17,7 @@ from pydantic import BaseModel
 from voxwell import live_audio
 from voxwell.features.dictation import engine as stt
 from voxwell.features.translation import pipeline
+from voxwell.features.voice_cloning.engine import NothingToSay
 from voxwell.paths import child_path, data_dir
 
 log = logging.getLogger(__name__)
@@ -56,6 +57,8 @@ def _translate_and_speak(text: str, source: str, target: str, reference) -> dict
         raise HTTPException(500, "Translation failed; see the Voxwell log.") from exc
     try:
         wav = pipeline.speak(translation, target, reference)
+    except NothingToSay:
+        raise HTTPException(422, "Nothing to say after removing cue tags.")
     except Exception as exc:
         log.exception("Speech synthesis failed")
         raise HTTPException(500, "Speech synthesis failed; see the Voxwell log.") from exc

@@ -496,16 +496,17 @@ def cmd_effects(client: Client, args) -> tuple[str, dict]:
 def cmd_pronounce(client: Client, args) -> tuple[str, dict]:
     language = urllib.parse.quote(args.language)
     entries = client.get_json(f"/api/pronunciation/entries?language={language}")
+    scope = "all languages" if args.language == "all" else f"'{args.language}'"
     if args.action == "list":
         if not entries:
-            return f"No pronunciations for '{args.language}' yet. Add one with `voxwell pronounce add WORD RESPELLING`.", {"entries": []}
+            return f"No pronunciations for {scope} yet. Add one with `voxwell pronounce add WORD RESPELLING`.", {"entries": []}
         return "\n".join(f"{e['word']} -> {e['respelling']}" for e in entries), {"entries": entries}
     if not args.word:
         raise CliError("Give the word.")
     existing = next((e for e in entries if e["word"].lower() == args.word.strip().lower()), None)
     if args.action == "remove":
         if existing is None:
-            raise CliError(f"'{args.word}' has no pronunciation for '{args.language}'.")
+            raise CliError(f"'{args.word}' has no pronunciation for {scope}.")
         client.request("DELETE", f"/api/pronunciation/entries/{existing['id']}?language={language}")
         return f"Removed the pronunciation of '{existing['word']}'.", {"removed": existing}
     if not args.respelling:
@@ -568,7 +569,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(run=cmd_collection)
 
     p = sub.add_parser("speak", parents=[common], help="turn text into speech (WAV)")
-    p.add_argument("text", help="what to say, up to 4096 characters; - reads it from stdin")
+    p.add_argument("text", help="what to say, up to 4096 characters; - reads it from stdin. In English, cue tags "
+                   "such as [laugh] or [sigh] send the text to the Chatterbox-Turbo model (other languages leave them out); the list is under "
+                   "\"cues\" in GET /api/voice_cloning/status")
     p.add_argument("-v", "--voice", help="saved voice name or id (default: the built-in voice)")
     p.add_argument("-l", "--language", default="en", help="ISO 639-1 code, e.g. en, es, fr (default en)")
     p.add_argument("--speed", type=float, default=1.0, help="0.5 to 2.0 (default 1.0)")
@@ -640,7 +643,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("action", choices=["list", "add", "remove"], help="add also updates an existing word")
     p.add_argument("word", nargs="?", help="the word as written")
     p.add_argument("respelling", nargs="?", help="how to write it so it is spoken right, e.g. win for Nguyen")
-    p.add_argument("-l", "--language", default="en", help="ISO 639-1 code (default en)")
+    p.add_argument("-l", "--language", default="en", help="ISO 639-1 code, or all for a word every language uses (default en)")
     p.add_argument("--case-sensitive", action="store_true", help="match only this exact capitalization")
     p.add_argument("--partial", action="store_true", help="also match inside longer words")
     p.set_defaults(run=cmd_pronounce)

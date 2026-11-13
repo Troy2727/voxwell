@@ -205,3 +205,13 @@ def test_gateway_runs_only_while_enabled(monkeypatch, synth):
             break
     else:
         pytest.fail("the gateway kept running after phone calls were turned off")
+
+
+def test_a_greeting_of_only_cue_tags_is_refused_clearly(monkeypatch):
+    def synth(text, language, reference_audio=None, **kwargs):
+        raise cloning_engine.NothingToSay("Nothing to say after removing cue tags.")
+
+    monkeypatch.setattr(cloning_engine, "synthesize", synth)
+    settings(greeting_text="[laugh]", language="fr")
+    r = client.post("/api/integrations/phone/greeting")
+    assert r.status_code == 422 and r.json()["detail"] == "Nothing to say after removing cue tags."

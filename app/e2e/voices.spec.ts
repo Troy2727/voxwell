@@ -1,5 +1,5 @@
 import { dropFile, ensureVoice, expect, expectAudio, openFeature, pickVoice, test } from './fixtures';
-import { installMockBackend } from './mock-backend';
+import { CUES, installMockBackend } from './mock-backend';
 
 test('voice cloning: upload a clip, then speak in that voice', async ({ app: page }) => {
   await openFeature(page, 'Voice cloning');
@@ -139,4 +139,81 @@ test('voice remix: remix a saved voice and save it', async ({ app: page, mode })
   await expect(page.getByLabel('Name for the new voice')).toHaveValue(/\(remix\)$/);
   await page.getByRole('button', { name: 'Save to voices' }).click();
   await expect(page.getByRole('button', { name: 'Remix this one further' })).toBeVisible();
+});
+
+test('voice cloning: the Cues menu puts a tag at the cursor, in English only', async ({ app: page, mode }) => {
+  test.skip(mode === 'real', 'Uses the mocked cue list, so it only runs against the mock backend.');
+  await openFeature(page, 'Voice cloning');
+  const text = page.getByLabel('Text');
+  const pick = async (label: string) => {
+    await page.getByRole('button', { name: 'Cues' }).click();
+    await page.getByRole('menuitem', { name: label, exact: true }).click();
+  };
+  await expect(page.getByText('Cues such as [laugh] ask the voice for that sound or manner.')).toBeVisible();
+
+  await text.fill('Hello there');
+  await text.evaluate((el: HTMLTextAreaElement) => el.setSelectionRange(5, 5));
+  await page.getByRole('button', { name: 'Cues' }).click();
+  for (const group of ['Sounds', 'Feelings and delivery', 'Style']) await expect(page.getByText(group, { exact: true })).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: 'Clear throat' })).toBeVisible();
+  await page.getByRole('menuitem', { name: 'Laugh', exact: true }).click();
+  await expect(text).toHaveValue('Hello [laugh] there');
+  await expect(text).toBeFocused();
+  await page.keyboard.type('X');
+  await expect(text).toHaveValue('Hello [laugh] Xthere'); // the cursor lands right after the tag
+
+  await text.fill('Hello big world');
+  await text.evaluate((el: HTMLTextAreaElement) => el.setSelectionRange(6, 9)); // "big"
+  await pick('Sigh');
+  await expect(text).toHaveValue('Hello [sigh] world');
+  await text.evaluate((el: HTMLTextAreaElement) => el.setSelectionRange(0, 0));
+  await pick('Gasp');
+  await expect(text).toHaveValue('[gasp] Hello [sigh] world'); // no space before a tag at the start
+
+  await page.getByRole('combobox', { name: 'Language' }).click();
+  await page.getByRole('option', { name: 'Spanish' }).click();
+  await expect(page.getByRole('button', { name: 'Cues' })).toHaveCount(0);
+  await expect(page.getByText('Cues such as [laugh] ask the voice for that sound or manner.')).toHaveCount(0);
+  await expect(text).toHaveValue('[gasp] Hello [sigh] world');
+});
+
+test('voice cloning: cues in another language are left out, with a note', async ({ app: page, mode }) => {
+  test.skip(mode === 'real', 'Checks a mocked reply, so it only runs against the mock backend.');
+  await openFeature(page, 'Voice cloning');
+  const note = page.getByText('Cues work in English only, so they were left out.');
+  await page.getByLabel('Text').fill('Hello [laugh] friend.');
+  await page.getByRole('button', { name: 'Generate' }).click();
+  await expectAudio(page, 0.5);
+  await expect(note).toHaveCount(0);
+
+  await page.getByRole('combobox', { name: 'Language' }).click();
+  await page.getByRole('option', { name: 'Spanish' }).click();
+  await page.getByLabel('Text').fill('Hola [laugh] amigo.');
+  await page.getByRole('button', { name: 'Generate' }).click();
+  await expect(note).toBeVisible();
+  await expectAudio(page, 0.5);
+});
+
+test('voice cloning: the Cues button and menu fit phone, tablet and desktop widths', async ({ app: page, mode }) => {
+  test.skip(mode === 'real', 'Uses the mocked cue list, so it only runs against the mock backend.');
+  await openFeature(page, 'Voice cloning');
+  for (const width of [390, 768, 1024, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.getByRole('button', { name: 'Cues' }).click();
+    await expect(page.getByRole('menuitem', { name: 'Laugh', exact: true })).toBeVisible();
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(overflow, `scrolls sideways at ${width}px`).toBeLessThanOrEqual(0);
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('menu')).toHaveCount(0);
+  }
+});
+
+test('voice cloning: when the cue model is unavailable, Cues is disabled and the hint says why', async ({ app: page, mode }) => {
+  test.skip(mode === 'real', 'Fakes an unavailable cue model, so it only runs against the mock backend.');
+  await page.route('**/api/voice_cloning/status', (route) =>
+    route.fulfill({ json: { ready: true, languages: { en: 'English', es: 'Spanish' }, cues: { ...CUES, available: false } } }));
+  await openFeature(page, 'Voice cloning');
+  await expect(page.getByRole('button', { name: 'Cues' })).toBeDisabled();
+  await expect(page.getByText(/Cues are unavailable: their model \(Chatterbox-Turbo\) is missing or failed to load/)).toBeVisible();
+  await expect(page.getByText('Cues such as [laugh] ask the voice for that sound or manner.')).toHaveCount(0);
 });

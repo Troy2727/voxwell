@@ -191,3 +191,22 @@ def test_running_story_cannot_be_deleted(fake, monkeypatch):
     monkeypatch.setattr(jobs, "start", lambda job: jobs._save(job))
     jid = create().json()["id"]
     assert client.delete(f"/api/projects/items/story/{jid}").status_code == 409
+
+
+def test_a_line_with_only_cue_tags_is_skipped_and_the_story_goes_on(monkeypatch):
+    spoken = []
+
+    def synth(text, language, reference_audio=None):
+        if text == "[laugh]":
+            raise engine.NothingToSay("Nothing to say after removing cue tags.")
+        spoken.append(text)
+        return wav_bytes(1.0)
+
+    monkeypatch.setattr(engine, "synthesize", synth)
+    monkeypatch.setattr(jobs, "start", jobs._work)
+    r = client.post("/api/stories/jobs", json={"script": "Anna: Bonjour.\nAnna: [laugh]\nAnna: Au revoir.", "language": "fr"})
+    job = client.get(f"/api/stories/jobs/{r.json()['id']}").json()
+    assert job["state"] == "done" and spoken == ["Bonjour.", "Au revoir."]
+    with wave.open(io.BytesIO(client.get(f"/api/stories/jobs/{r.json()['id']}/audio").content)) as w:
+        seconds = w.getnframes() / w.getframerate()
+    assert seconds == pytest.approx(2 * 1.0 + engine.SKIPPED_LINE + 2 * jobs.PAUSE_SECONDS, abs=0.01)

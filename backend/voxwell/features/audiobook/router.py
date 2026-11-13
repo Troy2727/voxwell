@@ -36,6 +36,7 @@ class BookSettings(BaseModel):
     language: str | None = None
     voice: str | None = None
     chapters: list[ChapterSettings] | None = None
+    tone_memory: bool | None = None
 
 
 class PreviewRequest(BaseModel):
@@ -46,7 +47,7 @@ def summary(book: books.Book) -> dict:
     return {
         "id": book.id, "title": book.title, "created": book.created, "language": book.language,
         "voice": book.voice, "state": book.state, "step": book.step, "percent": book.percent,
-        "error": book.error,
+        "error": book.error, "tone_memory": book.tone_memory,
         "chapters": [
             {**c.__dict__, "audio_url": f"/api/audiobook/books/{book.id}/chapters/{i}/audio" if c.status == "done" else None}
             for i, c in enumerate(book.chapters)
@@ -124,8 +125,11 @@ def update(book_id: str, req: BookSettings):
             raise HTTPException(422, "Send a setting for every chapter.")
         for ch, setting in zip(book.chapters, req.chapters):
             ch.include = setting.include
-    if req.language is not None or req.voice is not None:
-        # New voice or language: finished chapters no longer match, so they render again.
+    tone_changed = req.tone_memory is not None and req.tone_memory != book.tone_memory
+    if tone_changed:
+        book.tone_memory = req.tone_memory
+    if req.language is not None or req.voice is not None or tone_changed:
+        # New voice, language or tone: finished chapters no longer match, so they render again.
         for i, ch in enumerate(book.chapters):
             ch.status = "pending"
             books.chapter_audio(book, i).unlink(missing_ok=True)

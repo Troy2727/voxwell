@@ -259,3 +259,123 @@ def test_mcp_tool(monkeypatch):
     assert "SQL -> sequel" in call(action="list")["content"][0]["text"]
     assert call(action="remove", word="SQL")["isError"] is False
     assert call(action="explode")["isError"] is True
+
+
+# --- shared words (scope "all") --------------------------------------------------------------------
+
+
+def test_shared_words_apply_in_every_language(isolated_data_dir):
+    assert store.list_entries("all") == [] and store.apply("Ask Nguyen", "fr") == "Ask Nguyen"
+    store.add_entry("all", "Nguyen", "win")
+    assert [store.apply("Ask Nguyen", lang) for lang in ("en", "es", "fr")] == ["Ask win"] * 3
+    assert (isolated_data_dir / "pronunciation" / "shared.json").exists()
+    assert not (isolated_data_dir / "pronunciation" / "en.json").exists()
+    assert not list((isolated_data_dir / "pronunciation").glob("*.tmp"))
+
+
+def test_a_language_entry_wins_over_a_shared_one_for_the_same_text(isolated_data_dir):
+    store.add_entry("all", "Nguyen", "win")
+    store.add_entry("es", "Nguyen", "nuyen")  # the same word in a language list is not a duplicate
+    assert store.apply("Nguyen", "es") == "nuyen" and store.apply("Nguyen", "en") == "win"
+    store.add_entry("all", "sql", "sequel")
+    store.add_entry("es", "SQL", "ese cu ele", case_sensitive=True)
+    assert store.apply("SQL sql", "es") == "ese cu ele sequel"
+
+
+def test_the_longest_match_wins_whatever_its_list(isolated_data_dir):
+    store.add_entry("all", "New York", "nu york")
+    store.add_entry("es", "New", "niu")
+    assert store.apply("New York, New", "es") == "nu york, niu"
+
+
+@pytest.mark.parametrize("corrupt, kept", [("es.json", ("all", "Nguyen", "win")), ("shared.json", ("es", "Nguyen", "nuyen"))])
+def test_a_corrupt_list_does_not_stop_the_other(isolated_data_dir, corrupt, kept):
+    store.add_entry(*kept)
+    (isolated_data_dir / "pronunciation" / corrupt).write_text("{not json", encoding="utf-8")
+    assert store.apply("Nguyen", "es") == kept[2]
+
+
+def test_shared_list_has_the_usual_rules(isolated_data_dir):
+    store.add_entry("all", "Nguyen", "win")
+    with pytest.raises(store.DuplicateWord):
+        store.add_entry("all", "nguyen", "x")
+    with pytest.raises(ValueError):
+        store.add_entry("all", "x" * 101, "x")
+
+
+def test_shared_and_language_lists_can_be_written_at_once(isolated_data_dir):
+    import threading
+
+    def add(scope, n):
+        for i in range(n):
+            store.add_entry(scope, f"{scope}{i}", "x")
+
+    threads = [threading.Thread(target=add, args=(scope, 20)) for scope in ("all", "en")]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert len(store.list_entries("all")) == len(store.list_entries("en")) == 20
+
+
+def test_api_shared_scope():
+    created = post(language="all").json()
+    assert [e["id"] for e in client.get("/api/pronunciation/entries?language=all").json()] == [created["id"]]
+    assert client.get("/api/pronunciation/entries").json() == []
+    r = client.put(f"/api/pronunciation/entries/{created['id']}", json={"language": "all", "word": "Nguyen", "respelling": "wen"})
+    assert r.json()["respelling"] == "wen"
+    assert client.delete(f"/api/pronunciation/entries/{created['id']}?language=en").status_code == 404
+    assert client.delete(f"/api/pronunciation/entries/{created['id']}?language=all").status_code == 200
+    for bad in ("xx", "ALL", "../x"):
+        assert client.get(f"/api/pronunciation/entries?language={bad}").status_code == 422
+
+
+def test_preview_uses_shared_words_and_needs_a_language():
+    post(language="all")
+    assert client.post("/api/pronunciation/preview", json={"text": "Hola Nguyen", "language": "es"}).json() == {"text": "Hola win"}
+    assert client.post("/api/pronunciation/preview", json={"text": "x", "language": "all"}).status_code == 422
+
+
+def test_synthesize_uses_shared_words(monkeypatch):
+    seen = []
+
+    class Model:
+        sr = 24000
+
+        def generate(self, text, **kwargs):
+            seen.append(text)
+            return np.zeros(10, dtype="float32")
+
+    monkeypatch.setattr(engine, "_load_model", lambda: Model())
+    store.add_entry("all", "Nguyen", "win")
+    engine.synthesize("Ask Nguyen.", "en")
+    engine.synthesize("Ask Nguyen.", "es")
+    assert seen == ["Ask win.", "Ask win."]
+
+
+def test_cli_shared_scope(capsys):
+    assert run(capsys, "pronounce", "add", "Nguyen", "win", "-l", "all")[0] == 0
+    assert [e["word"] for e in json.loads(run(capsys, "pronounce", "list", "-l", "all", "--json")[1])["entries"]] == ["Nguyen"]
+    assert json.loads(run(capsys, "pronounce", "list", "-l", "es", "--json")[1])["entries"] == []
+    assert run(capsys, "pronounce", "remove", "Nguyen", "-l", "all")[0] == 0
+    code, _, err = run(capsys, "pronounce", "remove", "Nguyen", "-l", "all")
+    assert code == 1 and "all languages" in err
+    assert "all languages" in run(capsys, "pronounce", "list", "-l", "all")[1]
+
+
+def test_mcp_tool_shared_scope(monkeypatch):
+    monkeypatch.setattr(mcp_server, "_client", AppClient)
+
+    def call(**arguments):
+        return mcp_server.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                                  "params": {"name": "manage_pronunciations", "arguments": arguments}})["result"]
+
+    assert call(action="add", word="SQL", respelling="sequel", language="all")["isError"] is False
+    assert store.list_entries("all")[0].word == "SQL" and store.list_entries("en") == []
+    assert "SQL -> sequel" in call(action="list", language="all")["content"][0]["text"]
+    assert call(action="remove", word="SQL", language="all")["isError"] is False
+
+
+def test_apply_needs_a_real_language(isolated_data_dir):
+    with pytest.raises(ValueError):
+        store.apply("Nguyen", "all")

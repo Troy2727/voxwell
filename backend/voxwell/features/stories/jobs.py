@@ -148,7 +148,7 @@ def _speak_subtitles(job: Job) -> bytes:
     clips = []
     for i, cue in enumerate(cues):
         job.step, job.percent = f"Speaking subtitle {i + 1} of {len(cues)}", int(99 * i / len(cues))
-        clips.append(engine.synthesize(cue.text, job.language, reference))
+        clips.append(engine.synthesize_line(cue.text, job.language, reference))
     return subtitles.place(cues, clips)
 
 
@@ -158,7 +158,7 @@ def _speak_script(job: Job) -> bytes:
     clips = []
     for i, line in enumerate(lines):
         job.step, job.percent = f"Speaking line {i + 1} of {len(lines)}", int(99 * i / len(lines))
-        clips.append(engine.synthesize(line.text, job.language, refs.get(line.speaker)))
+        clips.append(engine.synthesize_line(line.text, job.language, refs.get(line.speaker)))
     return _join(clips)
 
 

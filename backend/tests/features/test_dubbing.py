@@ -259,3 +259,19 @@ def test_mux_keeps_the_whole_video(tmp_path, track_seconds):
     durations = {kind: float(seconds) for kind, seconds in (line.split(",") for line in probe)}
     assert durations["video"] == pytest.approx(3.0, abs=0.1)
     assert durations["audio"] == pytest.approx(3.0, abs=0.15)
+
+
+def test_a_line_with_only_cue_tags_becomes_silence_and_the_dub_goes_on(mocked, monkeypatch):
+    # Whisper writes "[Music]" for music; after translation that line has nothing left to say.
+    monkeypatch.setattr(translator, "translate", lambda texts, s, t: ["[Music]", "adios"])
+
+    def synth(text, language, reference_audio=None):
+        if text == "[Music]":
+            raise cloning_engine.NothingToSay("Nothing to say after removing cue tags.")
+        mocked["synth"].append(text)
+        return wav_bytes(1.0)
+
+    monkeypatch.setattr(cloning_engine, "synthesize", synth)
+    job = client.get(f"/api/dubbing/jobs/{post().json()['id']}").json()
+    assert job["state"] == "done" and job["error"] is None
+    assert mocked["synth"] == ["adios"]

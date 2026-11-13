@@ -177,3 +177,12 @@ def test_translate_file_transcribes_off_the_event_loop(models, monkeypatch):
     monkeypatch.setattr(stt, "transcribe", watching)
     r = client.post("/api/translation/file", files={"file": ("talk.wav", wav_bytes(), "audio/wav")}, data={"target": "it"})
     assert r.status_code == 200 and on_loop == [False]
+
+
+def test_speaking_a_translation_of_only_cue_tags_is_refused_clearly(models, monkeypatch):
+    def synthesize(text, language, reference=None, **kwargs):
+        raise tts.NothingToSay("Nothing to say after removing cue tags.")
+
+    monkeypatch.setattr(tts, "synthesize", synthesize)
+    r = client.post("/api/translation/speak", json={"text": "[laugh]", "target": "de"})
+    assert r.status_code == 422 and r.json()["detail"] == "Nothing to say after removing cue tags."

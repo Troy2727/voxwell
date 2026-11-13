@@ -97,7 +97,7 @@ def run(job_dir: Path, video: Path, target: str, voice: str, progress: Progress,
         progress(f"Synthesizing speech ({i + 1}/{len(segments)})", 45 + int(45 * i / len(segments)))
         raw = job_dir / f"clip{i}.raw.wav"
         reference = references.get(labels[i], references.get(None))
-        raw.write_bytes(cloning_engine.synthesize(text, target, reference))
+        raw.write_bytes(cloning_engine.synthesize_line(text, target, reference))
         norm = job_dir / f"clip{i}.wav"
         samples = _normalize(raw, norm)
         tempo = fitting.tempo_for(len(samples) / RATE, seg.end - seg.start)
