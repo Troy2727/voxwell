@@ -156,5 +156,7 @@ def apply(text: str, language: str) -> str:
     The language's entries come first, so for the same matched text they win over shared ones
     (rewrite's sort is stable); otherwise the longest match wins whatever its list.
     """
+    if language == ALL:
+        raise ValueError("Speech needs a language; the shared words apply within it.")
     entries = [*list_entries(language), *list_entries(ALL)]
     return rewrite(text, entries) if entries else text

@@ -374,3 +374,8 @@ def test_mcp_tool_shared_scope(monkeypatch):
     assert store.list_entries("all")[0].word == "SQL" and store.list_entries("en") == []
     assert "SQL -> sequel" in call(action="list", language="all")["content"][0]["text"]
     assert call(action="remove", word="SQL", language="all")["isError"] is False
+
+
+def test_apply_needs_a_real_language(isolated_data_dir):
+    with pytest.raises(ValueError):
+        store.apply("Nguyen", "all")
