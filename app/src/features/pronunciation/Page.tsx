@@ -23,8 +23,12 @@ interface Entry {
   whole_word: boolean;
 }
 
+// "all" is the shared list: words every language uses (a language's own entry wins there).
+const SCOPES: [string, string][] = [['all', 'All languages'], ...LANGUAGES];
+
 export default function Page() {
   const [language, setLanguage] = useState('en');
+  const [hearLanguage, setHearLanguage] = useState('en'); // Hear it needs a real language when the scope is all
   const [entries, setEntries] = useState<Entry[] | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [word, setWord] = useState('');
@@ -56,6 +60,10 @@ export default function Page() {
     setAudioUrl('');
     void refresh();
   }, [refresh]);
+  useEffect(() => {
+    setRewritten('');
+    setAudioUrl('');
+  }, [hearLanguage]);
   useEffect(() => {
     listVoices().then(setVoices, () => setVoices([]));
   }, []);
@@ -105,16 +113,17 @@ export default function Page() {
   }
 
   async function hear() {
+    const spoken = language === 'all' ? hearLanguage : language;
     setHearing(true);
     setHearError('');
     setAudioUrl('');
     try {
-      const preview = await sendJson<{ text: string }>('/api/pronunciation/preview', 'POST', { text: sample, language });
+      const preview = await sendJson<{ text: string }>('/api/pronunciation/preview', 'POST', { text: sample, language: spoken });
       setRewritten(preview.text);
       // Speech applies the dictionary itself, so the original text goes in.
       const res = await sendJson<{ url: string }>('/api/voice_cloning/synthesize', 'POST', {
         text: sample,
-        language,
+        language: spoken,
         voice_id: voiceId || null,
       });
       setAudioUrl(apiUrl(res.url));
@@ -127,8 +136,15 @@ export default function Page() {
 
   return (
     <PageLayout title="Pronunciation" description="Teach every voice how to say names, brands and jargon. Applies to all speech Voxwell makes.">
-      <Section title="Language" description="Each language has its own list.">
-        <ChoiceSelect options={LANGUAGES} value={language} onChange={setLanguage} aria-label="Language" />
+      <Section
+        title="Language"
+        description={
+          language === 'all'
+            ? 'These words apply in every language. Add the same word under a language to say it differently there.'
+            : 'Each language has its own list, and also uses the All languages words; its own entry wins.'
+        }
+      >
+        <ChoiceSelect options={SCOPES} value={language} onChange={setLanguage} disabled={editing !== null || saving} aria-label="Language" />
       </Section>
 
       <Section title={editing ? 'Edit word' : 'Add a word'} description="Write the respelling the way it should sound, e.g. Nguyen becomes win.">
@@ -167,7 +183,7 @@ export default function Page() {
         {entries === null ? (
           <Skeleton className="h-16 w-full" />
         ) : entries.length === 0 ? (
-          <p className="text-muted-foreground text-sm">No words for this language yet.</p>
+          <p className="text-muted-foreground text-sm">{language === 'all' ? 'No words for all languages yet.' : 'No words for this language yet.'}</p>
         ) : (
           <ul className="flex flex-col divide-y">
             {entries.map((e) => (
@@ -196,6 +212,11 @@ export default function Page() {
         <Field label="Voice">
           <VoiceSelect voices={voices} value={voiceId} onChange={setVoiceId} disabled={voices === null} />
         </Field>
+        {language === 'all' && (
+          <Field label="Speak in">
+            <ChoiceSelect options={LANGUAGES} value={hearLanguage} onChange={setHearLanguage} aria-label="Speak in" />
+          </Field>
+        )}
         <Field label="Sentence" htmlFor="pron-sample">
           <Textarea id="pron-sample" rows={3} maxLength={2000} value={sample} onChange={(e) => setSample(e.target.value)} placeholder="Ask Ms. Nguyen about it." />
         </Field>

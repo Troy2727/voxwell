@@ -1,6 +1,7 @@
-"""Pronunciation dictionaries: per-language words and how to respell them for the speech model.
+"""Pronunciation dictionaries: words and how to respell them for the speech model.
 
-Entries live in one JSON file per language under data_dir("pronunciation"). apply() rewrites a
+Entries live in one JSON file per language under data_dir("pronunciation"), plus shared.json for the
+words that apply in every language (Shared words, the scope ALL). apply() rewrites a
 text before it reaches the model; voice_cloning.engine.synthesize() calls it, so every path that
 makes speech (cloning, stories, audiobook, dubbing, tools, the OpenAI-compatible API) gets it.
 """
@@ -18,6 +19,7 @@ MAX_RESPELLING = 200
 MAX_ENTRIES = 2000
 
 _LANGUAGE = re.compile(r"^[a-z]{2,3}$")
+ALL = "all"  # the scope of the shared list; not a language
 _lock = threading.Lock()
 
 
@@ -35,6 +37,8 @@ class Entry:
 
 
 def _path(language: str):
+    if language == ALL:
+        return child_path(data_dir("pronunciation"), "shared.json")
     if not _LANGUAGE.match(language):  # the language names a file, so never trust it as a path
         raise ValueError(f"Invalid language '{language}'.")
     return child_path(data_dir("pronunciation"), f"{language}.json")
@@ -82,7 +86,7 @@ def add_entry(language: str, word: str, respelling: str, case_sensitive: bool = 
     with _lock:
         entries = list_entries(language)
         if len(entries) >= MAX_ENTRIES:
-            raise ValueError(f"Too many entries ({MAX_ENTRIES} max per language).")
+            raise ValueError(f"Too many entries ({MAX_ENTRIES} max per list).")
         if any(_same_word(e, word, case_sensitive) for e in entries):
             raise DuplicateWord(word)
         entry = Entry(uuid.uuid4().hex, word, respelling, case_sensitive, whole_word)
@@ -147,6 +151,10 @@ def rewrite(text: str, entries: list[Entry]) -> str:
 
 
 def apply(text: str, language: str) -> str:
-    """`text` rewritten with the language's dictionary (unchanged when there are no entries)."""
-    entries = list_entries(language)
+    """`text` rewritten with the language's entries and the shared ones (unchanged when there are none).
+
+    The language's entries come first, so for the same matched text they win over shared ones
+    (rewrite's sort is stable); otherwise the longest match wins whatever its list.
+    """
+    entries = [*list_entries(language), *list_entries(ALL)]
     return rewrite(text, entries) if entries else text
