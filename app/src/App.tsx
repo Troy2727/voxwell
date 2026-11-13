@@ -7,6 +7,7 @@ import { FEATURES } from './features';
 import { useShortcutDictation } from './features/dictation/useShortcutDictation';
 import { HomePage } from './home/Page';
 import { LogoMark } from '@/components/logo';
+import { PageSearch } from '@/components/page-search';
 import { Button } from '@/components/ui/button';
 import {
   Sidebar,
@@ -204,6 +205,7 @@ function Shell({ user }: { user?: User }) {
           ) : (
             <span className="text-sm font-medium">Home</span>
           )}
+          <PageSearch onOpen={setActive} />
         </header>
         <main id="main" tabIndex={-1} className="flex-1 p-4 outline-none sm:p-6 md:p-8">
           {feature ? (
