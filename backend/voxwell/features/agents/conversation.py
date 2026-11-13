@@ -16,7 +16,7 @@ import wave
 from collections.abc import Iterator
 
 from voxwell import voices
-from voxwell.features.agents import tools
+from voxwell.features.agents import mood, tools
 from voxwell.features.agents.sentences import SentenceSplitter
 from voxwell.features.agents.store import Agent, AgentError
 from voxwell.features.audiobook.books import render_text
@@ -142,10 +142,28 @@ def _use_tool(agent: Agent, call: dict | None, problem: str | None, reply: str, 
     messages += [{"role": "assistant", "content": reply}, {"role": "tool", "content": feedback}]
 
 
-def speak(agent: Agent, text: str, language: str | None = None) -> str:
-    """The reply spoken in the agent's voice, as base64 WAV."""
+def speak(agent: Agent, text: str, language: str | None = None, delivery: mood.Delivery | None = None) -> str:
+    """The reply spoken in the agent's voice, as base64 WAV; `delivery` (Mood match) sets how."""
     reference = voices.voice_audio_path(agent.voice) if agent.voice else None
-    return base64.b64encode(render_text(chapter_chunks(text), language or agent.language, reference)).decode("ascii")
+    wav = render_text(chapter_chunks(text), language or agent.language, reference, settings=_engine_settings(delivery))
+    return base64.b64encode(_with_tempo(wav, delivery)).decode("ascii")
+
+
+def _engine_settings(delivery: mood.Delivery | None) -> dict | None:
+    return {"exaggeration": delivery.exaggeration, "cfg_weight": delivery.cfg_weight} if delivery else None
+
+
+def _with_tempo(wav: bytes, delivery: mood.Delivery | None) -> bytes:
+    """The speech at the mood's tempo; as spoken if there is none or it can't be changed (never an error)."""
+    if delivery is None or delivery.tempo == 1.0:
+        return wav
+    try:
+        from voxwell.features.audio_effects.dsp import Effects, apply_to_wav
+
+        return apply_to_wav(wav, Effects(speed=delivery.tempo))
+    except Exception:
+        log.warning("Mood match could not change the tempo; the reply keeps its own", exc_info=True)
+        return wav
 
 
 def reply_and_speak(
@@ -158,8 +176,12 @@ def reply_and_speak(
     language = language or agent.language
     result = {**respond(agent, history, message, language), "language": language}
     if spoken:
+        delivery = None
+        if agent.mood_match:
+            result["mood"] = mood.choose_mood(message)
+            delivery = mood.delivery_for(result["mood"])
         try:
-            result["audio"] = speak(agent, result["reply"], language)
+            result["audio"] = speak(agent, result["reply"], language, delivery)
         except Exception:
             log.exception("Could not speak an agent reply")
             result["warning"] = SPEAK_WARNING
@@ -220,7 +242,10 @@ def _duration_ms(wav: bytes) -> int:
         return round(w.getnframes() * 1000 / w.getframerate())
 
 
-def run_turn(agent: Agent, history: list[dict], message: str, emit, language: str | None = None, started: float | None = None) -> dict:
+def run_turn(
+    agent: Agent, history: list[dict], message: str, emit, language: str | None = None, started: float | None = None,
+    delivery: mood.Delivery | None = None,
+) -> dict:
     """One live turn with Flow replies: each sentence is sent and spoken as soon as the model finishes it.
 
     `emit` sends a message mid-turn and has `cancelled` (live_audio.Emitter). Tool rounds run first
@@ -251,7 +276,7 @@ def run_turn(agent: Agent, history: list[dict], message: str, emit, language: st
         if emit.cancelled:
             return
         try:
-            wav = tts.synthesize(sentence, language, reference)
+            wav = _with_tempo(tts.synthesize(sentence, language, reference, **(_engine_settings(delivery) or {})), delivery)
             part = {"audio": base64.b64encode(wav).decode("ascii"), "duration_ms": _duration_ms(wav)}
         except Exception:
             log.exception("Could not speak a sentence of an agent reply")

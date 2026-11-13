@@ -28,6 +28,7 @@ class Agent:
     language: str = "en"  # what it listens and speaks in
     tools: list[str] = field(default_factory=list)
     follow_languages: list[str] = field(default_factory=list)  # other languages it may answer in
+    mood_match: bool = False  # spoken delivery follows how the user sounds (see mood)
 
 
 def _path(agent_id: str):

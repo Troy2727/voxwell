@@ -883,3 +883,117 @@ def test_text_in_the_same_piece_as_a_tool_call_is_still_spoken(stream, monkeypat
     messages = streamed_turn(make_agent()["id"], "six times seven", monkeypatch)
     texts = [m["text"] for m in messages if m["type"] == "reply_text"]
     assert texts == ["Let me work that out for you right now.", "Back in a moment.", "Six times seven comes to forty two."]
+
+
+
+# --- Mood match -------------------------------------------------------------------------------------
+
+
+@pytest.fixture
+def moods(monkeypatch):
+    """The mood model's answers in turn (default "upbeat"); `moods.asked` holds the messages it read."""
+    from voxwell.features.tools import direction
+
+    class Fake:
+        answers: list = []
+        asked: list = []
+
+    fake = Fake()
+    fake.answers, fake.asked = [], []
+
+    def complete(system, user, max_new_tokens=80):
+        fake.asked.append(user)
+        return fake.answers.pop(0) if fake.answers else "upbeat"
+
+    monkeypatch.setattr(direction, "complete", complete)
+    from voxwell.features.agents import mood
+
+    monkeypatch.setattr(mood, "warm_up", lambda: None)  # tests never load the audio library
+    return fake
+
+
+@pytest.fixture
+def engine_calls(monkeypatch):
+    calls = []
+    monkeypatch.setattr(tts, "synthesize", lambda text, language, reference=None, **k: calls.append(k) or wav_bytes())
+    return calls
+
+
+def test_old_agents_load_with_mood_match_off():
+    folder = data_dir("agents")
+    (folder / "0123456789ab.json").write_text(json.dumps({"id": "0123456789ab", "name": "Old", "system_prompt": ""}), encoding="utf-8")
+    assert store.get("0123456789ab").mood_match is False
+    agent = make_agent(mood_match=True)
+    assert agent["mood_match"] is True and make_agent()["mood_match"] is False
+    body = {k: v for k, v in agent.items() if k not in ("id", "mood_match")}
+    assert client.put(f"/api/agents/agents/{agent['id']}", json=body).json()["mood_match"] is False
+
+
+def test_mood_match_off_changes_nothing(llm, moods, engine_calls):
+    r = chat(make_agent()["id"], "I am so happy today!").json()
+    assert "mood" not in r and moods.asked == [] and engine_calls == [{}]
+
+
+def test_mood_match_on_sets_the_delivery(llm, moods, engine_calls):
+    from voxwell.features.agents import mood
+
+    r = chat(make_agent(mood_match=True)["id"], "We got the job!").json()
+    upbeat = mood.delivery_for("upbeat")
+    assert r["mood"] == "upbeat" and engine_calls == [{"exaggeration": upbeat.exaggeration, "cfg_weight": upbeat.cfg_weight}]
+    assert '"""We got the job!"""' in moods.asked[0]
+
+
+def test_an_unreadable_mood_is_neutral(llm, moods, engine_calls):
+    moods.answers = ["no idea"]
+    r = chat(make_agent(mood_match=True)["id"], "hm").json()
+    assert r["mood"] == "neutral" and engine_calls == [{"exaggeration": 0.5, "cfg_weight": 0.5}]
+
+
+def test_a_tempo_that_cannot_be_applied_is_not_an_error(llm, moods, engine_calls, monkeypatch):
+    from voxwell.features.audio_effects import dsp
+
+    monkeypatch.setattr(dsp, "apply_to_wav", lambda wav, fx: (_ for _ in ()).throw(RuntimeError("no ffmpeg")))
+    r = chat(make_agent(mood_match=True)["id"], "great news!").json()  # upbeat: a faster tempo
+    assert r["audio"] and "warning" not in r
+
+
+def test_unspoken_chat_chooses_no_mood(llm, moods):
+    r = chat(make_agent(mood_match=True)["id"], "hi", speak=False).json()
+    assert "mood" not in r and moods.asked == []
+
+
+def test_mood_never_changes_the_reply(llm, moods, monkeypatch):
+    llm.replies = ["Here you go.", "Here you go."]
+    off = chat(make_agent()["id"], "hi").json()
+    on = chat(make_agent(mood_match=True)["id"], "hi").json()
+    assert (off["reply"], off["tool_calls"]) == (on["reply"], on["tool_calls"])
+    monkeypatch.setattr(tts, "synthesize", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("no GPU")))
+    failed = chat(make_agent(mood_match=True)["id"], "hi").json()
+    assert failed["warning"] and failed["reply"]
+
+
+def test_a_streamed_turn_chooses_its_mood_once(stream, moods, monkeypatch):
+    from voxwell.features.agents import mood
+
+    calls = []
+    monkeypatch.setattr(tts, "synthesize", lambda text, language, reference=None, **k: calls.append(k) or wav_bytes(0.25))
+    stream.rounds = [THREE]
+    messages = streamed_turn(make_agent(mood_match=True)["id"], "good news everyone", monkeypatch)
+    upbeat = mood.delivery_for("upbeat")
+    assert len(moods.asked) == 1 and messages[-1]["mood"] == "upbeat"
+    assert calls == [{"exaggeration": upbeat.exaggeration, "cfg_weight": upbeat.cfg_weight}] * 3
+
+
+def test_an_empty_live_turn_has_no_mood(stream, moods, monkeypatch):
+    agent = make_agent(mood_match=True)
+    monkeypatch.setattr(stt, "transcribe", lambda path, language=None: stt.Transcript("", "en", []))
+    with client.websocket_connect(f"ws://127.0.0.1/api/agents/agents/{agent['id']}/live") as ws:
+        ws.send_json({"type": "start", "config": {"silence_ms": 400, "stream_reply": True}})
+        ws.receive_json()
+        ws.send_bytes(speech(600) + bytes(500 * 32))
+        ws.send_json({"type": "end"})
+        turns = []
+        while (m := ws.receive_json())["type"] != "done":
+            if m["type"] == "turn":
+                turns.append(m)
+    assert turns == [{"type": "turn", "index": 0, "transcript": ""}] and moods.asked == []

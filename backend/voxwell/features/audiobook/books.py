@@ -163,7 +163,10 @@ def _join(parts: list[tuple[bytes, float]]) -> bytes:
     return buf.getvalue()
 
 
-def render_text(paragraphs: list[list[str]], language: str, reference: Path | None, progress=None) -> bytes:
+def render_text(
+    paragraphs: list[list[str]], language: str, reference: Path | None, progress=None, settings: dict | None = None
+) -> bytes:
+    """`settings` are passed to every synthesize() call (e.g. exaggeration); without it, the engine's defaults."""
     parts = []
     total = sum(len(p) for p in paragraphs)
     for p_index, paragraph in enumerate(paragraphs):
@@ -171,7 +174,7 @@ def render_text(paragraphs: list[list[str]], language: str, reference: Path | No
             if progress:
                 progress(len(parts), total)
             last_in_paragraph = c_index == len(paragraph) - 1
-            parts.append((engine.synthesize(chunk, language, reference), PARAGRAPH_PAUSE if last_in_paragraph else SENTENCE_PAUSE))
+            parts.append((engine.synthesize(chunk, language, reference, **(settings or {})), PARAGRAPH_PAUSE if last_in_paragraph else SENTENCE_PAUSE))
     return _join(parts)
 
 

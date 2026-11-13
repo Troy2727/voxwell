@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Bot, Mic, Radio, Send, Square, Trash2, Wrench } from 'lucide-react';
 import { sendJson } from '@/api';
 import { EmptyState, ErrorAlert, Field, message, Muted, Section } from '@/components/page';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -23,6 +24,7 @@ interface Message {
   language?: string; // the language an assistant reply was given in
   turn?: string; // the live session and turn a streamed reply belongs to (turn numbers restart per session)
   interrupted?: boolean; // the user spoke over it; the text is what they heard
+  mood?: string; // Mood match: how the reply was said
 }
 
 interface Reply {
@@ -31,6 +33,7 @@ interface Reply {
   audio?: string;
   warning?: string;
   language: string;
+  mood?: string;
 }
 
 const languageNames = new Intl.DisplayNames(['en'], { type: 'language' });
@@ -186,7 +189,7 @@ export default function Conversation({ agent }: { agent: Agent }) {
       const cut = cutTurns.current.has(turn);
       const content = (x: Message) => (cut && !m.cut ? x.content : r.reply);
       // The final turn also carries tool calls made after the first sentence was spoken.
-      setMessages((list) => list.map((x) => (x.turn === turn ? { ...x, content: content(x), toolCalls: r.tool_calls, warning: r.warning, language: r.language } : x)));
+      setMessages((list) => list.map((x) => (x.turn === turn ? { ...x, content: content(x), toolCalls: r.tool_calls, warning: r.warning, language: r.language, mood: r.mood } : x)));
       const current = streaming.current;
       if (current && current.turn === turn) {
         current.done = true;
@@ -208,7 +211,7 @@ export default function Conversation({ agent }: { agent: Agent }) {
       const transcript = typeof m.transcript === 'string' ? m.transcript : '';
       if (!transcript) return;
       const r = m as unknown as Reply;
-      add({ role: 'user', content: transcript }, { role: 'assistant', content: r.reply, toolCalls: r.tool_calls, warning: r.warning, language: r.language });
+      add({ role: 'user', content: transcript }, { role: 'assistant', content: r.reply, toolCalls: r.tool_calls, warning: r.warning, language: r.language, mood: r.mood });
       play(r.audio);
     }
   };
@@ -249,7 +252,7 @@ export default function Conversation({ agent }: { agent: Agent }) {
     try {
       const r = await sendJson<Reply>(`/api/agents/agents/${agent.id}/chat`, 'POST', { message: message_, history: history(), speak: true, language: lastLanguage });
       setText('');
-      add({ role: 'user', content: message_ }, { role: 'assistant', content: r.reply, toolCalls: r.tool_calls, warning: r.warning, language: r.language });
+      add({ role: 'user', content: message_ }, { role: 'assistant', content: r.reply, toolCalls: r.tool_calls, warning: r.warning, language: r.language, mood: r.mood });
       play(r.audio);
     } catch (e) {
       setError(message(e));
@@ -324,6 +327,11 @@ export default function Conversation({ agent }: { agent: Agent }) {
                 </Muted>
               )}
               {m.interrupted && <Muted className="text-xs">Interrupted</Muted>}
+              {m.mood && (
+                <Badge variant="secondary" className="text-xs capitalize" aria-label={`Mood: ${m.mood}`}>
+                  {m.mood}
+                </Badge>
+              )}
               {m.toolCalls && m.toolCalls.length > 0 && <ToolCalls calls={m.toolCalls} />}
               {m.warning && <Muted className="text-xs">{m.warning}</Muted>}
             </div>
