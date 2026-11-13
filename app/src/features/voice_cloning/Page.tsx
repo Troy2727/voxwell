@@ -7,6 +7,7 @@ import { ChoiceSelect } from '@/components/choice-select';
 import { EffectsControls, isNeutral, NO_EFFECTS, reviveEffects } from '@/components/effects-controls';
 import { FileDrop } from '@/components/file-drop';
 import { ErrorAlert, Field, message, Page as PageLayout, Section } from '@/components/page';
+import { usePromptMenu } from '@/components/prompt-menu';
 import { VoiceSelect } from '@/components/voice-select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -56,17 +57,23 @@ export default function Page() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [voices]);
 
-  /** Put `tag` ("[pause 1]", "[laugh]") at the cursor, in place of any selection, spaced from its neighbors. */
+  /** `tag` ("[pause 1]", "[laugh]") put into `source` between `start` and `end`, spaced from its neighbors. */
+  function withTag(source: string, tag: string, start: number, end: number) {
+    const before = source.slice(0, start);
+    tag = `${before && !before.endsWith(' ') ? ' ' : ''}${tag} `;
+    return { text: before + tag + source.slice(end).trimStart(), cursor: start + tag.length };
+  }
+
+  /** Put `tag` at the cursor, in place of any selection. */
   function insertTag(tag: string) {
     const start = textBox.current?.selectionStart ?? text.length;
     const end = textBox.current?.selectionEnd ?? text.length;
-    const before = text.slice(0, start);
-    tag = `${before && !before.endsWith(' ') ? ' ' : ''}${tag} `;
-    setText(before + tag + text.slice(end).trimStart());
+    const next = withTag(text, tag, start, end);
+    setText(next.text);
     // After React has put the new text in the box, so the cursor isn't reset by it.
     requestAnimationFrame(() => {
       textBox.current?.focus();
-      textBox.current?.setSelectionRange(start + tag.length, start + tag.length);
+      textBox.current?.setSelectionRange(next.cursor, next.cursor);
     });
   }
 
@@ -90,6 +97,22 @@ export default function Page() {
       setUploading(false);
     }
   }
+
+  const prompt = usePromptMenu({
+    box: textBox,
+    text,
+    setText,
+    onSubmit: () => {
+      if (!busy && text.trim()) void generate();
+    },
+    sources: {
+      '@': { title: 'Voices', items: (voices ?? []).map((v) => ({ label: v.name, hint: 'voice', pick: () => setVoiceId(v.id) })) },
+      '/': {
+        title: 'Pauses',
+        items: PAUSES.map(([label, seconds]) => ({ label: `pause-${label.toLowerCase()}`, hint: `${seconds} s`, pick: (t, at) => withTag(t, `[pause ${seconds}]`, at, at) })),
+      },
+    },
+  });
 
   async function generate() {
     setBusy(true);
@@ -143,9 +166,12 @@ export default function Page() {
         <Field
           label="Text"
           htmlFor="clone-text"
-          hint={`${text.length} / 2000. Type [pause 2] anywhere for two seconds of silence, up to 10.${cueHint}`}
+          hint={`${text.length} / 2000. Type [pause 2] anywhere for two seconds of silence, up to 10. @ picks a voice, / adds a pause, Ctrl+Enter generates.${cueHint}`}
         >
-          <Textarea ref={textBox} id="clone-text" rows={5} maxLength={2000} value={text} onChange={(e) => setText(e.target.value)} placeholder="Type what the voice should say…" />
+          <div className="relative">
+            <Textarea ref={textBox} id="clone-text" rows={5} maxLength={2000} value={text} placeholder="Type what the voice should say…" {...prompt.inputProps} />
+            {prompt.menu}
+          </div>
         </Field>
         <div className="flex flex-wrap items-center gap-2">
           {PAUSES.map(([label, seconds]) => (
