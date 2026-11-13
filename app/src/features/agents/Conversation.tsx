@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { Bot, Mic, Radio, Send, Square, Trash2, Wrench } from 'lucide-react';
+import { Fragment, useEffect, useRef, useState } from 'react';
+import { Bot, ChevronRight, Mic, Radio, Send, Square, Trash2, Wrench } from 'lucide-react';
 import { sendJson } from '@/api';
 import { EmptyState, ErrorAlert, Field, message, Muted, Section } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
@@ -40,19 +40,57 @@ const languageNames = new Intl.DisplayNames(['en'], { type: 'language' });
 
 const HISTORY = 12; // messages sent back with each turn (the server uses at most this many)
 
-function ToolCalls({ calls }: { calls: ToolCall[] }) {
+/* Tool chips and the streamed reply are adapted from Beautiful UI's ToolChips and StreamingText
+ * (https://github.com/slev12397/beautiful-ui), MIT License, Copyright (c) 2026 Shane Levine. */
+
+/** One tool call as a compact row of chips; it expands to show the arguments and the result. */
+function ToolChip({ call }: { call: ToolCall }) {
+  const [open, setOpen] = useState(false);
+  const args = call.arguments && typeof call.arguments === 'object' ? Object.values(call.arguments as Record<string, unknown>) : [];
   return (
-    <div className="flex flex-col gap-1">
-      {calls.map((c, i) => (
-        <p key={i} className="text-muted-foreground flex items-start gap-1.5 text-xs">
-          <Wrench className="mt-0.5 size-3 shrink-0" />
-          <span className="break-all">
-            <span className="font-medium">{c.tool || 'tool call'}</span>
-            {c.tool && `(${JSON.stringify(c.arguments ?? {})})`} → {c.error ? <span className="text-destructive">{c.error}</span> : c.result}
-          </span>
-        </p>
-      ))}
+    <div className="text-xs">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+        className="hover:bg-muted group flex max-w-full flex-wrap items-center gap-1.5 rounded-md px-1.5 py-1 text-left"
+      >
+        <Wrench className="text-muted-foreground size-3 shrink-0" aria-hidden />
+        <span className="text-muted-foreground">Called</span>
+        <span className={cn('rounded border px-1.5 font-mono', call.error ? 'text-destructive' : 'text-primary')}>{call.tool || 'tool call'}</span>
+        {args.map((a, i) => (
+          <span key={i} className="bg-muted max-w-48 truncate rounded border px-1.5 font-mono">{String(a)}</span>
+        ))}
+        <ChevronRight className={cn('text-muted-foreground size-3 opacity-0 transition group-hover:opacity-100', open && 'rotate-90 opacity-100')} aria-hidden />
+      </button>
+      {open && (
+        <pre className="bg-muted mt-1 ml-5 overflow-x-auto rounded-md px-2.5 py-2 font-mono text-[11px] leading-relaxed whitespace-pre-wrap break-all">
+          {`arguments  ${JSON.stringify(call.arguments ?? {})}\n`}
+          {call.error ? <span className="text-destructive">{`error      ${call.error}`}</span> : `result     ${call.result ?? ''}`}
+        </pre>
+      )}
     </div>
+  );
+}
+
+/** A reply whose words resolve out of a blur as they arrive. The whole text is in the page at once
+ *  (screen readers read it normally); when it grows, as in a live turn, only the new words animate. */
+function StreamText({ text }: { text: string }) {
+  // Each word's delay is fixed when it first appears, so a re-render never restarts its animation.
+  const delays = useRef<number[]>([]);
+  const words = text.split(/(\s+)/);
+  const firstNew = delays.current.length;
+  words.forEach((_, i) => {
+    delays.current[i] ??= (i - firstNew) * 18;
+  });
+  return words.map((w, i) =>
+    !w.trim() ? (
+      <Fragment key={i}>{w}</Fragment>
+    ) : (
+      <span key={i} className="animate-in fade-in blur-in-sm fill-mode-both duration-500 motion-reduce:animate-none" style={{ animationDelay: `${delays.current[i]}ms` }}>
+        {w}
+      </span>
+    ),
   );
 }
 
@@ -319,7 +357,7 @@ export default function Conversation({ agent }: { agent: Agent }) {
                   m.failed ? 'text-destructive border' : m.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted',
                 )}
               >
-                {m.content}
+                {m.role === 'assistant' && !m.failed ? <StreamText text={m.content} /> : m.content}
               </p>
               {m.language && follows.length > 0 && (
                 <Muted className={cn('text-xs', m.language !== (messages.slice(0, i).reverse().find((x) => x.language)?.language ?? agent.language) && 'text-primary font-medium')}>
@@ -332,7 +370,11 @@ export default function Conversation({ agent }: { agent: Agent }) {
                   {m.mood}
                 </Badge>
               )}
-              {m.toolCalls && m.toolCalls.length > 0 && <ToolCalls calls={m.toolCalls} />}
+              {m.toolCalls && m.toolCalls.length > 0 && (
+                <div className="flex flex-col">
+                  {m.toolCalls.map((c, j) => <ToolChip key={j} call={c} />)}
+                </div>
+              )}
               {m.warning && <Muted className="text-xs">{m.warning}</Muted>}
             </div>
           ))
