@@ -142,6 +142,15 @@ Voxwell is **MIT licensed**, and every model it runs allows commercial use ([one
 | **Tone memory** | Audiobook | A local AI reads each paragraph with the ones around it, so the narration keeps a steady tone. |
 | **Shared words** | Pronunciation | Add a word once under All languages and every language says it your way. |
 
+**New: dictation**
+
+| Feature | Where | What it does |
+| --- | --- | --- |
+| **Paste in place** | Dictation (desktop app) | Turn it on and the shortcut types your words where your cursor is, in any app. |
+| **Known words** | Pronunciation | The names and jargon in your lists are spelled your way when you dictate or transcribe. |
+| **Mic check** | Dictation | If your microphone hears nothing, you're warned while you're still recording. |
+| **Dictation clean-up** | Dictation | A local AI model removes filler words, fixes punctuation, or makes the text formal or concise, with the original one click away. |
+
 **Voices**
 
 | Feature | What it does |
@@ -175,7 +184,7 @@ Voxwell is **MIT licensed**, and every model it runs allows commercial use ([one
 
 | Feature | What it does |
 | --- | --- |
-| **Dictation** | Record and transcribe, or go live: each turn is transcribed when you pause. In the desktop app, press Ctrl/Cmd+Shift+Space anywhere: a small overlay shows it's listening, and the text is copied for you to paste. Turn on **Paste in place** and it goes straight where your cursor is, in whatever app you're using (macOS asks for Accessibility access; Linux needs `xdotool` or `wtype`). Dictation clean-up (optional) removes filler words, fixes punctuation, or makes the text formal or concise, with the original one click away. |
+| **Dictation** | Record and transcribe, or go live: each turn is transcribed when you pause. In the desktop app, press Ctrl/Cmd+Shift+Space anywhere: a small overlay shows it's listening, and the text is copied for you to paste. Turn on **Paste in place** and it goes straight where your cursor is, in whatever app you're using (macOS asks for Accessibility access; Linux needs `xdotool` or `wtype`). **Dictation clean-up** (optional) removes filler words, fixes punctuation, or makes the text formal or concise, with the original one click away. **Mic check** warns you while you record if the microphone hears nothing. |
 | **Transcribe** | TXT, SRT or VTT, with optional speaker labels ("Speaker 1", "Speaker 2"). |
 | **Transcript clean-up** | A local AI model removes filler words, fixes punctuation or makes the text formal. |
 | **Subtitles from a script** | Paste a script you already have, add the recording, and every word is timed against the audio. |
