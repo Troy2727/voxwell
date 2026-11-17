@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { startMicCheck } from '@/lib/microphone';
 import { DICTATED_EVENT, dictationChoices, openMicrophone, transcribeRecording } from './capture';
 
 const messageOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -13,6 +14,7 @@ export function useShortcutDictation() {
     const bridge = window.voxwell?.dictation;
     if (!bridge) return;
     let recorder: MediaRecorder | null = null;
+    let stopMicCheck = () => {};
     let busy = false; // opening the microphone or transcribing
     let cancelled = false;
     let disposed = false;
@@ -57,6 +59,7 @@ export function useShortcutDictation() {
         if (ev.data.size) chunks.push(ev.data);
       };
       rec.onstop = () => {
+        stopMicCheck();
         stream.getTracks().forEach((t) => t.stop());
         recorder = null;
         if (cancelled) {
@@ -69,7 +72,10 @@ export function useShortcutDictation() {
       recorder = rec;
       rec.start();
       busy = false;
-      bridge.setStatus({ phase: 'recording', startedAt: Date.now(), deviceId: device || undefined });
+      const startedAt = Date.now();
+      const report = (silent: boolean) => bridge.setStatus({ phase: 'recording', startedAt, deviceId: device || undefined, silent });
+      report(false);
+      stopMicCheck = startMicCheck(stream, report);
     };
 
     const cancel = () => {

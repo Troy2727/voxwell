@@ -81,7 +81,9 @@ async function main() {
   check('bottom centre', centreOff <= 1 && bottomGap >= 0 && bottomGap <= 60, { centreOff, bottomGap });
   // Keeps looking, since a slow machine may not have painted yet. Silent bars count: macOS test
   // machines give the fake microphone no signal, so this can't check that the bars react to sound.
+  // That silence also makes Mic check swap the waveform for its warning, which counts too.
   check('waveform drawn', await overlay.waitForFunction(() => {
+    if (document.querySelector('[role="alert"]')?.textContent?.includes("isn't picking up any sound")) return true;
     const c = document.querySelector('canvas');
     if (!c) return false;
     const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
