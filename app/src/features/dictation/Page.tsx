@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { LiveWaveform } from '@/components/ui/live-waveform';
 import { MicSelector } from '@/components/ui/mic-selector';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { SILENT_MICROPHONE, startMicCheck } from '@/lib/microphone';
 import { DICTATED_EVENT, dictationChoices, openMicrophone, rememberCleanup, rememberLanguage, rememberPasteInPlace, transcribeRecording } from './capture';
 import LiveDictation from './LiveDictation';
 
@@ -41,12 +42,14 @@ export default function Page() {
   const [detected, setDetected] = useState('');
   const [history, setHistory] = useState<string[]>([]);
   const [error, setError] = useState('');
+  const [silent, setSilent] = useState(false);
   const [copied, setCopied] = useState(false);
   const [mode, setMode] = useState<Mode>('record');
   const [liveActive, setLiveActive] = useState(false);
 
   const recorder = useRef<MediaRecorder | null>(null);
   const timer = useRef<number | undefined>(undefined);
+  const stopMicCheck = useRef(() => {});
   const phaseRef = useRef<Phase>('idle');
   dictationChoices.device = device;
 
@@ -94,12 +97,15 @@ export default function Page() {
         if (ev.data.size) chunks.push(ev.data);
       };
       rec.onstop = () => {
+        stopMicCheck.current();
+        setSilent(false);
         stream.getTracks().forEach((t) => t.stop());
         window.clearInterval(timer.current);
         void transcribe(new Blob(chunks, { type: rec.mimeType || 'audio/webm' }));
       };
       recorder.current = rec;
       rec.start();
+      stopMicCheck.current = startMicCheck(stream, setSilent);
       setElapsed(0);
       timer.current = window.setInterval(() => setElapsed((s) => s + 1), 1000);
       setPhaseBoth('recording');
@@ -142,6 +148,7 @@ export default function Page() {
   useEffect(
     () => () => {
       window.clearInterval(timer.current);
+      stopMicCheck.current();
       const rec = recorder.current;
       if (rec?.state === 'recording') {
         rec.onstop = null;
@@ -208,6 +215,7 @@ export default function Page() {
       <Section title="Record" action={tabs}>
         <div className="bg-muted/30 flex flex-col items-center gap-4 rounded-xl border p-6">
           <LiveWaveform active={recording} processing={phase === 'transcribing'} deviceId={device || undefined} height={64} mode="static" className="w-full" />
+          {recording && silent && <p role="alert" className="text-destructive text-center text-sm">{SILENT_MICROPHONE}</p>}
           <div className="flex items-center gap-3">
             <Button
               size="lg"

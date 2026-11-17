@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { Check, CircleAlert, Loader2, Square, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { LiveWaveform } from '@/components/ui/live-waveform';
+import { SILENT_MICROPHONE } from '@/lib/microphone';
 import { applyTheme } from '@/lib/theme';
 import '../../styles.css';
 
@@ -56,7 +57,11 @@ function Overlay() {
           <span className="sr-only" role="status">Recording</span>
           <span aria-hidden className="bg-destructive size-2 shrink-0 rounded-full motion-safe:animate-pulse" />
           <Elapsed since={status.startedAt} />
-          <LiveWaveform active deviceId={status.deviceId} height={32} mode="static" className="min-w-0 flex-1" />
+          {status.silent ? (
+            <p role="alert" className="text-destructive line-clamp-2 min-w-0 flex-1 text-xs">{SILENT_MICROPHONE}</p>
+          ) : (
+            <LiveWaveform active deviceId={status.deviceId} height={32} mode="static" className="min-w-0 flex-1" />
+          )}
           <Button variant="ghost" size="icon-sm" aria-label="Cancel" title="Cancel" onClick={() => action('cancel')}>
             <X />
           </Button>

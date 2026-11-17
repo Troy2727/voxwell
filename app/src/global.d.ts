@@ -1,6 +1,6 @@
 /** What the dictation overlay shows; null hides it. */
 type DictationStatus =
-  | { phase: 'recording'; startedAt: number; deviceId?: string }
+  | { phase: 'recording'; startedAt: number; deviceId?: string; silent?: boolean }
   | { phase: 'transcribing' }
   | { phase: 'done'; text: string; pasted?: boolean; reason?: string }
   | { phase: 'error'; message: string }
