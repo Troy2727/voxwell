@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Copy, Mic, Square, Trash2 } from 'lucide-react';
-import { onPhoneOrTablet } from '../../api';
+import { api, onPhoneOrTablet } from '../../api';
 import { ChoiceSelect } from '@/components/choice-select';
 import { ErrorAlert, Field, Muted, Page as PageLayout, Section } from '@/components/page';
 import { PhoneDictation, savedPhoneAddress } from '@/components/phone-dictation';
@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { LiveWaveform } from '@/components/ui/live-waveform';
 import { MicSelector } from '@/components/ui/mic-selector';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { DICTATED_EVENT, dictationChoices, openMicrophone, rememberLanguage, transcribeRecording } from './capture';
+import { DICTATED_EVENT, dictationChoices, openMicrophone, rememberCleanup, rememberLanguage, transcribeRecording } from './capture';
 import LiveDictation from './LiveDictation';
 
 const LANGUAGES: [string, string][] = [
@@ -31,6 +31,10 @@ export default function Page() {
   const [device, setDevice] = useState(dictationChoices.device);
   const [muted, setMuted] = useState(false);
   const [text, setText] = useState('');
+  const [original, setOriginal] = useState(''); // what was heard, when clean-up changed it
+  const [showOriginal, setShowOriginal] = useState(false);
+  const [cleanup, setCleanup] = useState(dictationChoices.cleanup);
+  const [cleanups, setCleanups] = useState<[string, string][]>([['off', 'Off']]);
   const [detected, setDetected] = useState('');
   const [history, setHistory] = useState<string[]>([]);
   const [error, setError] = useState('');
@@ -52,11 +56,14 @@ export default function Page() {
     setPhaseBoth('transcribing');
     try {
       const asked = dictationChoices.language;
-      const result = await transcribeRecording(blob, asked);
+      const result = await transcribeRecording(blob, asked, dictationChoices.cleanup);
       setText(result.text);
+      setOriginal(result.text !== result.original ? result.original : '');
+      setShowOriginal(false);
       setDetected(asked === 'auto' ? result.language : '');
       if (result.text) {
         setHistory((h) => [result.text, ...h].slice(0, 20));
+        if (result.cleanup_error) setError(result.cleanup_error);
       } else {
         setError('No speech detected.');
       }
@@ -115,11 +122,19 @@ export default function Page() {
       setError('');
       setCopied(false);
       setText(dictated);
+      setOriginal('');
       setDetected('');
       setHistory((h) => [dictated, ...h].slice(0, 20));
     };
     window.addEventListener(DICTATED_EVENT, show);
     return () => window.removeEventListener(DICTATED_EVENT, show);
+  }, []);
+  // The clean-up choices are the Transcribe page's edit presets.
+  useEffect(() => {
+    api<{ id: string; label: string }[]>('/api/transcription/edit/presets').then(
+      (presets) => setCleanups([['off', 'Off'], ...presets.map((p): [string, string] => [p.id, p.label])]),
+      () => {}, // without the presets, only Off is offered
+    );
   }, []);
   useEffect(
     () => () => {
@@ -205,6 +220,18 @@ export default function Page() {
           </div>
         </div>
         {fields}
+        <Field label="Clean up" htmlFor="dictation-cleanup" hint="A local AI model tidies the text after you stop; the first time, it downloads (about 3 GB). The shortcut uses it too.">
+          <ChoiceSelect
+            id="dictation-cleanup"
+            options={cleanups}
+            value={cleanup}
+            disabled={phase !== 'idle'}
+            onChange={(choice) => {
+              rememberCleanup(choice);
+              setCleanup(choice);
+            }}
+          />
+        </Field>
         <Muted className="text-xs">
           {window.voxwell
             ? 'Press Ctrl/Cmd+Shift+Space anywhere to start and stop; the text is copied for you to paste.'
@@ -219,12 +246,17 @@ export default function Page() {
       <Section title="Result">
         {text ? (
           <>
-            <p className="leading-relaxed">{text}</p>
+            <p className="leading-relaxed">{showOriginal && original ? original : text}</p>
             {detected && <Muted className="text-xs">Detected: {languageName(detected)}. If that's wrong, choose your language above.</Muted>}
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => copy(text)}>
+              <Button variant="outline" size="sm" onClick={() => copy(showOriginal && original ? original : text)}>
                 <Copy /> {copied ? 'Copied' : 'Copy'}
               </Button>
+              {original && (
+                <Button variant="ghost" size="sm" onClick={() => setShowOriginal((s) => !s)}>
+                  {showOriginal ? 'Show cleaned' : 'Show original'}
+                </Button>
+              )}
               <Button variant="outline" size="sm" onClick={() => remove(0)}>
                 <Trash2 /> Delete
               </Button>

@@ -11,6 +11,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile, WebSocket
 
 from voxwell import live_audio
 from voxwell.features.dictation import engine
+from voxwell.features.transcription import editing
 from voxwell.paths import data_dir
 
 log = logging.getLogger(__name__)
@@ -26,7 +27,11 @@ def status():
 
 
 @router.post("/transcribe")
-async def transcribe(file: UploadFile = File(...), language: str | None = Form(None)):
+async def transcribe(
+    file: UploadFile = File(...), language: str | None = Form(None), cleanup: str | None = Form(None)
+):
+    if cleanup and cleanup not in editing.PRESETS:
+        raise HTTPException(422, f"Unknown clean-up '{cleanup}'. Options: {', '.join(editing.PRESETS)}.")
     data = await file.read(MAX_UPLOAD + 1)
     if len(data) > MAX_UPLOAD:
         raise HTTPException(413, "The recording is too large (50 MB max).")
@@ -46,10 +51,19 @@ async def transcribe(file: UploadFile = File(...), language: str | None = Form(N
         except Exception as exc:
             log.exception("Transcription failed")
             raise HTTPException(500, "Transcription failed; see the Voxwell log.") from exc
+        text, cleanup_error = result.text, None
+        if cleanup and text.strip():
+            try:
+                text = (await asyncio.to_thread(editing.edit_text, text, editing.PRESETS[cleanup][1])).text
+            except Exception:  # the dictation still succeeds, with what Whisper heard
+                log.exception("Dictation clean-up failed")
+                cleanup_error = "Clean-up failed, so this is the original text."
         return {
-            "text": result.text,
+            "text": text,
+            "original": result.text,
             "language": result.language,
             "segments": [asdict(s) for s in result.segments],
+            **({"cleanup_error": cleanup_error} if cleanup_error else {}),
         }
     finally:
         path.unlink(missing_ok=True)

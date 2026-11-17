@@ -12,8 +12,28 @@ function savedLanguage() {
   }
 }
 
-/** The Dictation page's microphone and language, which the global shortcut uses too. */
-export const dictationChoices = { language: savedLanguage(), device: '' };
+const CLEANUP_KEY = 'voxwell.dictation.cleanup';
+
+function savedCleanup() {
+  try {
+    return localStorage.getItem(CLEANUP_KEY) || 'off';
+  } catch {
+    return 'off'; // storage can be blocked
+  }
+}
+
+/** The Dictation page's microphone, language and clean-up, which the global shortcut uses too. */
+export const dictationChoices = { language: savedLanguage(), device: '', cleanup: savedCleanup() };
+
+/** A clean-up preset key from /api/transcription/edit/presets, or 'off'. */
+export function rememberCleanup(cleanup: string) {
+  dictationChoices.cleanup = cleanup;
+  try {
+    localStorage.setItem(CLEANUP_KEY, cleanup);
+  } catch {
+    /* storage can be blocked; the choice still holds until the page closes */
+  }
+}
 
 /** Auto-detect can pick the wrong language in a noisy room, so a chosen language is kept for next time. */
 export function rememberLanguage(language: string) {
@@ -72,12 +92,20 @@ async function postRecording(form: FormData): Promise<Response> {
   }
 }
 
-/** Send a recording to the backend. Its text is empty when no speech was heard. */
-export async function transcribeRecording(blob: Blob, language: string): Promise<{ text: string; language: string }> {
+/**
+ * Send a recording to the backend. Its text is empty when no speech was heard. With a clean-up,
+ * `text` is the cleaned text and `original` what was heard; `cleanup_error` says why it wasn't cleaned.
+ */
+export async function transcribeRecording(
+  blob: Blob,
+  language: string,
+  cleanup = 'off',
+): Promise<{ text: string; original: string; language: string; cleanup_error?: string }> {
   const form = new FormData();
   form.append('file', blob, 'recording.webm');
   if (language !== 'auto') form.append('language', language);
+  if (cleanup !== 'off') form.append('cleanup', cleanup);
   const res = await postRecording(form);
   if (!res.ok) throw new Error(await errorMessage(res));
-  return (await res.json()) as { text: string; language: string };
+  return (await res.json()) as { text: string; original: string; language: string; cleanup_error?: string };
 }

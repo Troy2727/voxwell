@@ -17,11 +17,11 @@ export function useShortcutDictation() {
     let cancelled = false;
     let disposed = false;
 
-    const transcribe = async (blob: Blob, language: string) => {
+    const transcribe = async (blob: Blob, language: string, cleanup: string) => {
       busy = true;
       bridge.setStatus({ phase: 'transcribing' });
       try {
-        const { text } = await transcribeRecording(blob, language);
+        const { text } = await transcribeRecording(blob, language, cleanup);
         if (text) {
           await bridge.deliver(text);
           window.dispatchEvent(new CustomEvent(DICTATED_EVENT, { detail: text }));
@@ -38,7 +38,7 @@ export function useShortcutDictation() {
 
     const start = async () => {
       busy = true;
-      const { language, device } = dictationChoices;
+      const { language, device, cleanup } = dictationChoices;
       let stream: MediaStream;
       try {
         stream = await openMicrophone(device);
@@ -63,7 +63,7 @@ export function useShortcutDictation() {
           cancelled = false;
           bridge.setStatus(null);
         } else {
-          void transcribe(new Blob(chunks, { type: rec.mimeType || 'audio/webm' }), language);
+          void transcribe(new Blob(chunks, { type: rec.mimeType || 'audio/webm' }), language, cleanup);
         }
       };
       recorder = rec;

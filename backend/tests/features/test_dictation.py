@@ -8,6 +8,7 @@ from starlette.websockets import WebSocketDisconnect
 
 from voxwell import live_audio
 from voxwell.features.dictation import engine
+from voxwell.features.transcription import editing
 from voxwell.main import app
 from voxwell.paths import data_dir
 
@@ -34,6 +35,7 @@ def test_happy_path(monkeypatch):
     assert r.status_code == 200
     assert r.json() == {
         "text": "hello world",
+        "original": "hello world",
         "language": "en",
         "segments": [{"start": 0.0, "end": 1.0, "text": "hello world"}],
     }
@@ -47,6 +49,53 @@ def test_language_passthrough(monkeypatch):
     r = _post(language="es")
     assert r.json()["language"] == "es"
     assert calls[0][1] == "es"
+
+
+def _post_cleanup(cleanup):
+    return client.post(
+        "/api/dictation/transcribe", files={"file": ("a.webm", b"RIFFfake", "audio/webm")}, data={"cleanup": cleanup}
+    )
+
+
+def test_cleanup_runs_the_preset_and_keeps_the_original(monkeypatch):
+    monkeypatch.setattr(engine, "transcribe", _fake([]))
+    seen = []
+
+    def fake_edit(text, instruction):
+        seen.append((text, instruction))
+        return editing.Edited("Hello, world.", 1, 0)
+
+    monkeypatch.setattr(editing, "edit_text", fake_edit)
+    body = _post_cleanup("punctuation").json()
+    assert body["text"] == "Hello, world."
+    assert body["original"] == "hello world"
+    assert "cleanup_error" not in body
+    assert seen == [("hello world", editing.PRESETS["punctuation"][1])]
+
+
+def test_cleanup_off_does_not_call_the_model(monkeypatch):
+    monkeypatch.setattr(engine, "transcribe", _fake([]))
+    monkeypatch.setattr(editing, "edit_text", lambda *a: pytest.fail("edit_text called"))
+    assert _post().json()["text"] == "hello world"
+    assert _post_cleanup("").json()["text"] == "hello world"
+
+
+def test_unknown_cleanup_is_rejected(monkeypatch):
+    monkeypatch.setattr(engine, "transcribe", _fake([]))
+    assert _post_cleanup("shouty").status_code == 422
+
+
+def test_cleanup_failure_returns_the_original(monkeypatch):
+    monkeypatch.setattr(engine, "transcribe", _fake([]))
+
+    def boom(text, instruction):
+        raise RuntimeError("model not installed")
+
+    monkeypatch.setattr(editing, "edit_text", boom)
+    r = _post_cleanup("filler")
+    assert r.status_code == 200
+    assert r.json()["text"] == "hello world"
+    assert r.json()["cleanup_error"]
 
 
 def test_empty_file(monkeypatch):
