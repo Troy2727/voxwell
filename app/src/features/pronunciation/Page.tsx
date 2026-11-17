@@ -143,7 +143,7 @@ export default function Page() {
   }
 
   return (
-    <PageLayout title="Pronunciation" description="Teach every voice how to say names, brands and jargon. Applies to all speech Voxwell makes.">
+    <PageLayout title="Pronunciation" description="Teach every voice how to say names, brands and jargon. Applies to all speech Voxwell makes, and dictation and transcription recognize these words too.">
       <Section
         title="Language"
         description={

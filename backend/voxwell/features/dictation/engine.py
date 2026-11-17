@@ -53,6 +53,14 @@ def _load_model():
         return _model
 
 
+def _vocabulary_options(language: str | None) -> dict:
+    """faster-whisper's `hotwords` argument holding the user's Pronunciation words; empty when there are none."""
+    from voxwell.features.pronunciation.store import recognition_vocabulary
+
+    words = recognition_vocabulary(language or None)
+    return {"hotwords": words} if words else {}
+
+
 def transcribe(
     audio_path: Path,
     language: str | None = None,
@@ -69,7 +77,9 @@ def transcribe(
     """
     model = _load_model()
     try:
-        segments, info = model.transcribe(str(audio_path), language=language or None, vad_filter=speech_only)
+        segments, info = model.transcribe(
+            str(audio_path), language=language or None, vad_filter=speech_only, **_vocabulary_options(language)
+        )
         parts = []
         for s in segments:  # a generator: decoding happens as it is consumed
             parts.append(Segment(start=s.start, end=s.end, text=s.text.strip()))
@@ -107,7 +117,9 @@ def transcribe_words(
     """
     model = _load_model()
     try:
-        segments, info = model.transcribe(str(audio_path), language=language or None, word_timestamps=True)
+        segments, info = model.transcribe(
+            str(audio_path), language=language or None, word_timestamps=True, **_vocabulary_options(language)
+        )
         words = []
         for s in segments:
             words.extend(Word(w.start, w.end, w.word.strip()) for w in s.words or [] if w.word.strip())
