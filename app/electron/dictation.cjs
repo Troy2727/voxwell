@@ -71,8 +71,8 @@ function register(win, overlayUrl) {
   // paste in the focused app (see paste.cjs); the overlay never takes focus, so that app keeps it.
   // If pasting fails, the text stays on the clipboard and the reason goes back to the overlay.
   ipcMain.removeHandler('dictation:deliver');
-  ipcMain.handle('dictation:deliver', async (_event, text, pasteInPlace) => {
-    if (typeof text !== 'string' || !text) return { pasted: false };
+  ipcMain.handle('dictation:deliver', async (event, text, pasteInPlace) => {
+    if (event.sender !== win.webContents || typeof text !== 'string' || !text) return { pasted: false };
     clipboard.writeText(text);
     return pasteInPlace === true ? paste() : { pasted: false };
   });
