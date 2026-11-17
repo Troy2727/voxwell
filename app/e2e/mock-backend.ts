@@ -246,7 +246,7 @@ function routes(): [string | RegExp, Reply][] {
     }],
 
     ['GET /api/translation/status', { ready: true, sources: ['en', 'es'], targets: ['en', 'es'] }],
-    ['POST /api/dictation/transcribe', { text: SPEECH, language: 'en' }],
+    ['POST /api/dictation/transcribe', { text: SPEECH, original: SPEECH, language: 'en' }],
 
     ['GET /api/batch/watch', () => watch],
     ['PUT /api/batch/watch', (_url: URL, request: Request) => {
