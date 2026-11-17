@@ -130,7 +130,7 @@ Voxwell is **MIT licensed**, and every model it runs allows commercial use ([one
 
 ## <img src="docs/readme/icons/sparkles.svg" width="24" height="24" alt="" /> Features
 
-**New: more expressive, real-time voices**
+### New: more expressive, real-time voices
 
 | Feature | Where | What it does |
 | --- | --- | --- |
@@ -142,7 +142,7 @@ Voxwell is **MIT licensed**, and every model it runs allows commercial use ([one
 | **Tone memory** | Audiobook | A local AI reads each paragraph with the ones around it, so the narration keeps a steady tone. |
 | **Shared words** | Pronunciation | Add a word once under All languages and every language says it your way. |
 
-**New: dictation**
+### New: dictation
 
 | Feature | Where | What it does |
 | --- | --- | --- |
@@ -151,7 +151,7 @@ Voxwell is **MIT licensed**, and every model it runs allows commercial use ([one
 | **Mic check** | Dictation | If your microphone hears nothing, you're warned while you're still recording. |
 | **Dictation clean-up** | Dictation | A local AI model removes filler words, fixes punctuation, or makes the text formal or concise, with the original one click away. |
 
-**Voices**
+### Voices
 
 | Feature | What it does |
 | --- | --- |
@@ -162,7 +162,7 @@ Voxwell is **MIT licensed**, and every model it runs allows commercial use ([one
 | **Collections** | Keep saved voices organized in folders. |
 | **Pronunciation** | Teach every voice how to say names, brands and jargon. Each language has one list, and it applies to all speech. **Shared words** go in an All languages list that every language uses; a language's own entry wins there. **Known words:** dictation and transcription recognize the words in these lists too, so your names and jargon are spelled your way. |
 
-**Speech and sound**
+### Speech and sound
 
 | Feature | What it does |
 | --- | --- |
@@ -173,14 +173,14 @@ Voxwell is **MIT licensed**, and every model it runs allows commercial use ([one
 | **Sound effects** | Describe a sound and generate it with Stable Audio Open. Needs a free Hugging Face token and accepting the model's terms. |
 | **Music** | Songs with sung lyrics, or instrumentals, from a description (ACE-Step 1.5). AI can write the lyrics; regenerate any section, follow a style reference, or split a track into vocals and instrumental. Installs once from the Music page (about 12 GB). |
 
-**Video and translation**
+### Video and translation
 
 | Feature | What it does |
 | --- | --- |
 | **Dubbing** | Dub one video, a batch, or every video dropped into a watched folder. It can keep each speaker's own voice. |
 | **Live translation** | Speak in one language and hear the translation in another, turn by turn, in a saved voice or the default one. |
 
-**Listening and text**
+### Listening and text
 
 | Feature | What it does |
 | --- | --- |
@@ -189,7 +189,7 @@ Voxwell is **MIT licensed**, and every model it runs allows commercial use ([one
 | **Transcript clean-up** | A local AI model removes filler words, fixes punctuation or makes the text formal. |
 | **Subtitles from a script** | Paste a script you already have, add the recording, and every word is timed against the audio. |
 
-**AI and tools**
+### AI and tools
 
 | Feature | What it does |
 | --- | --- |
