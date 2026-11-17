@@ -29,6 +29,20 @@ LANGUAGES = {
 _model = None
 _lock = threading.Lock()
 
+# Chatterbox Multilingual V3: the same architecture, tokenizer and other files as the V2 that
+# chatterbox-tts 0.1.6 loads, with a new T3 checkpoint (fewer made-up words, closer voice
+# matches). No release of the package that loads V3 fits here (they need transformers 5, which
+# parler-tts can't use), so the engine downloads the files itself and points 0.1.6's loader at V3.
+# Upstream drops its alignment checks with V3; Voxwell keeps them and the tail limit below. Without
+# them V3 ran on past the text in 6 of 13 test clips ("Two." became 8 s of made-up words). With
+# them, 25 clips (en, es, fr, de, it, pt; built-in and cloned voice), transcribed back, had no
+# wrong, extra or missing words, where V2 had 4 wrong.
+MULTILINGUAL_REPO = "ResembleAI/chatterbox"
+MULTILINGUAL_T3 = "t3_mtl23ls_v3.safetensors"
+PACKAGE_T3 = "t3_mtl23ls_v2.safetensors"  # the checkpoint 0.1.6's from_local reads
+# The files from_local reads, V3 in place of V2 (Cangjie5_TC.json: the Chinese tokenizer's table).
+MULTILINGUAL_FILES = ["ve.pt", MULTILINGUAL_T3, "s3gen.pt", "grapheme_mtl_merged_expanded_v1.json", "conds.pt", "Cangjie5_TC.json"]
+
 # Chatterbox-Turbo speaks English text that has cue tags ("[laugh]"); see cues.py.
 TURBO_REPO = "ResembleAI/chatterbox-turbo"
 # The files ChatterboxTurboTTS.from_local reads (the repo also holds an s3gen.safetensors it doesn't).
@@ -138,13 +152,34 @@ def _limit_tail(analyzer_cls) -> None:
     analyzer_cls.step = step
 
 
+@contextlib.contextmanager
+def _read_v3_checkpoint(mtl_module):
+    """Make chatterbox-tts 0.1.6's loader read the V3 checkpoint where it reads V2's, for the duration."""
+    original = mtl_module.load_safetensors
+
+    def load(path, *args, **kwargs):
+        path = Path(path)
+        if path.name == PACKAGE_T3:
+            path = path.with_name(MULTILINGUAL_T3)
+        return original(path, *args, **kwargs)
+
+    mtl_module.load_safetensors = load
+    try:
+        yield
+    finally:
+        mtl_module.load_safetensors = original
+
+
 def _multilingual_from_hub(device: str):
+    from chatterbox import mtl_tts
     from chatterbox.models.t3.inference.alignment_stream_analyzer import AlignmentStreamAnalyzer
-    from chatterbox.mtl_tts import ChatterboxMultilingualTTS
+    from huggingface_hub import snapshot_download
 
     _limit_tail(AlignmentStreamAnalyzer)
-    with _torch_load_to_cpu():
-        return ChatterboxMultilingualTTS.from_pretrained(device=device)
+    # The repo is public (MIT): no token, as for Turbo.
+    folder = snapshot_download(repo_id=MULTILINGUAL_REPO, token=False, allow_patterns=MULTILINGUAL_FILES)
+    with _torch_load_to_cpu(), _read_v3_checkpoint(mtl_tts):
+        return mtl_tts.ChatterboxMultilingualTTS.from_local(folder, device)
 
 
 def _load_model():

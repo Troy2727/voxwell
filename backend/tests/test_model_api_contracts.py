@@ -17,17 +17,57 @@ def test_chatterbox_calls_match_installed_api(monkeypatch):
 
     from voxwell.features.voice_cloning import engine
 
+    import huggingface_hub
+
     model = mock.create_autospec(mtl.ChatterboxMultilingualTTS, instance=True)
     model.sr = 24000
     model.generate.return_value = np.zeros(10, dtype="float32")
-    loader = mock.create_autospec(mtl.ChatterboxMultilingualTTS.from_pretrained, return_value=model)
-    monkeypatch.setattr(mtl.ChatterboxMultilingualTTS, "from_pretrained", loader)
+    loader = mock.create_autospec(mtl.ChatterboxMultilingualTTS.from_local, return_value=model)
+    monkeypatch.setattr(mtl.ChatterboxMultilingualTTS, "from_local", loader)
+    download = mock.create_autospec(huggingface_hub.snapshot_download, return_value="folder")
+    monkeypatch.setattr(huggingface_hub, "snapshot_download", download)
     monkeypatch.setattr(engine, "_model", None)
     monkeypatch.setattr(engine, "_pick_device", lambda: "cpu")
 
     assert engine.synthesize("Hello", "en", Path("ref.wav"))[:4] == b"RIFF"
+    loader.assert_called_once_with("folder", "cpu")
     # Japanese is excluded on purpose (its dependency is GPL-3.0; see engine.LANGUAGES).
     assert engine.LANGUAGES.keys() == mtl.SUPPORTED_LANGUAGES.keys() - {"ja"}
+
+
+def test_v3_download_is_the_package_file_list_with_v3_for_v2():
+    # The engine downloads Multilingual itself (V3 in place of the V2 0.1.6 asks for): every other
+    # file must be the ones the installed package downloads, and its loader must read V2 by name.
+    mtl = pytest.importorskip("chatterbox.mtl_tts")
+    import ast
+    import inspect
+    import re
+
+    from voxwell.features.voice_cloning import engine
+
+    pretrained = inspect.getsource(mtl.ChatterboxMultilingualTTS.from_pretrained)
+    package_files = ast.literal_eval(re.search(r"allow_patterns=(\[[^\]]*\])", pretrained)[1])
+    assert engine.MULTILINGUAL_FILES == [engine.MULTILINGUAL_T3 if f == engine.PACKAGE_T3 else f for f in package_files]
+    assert f'REPO_ID = "{engine.MULTILINGUAL_REPO}"' in inspect.getsource(mtl)
+    local = inspect.getsource(mtl.ChatterboxMultilingualTTS.from_local)
+    assert f'load_safetensors(ckpt_dir / "{engine.PACKAGE_T3}")' in local
+    for name in re.findall(r'ckpt_dir / "([^"]+)"', local):
+        assert name == engine.PACKAGE_T3 or name in engine.MULTILINGUAL_FILES, f"from_local reads {name}, which isn't downloaded"
+
+
+def test_v3_checkpoint_is_read_in_place_of_v2():
+    from types import SimpleNamespace
+
+    from voxwell.features.voice_cloning import engine
+
+    read = []
+    original = lambda path, *a, **k: read.append(Path(path).name)  # noqa: E731
+    module = SimpleNamespace(load_safetensors=original)
+    with engine._read_v3_checkpoint(module):
+        module.load_safetensors(Path("ckpt") / engine.PACKAGE_T3)
+        module.load_safetensors(Path("ckpt") / "other.safetensors")
+    assert read == [engine.MULTILINGUAL_T3, "other.safetensors"]
+    assert module.load_safetensors is original  # restored afterwards
 
 
 def test_chatterbox_watermarker_imports():

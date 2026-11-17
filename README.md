@@ -337,7 +337,7 @@ Every model runs locally. Its license is recorded in its feature's `backend/voxw
 
 | Model | Used for | License |
 | --- | --- | --- |
-| [Chatterbox Multilingual](https://huggingface.co/ResembleAI/chatterbox) | Voice cloning, speech, dubbing, voice conversion, voice remix | MIT |
+| [Chatterbox Multilingual V3](https://huggingface.co/ResembleAI/chatterbox) | Voice cloning, speech, dubbing, voice conversion, voice remix | MIT |
 | [Chatterbox-Turbo](https://huggingface.co/ResembleAI/chatterbox-turbo) | Cue tags in English speech (same `chatterbox-tts==0.1.6` package) | MIT |
 | [Parler-TTS Mini v1](https://huggingface.co/parler-tts/parler-tts-mini-v1) | Voice design, voice remix | Apache-2.0 |
 | [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (Whisper small) | Dictation, transcription | MIT |
