@@ -26,6 +26,7 @@ declare global {
 interface FakeBridge {
   statuses: ({ phase: string } | null)[];
   delivered: string[];
+  pasteInPlace: boolean[];
   actions: string[];
   fire(event: string, value?: unknown): void;
 }
@@ -41,6 +42,7 @@ function installBridge() {
   const state: FakeBridge = {
     statuses: [],
     delivered: [],
+    pasteInPlace: [],
     actions: [],
     fire: (event, value) => listeners[event]?.forEach((c) => c(value)),
   };
@@ -52,7 +54,11 @@ function installBridge() {
         onToggle: on('toggle'),
         onCancel: on('cancel'),
         onStatus: on('status'),
-        deliver: async (text: string) => void state.delivered.push(text),
+        deliver: async (text: string, pasteInPlace: boolean) => {
+          state.delivered.push(text);
+          state.pasteInPlace.push(pasteInPlace);
+          return { pasted: pasteInPlace };
+        },
         setStatus: (status: { phase: string } | null) => void state.statuses.push(status),
         overlayAction: (action: string) => void state.actions.push(action),
       },
@@ -107,6 +113,24 @@ test('text from the shortcut still reaches an open Dictation page', async ({ app
   await expect(page.getByRole('main').getByText(delivered).first()).toBeVisible();
 });
 
+test('Paste in place is off by default, and the setting reaches the shortcut and is kept', async ({ app: page }) => {
+  await openWithBridge(page);
+  await openFeature(page, 'Dictation');
+  const toggle = page.getByRole('checkbox', { name: 'Paste in place' });
+  await expect(toggle).not.toBeChecked();
+  await toggle.check();
+  await fire(page, 'toggle');
+  await expect.poll(() => lastPhase(page)).toBe('recording');
+  await fire(page, 'toggle');
+  await expect.poll(() => lastPhase(page)).toBe('done');
+  expect(await page.evaluate(() => window.fakeBridge.pasteInPlace)).toEqual([true]);
+  expect(await page.evaluate(() => (window.fakeBridge.statuses.at(-1) as { pasted?: boolean }).pasted)).toBe(true);
+
+  await page.reload();
+  await openFeature(page, 'Dictation');
+  await expect(page.getByRole('checkbox', { name: 'Paste in place' })).toBeChecked();
+});
+
 test('the overlay shows each state in its small window', async ({ page }) => {
   await page.setViewportSize({ width: 420, height: 64 });
   await page.clock.install();
@@ -133,6 +157,10 @@ test('the overlay shows each state in its small window', async ({ page }) => {
   await fire(page, 'status', { phase: 'done', text: 'word '.repeat(200) });
   await expect(page.getByText(/Copied\. Press (Ctrl|Cmd)\+V to paste\./)).toBeVisible();
   expect(await fits()).toBe(true);
+  await fire(page, 'status', { phase: 'done', text: 'Hello.', pasted: false, reason: 'Install wtype to paste in place.' });
+  await expect(page.getByText('Install wtype to paste in place.')).toBeVisible();
+  await fire(page, 'status', { phase: 'done', text: 'Hello.', pasted: true });
+  await expect(page.getByText('Pasted.')).toBeVisible();
   await page.clock.fastForward(4_000);
   await expect.poll(() => page.evaluate(() => window.fakeBridge.actions.at(-1))).toBe('dismiss');
 

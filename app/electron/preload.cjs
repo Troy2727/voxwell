@@ -15,8 +15,9 @@ contextBridge.exposeInMainWorld('voxwell', {
       ipcRenderer.on('dictation:cancel', listener);
       return () => ipcRenderer.removeListener('dictation:cancel', listener);
     },
-    // Hand finished text to the main process (clipboard / insertion).
-    deliver: (text) => ipcRenderer.invoke('dictation:deliver', text),
+    // Hand finished text to the main process: clipboard, then paste in place if asked.
+    // Resolves to { pasted, reason? }.
+    deliver: (text, pasteInPlace) => ipcRenderer.invoke('dictation:deliver', text, pasteInPlace),
     // Main window: report progress for the overlay to show. null hides it.
     setStatus: (status) => ipcRenderer.send('dictation:status', status),
     // Overlay window: receive that progress, and send button presses back.

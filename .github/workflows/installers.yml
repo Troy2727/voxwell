@@ -63,7 +63,7 @@ jobs:
           cache: npm
           cache-dependency-path: app/package-lock.json
       - run: npm ci
-      - run: node --test electron/backend-setup.test.cjs
+      - run: node --test electron/backend-setup.test.cjs electron/paste.test.cjs
       - run: npm run build
       - run: node scripts/fetch-uv.cjs
       - name: Build

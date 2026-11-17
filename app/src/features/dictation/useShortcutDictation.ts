@@ -23,9 +23,9 @@ export function useShortcutDictation() {
       try {
         const { text } = await transcribeRecording(blob, language, cleanup);
         if (text) {
-          await bridge.deliver(text);
+          const { pasted, reason } = await bridge.deliver(text, dictationChoices.pasteInPlace);
           window.dispatchEvent(new CustomEvent(DICTATED_EVENT, { detail: text }));
-          bridge.setStatus({ phase: 'done', text });
+          bridge.setStatus({ phase: 'done', text, pasted, reason });
         } else {
           bridge.setStatus({ phase: 'error', message: 'No speech detected.' });
         }

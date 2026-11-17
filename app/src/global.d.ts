@@ -2,7 +2,7 @@
 type DictationStatus =
   | { phase: 'recording'; startedAt: number; deviceId?: string }
   | { phase: 'transcribing' }
-  | { phase: 'done'; text: string }
+  | { phase: 'done'; text: string; pasted?: boolean; reason?: string }
   | { phase: 'error'; message: string }
   | null;
 
@@ -13,7 +13,8 @@ interface VoxwellBridge {
   dictation: {
     onToggle(callback: () => void): () => void;
     onCancel(callback: () => void): () => void;
-    deliver(text: string): Promise<void>;
+    /** Copies the text and, with pasteInPlace, pastes it into the focused app. reason says why not. */
+    deliver(text: string, pasteInPlace: boolean): Promise<{ pasted: boolean; reason?: string }>;
     setStatus(status: DictationStatus): void;
     onStatus(callback: (status: DictationStatus) => void): () => void;
     overlayAction(action: DictationOverlayAction): void;

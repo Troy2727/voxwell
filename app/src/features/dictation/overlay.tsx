@@ -75,8 +75,8 @@ function Overlay() {
         <>
           <Check className="text-primary size-4 shrink-0" />
           <div role="status" className="min-w-0 flex-1">
-            <p className="text-sm font-medium">Copied. Press {PASTE_KEY} to paste.</p>
-            <p className="text-muted-foreground truncate text-xs">{status.text}</p>
+            <p className="text-sm font-medium">{status.pasted ? 'Pasted.' : `Copied. Press ${PASTE_KEY} to paste.`}</p>
+            <p className="text-muted-foreground truncate text-xs">{status.reason || status.text}</p>
           </div>
           <Dismiss />
         </>

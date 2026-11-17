@@ -5,10 +5,12 @@ import { ChoiceSelect } from '@/components/choice-select';
 import { ErrorAlert, Field, Muted, Page as PageLayout, Section } from '@/components/page';
 import { PhoneDictation, savedPhoneAddress } from '@/components/phone-dictation';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import { LiveWaveform } from '@/components/ui/live-waveform';
 import { MicSelector } from '@/components/ui/mic-selector';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { DICTATED_EVENT, dictationChoices, openMicrophone, rememberCleanup, rememberLanguage, transcribeRecording } from './capture';
+import { DICTATED_EVENT, dictationChoices, openMicrophone, rememberCleanup, rememberLanguage, rememberPasteInPlace, transcribeRecording } from './capture';
 import LiveDictation from './LiveDictation';
 
 const LANGUAGES: [string, string][] = [
@@ -28,6 +30,7 @@ export default function Page() {
   const [phase, setPhase] = useState<Phase>('idle');
   const [elapsed, setElapsed] = useState(0);
   const [language, setLanguage] = useState(dictationChoices.language);
+  const [pasteInPlace, setPasteInPlace] = useState(dictationChoices.pasteInPlace);
   const [device, setDevice] = useState(dictationChoices.device);
   const [muted, setMuted] = useState(false);
   const [text, setText] = useState('');
@@ -232,9 +235,21 @@ export default function Page() {
             }}
           />
         </Field>
+        {window.voxwell && (
+          <div className="flex items-start gap-2">
+            <Checkbox id="paste-in-place" className="mt-0.5" checked={pasteInPlace} onCheckedChange={(on) => {
+              rememberPasteInPlace(on === true);
+              setPasteInPlace(on === true);
+            }} />
+            <div className="grid gap-1">
+              <Label htmlFor="paste-in-place">Paste in place</Label>
+              <Muted className="text-xs">Puts the text where your cursor is, in the app you're using. macOS asks for Accessibility access; Linux needs xdotool or wtype.</Muted>
+            </div>
+          </div>
+        )}
         <Muted className="text-xs">
           {window.voxwell
-            ? 'Press Ctrl/Cmd+Shift+Space anywhere to start and stop; the text is copied for you to paste.'
+            ? `Press Ctrl/Cmd+Shift+Space anywhere to start and stop; the text is ${pasteInPlace ? 'pasted where your cursor is' : 'copied for you to paste'}.`
             : 'The global shortcut is available in the desktop app.'}
         </Muted>
         {onPhoneOrTablet() && !savedPhoneAddress() && <Muted className="text-xs">On a phone, Live needs your computer's private address, saved above.</Muted>}
