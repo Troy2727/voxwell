@@ -220,7 +220,7 @@ export default function Page() {
           </div>
         </div>
         {fields}
-        <Field label="Clean up" htmlFor="dictation-cleanup" hint="Tidies the text after you stop. The shortcut uses it too.">
+        <Field label="Clean up" htmlFor="dictation-cleanup" hint="A local AI model tidies the text after you stop; the first time, it downloads (about 3 GB). The shortcut uses it too.">
           <ChoiceSelect
             id="dictation-cleanup"
             options={cleanups}
