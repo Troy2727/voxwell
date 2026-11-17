@@ -379,3 +379,28 @@ def test_mcp_tool_shared_scope(monkeypatch):
 def test_apply_needs_a_real_language(isolated_data_dir):
     with pytest.raises(ValueError):
         store.apply("Nguyen", "all")
+
+
+def test_known_words_are_the_language_and_shared_words_without_duplicates():
+    assert store.recognition_vocabulary("en") is None
+    store.add_entry("en", "Voxwell", "vox well")
+    store.add_entry("en", "Kubernetes", "koo ber net eez")
+    store.add_entry("fr", "Genève", "je nev")
+    store.add_entry(store.ALL, "voxwell", "vox well")  # same word as the English one, other case
+    store.add_entry(store.ALL, "Anthropic", "an throp ik")
+    assert store.recognition_vocabulary("en") == "Voxwell, Kubernetes, Anthropic"
+    assert store.recognition_vocabulary("fr") == "Genève, voxwell, Anthropic"
+
+
+def test_known_words_with_an_auto_detected_language_use_every_list():
+    store.add_entry("en", "Voxwell", "vox well")
+    store.add_entry("fr", "Genève", "je nev")
+    store.add_entry(store.ALL, "Anthropic", "an throp ik")
+    assert store.recognition_vocabulary(None) == "Voxwell, Genève, Anthropic"
+
+
+def test_known_words_stop_at_a_whole_word_within_the_cap(monkeypatch):
+    monkeypatch.setattr(store, "MAX_VOCABULARY_CHARS", 12)
+    for word in ("alpha", "bravo", "charlie"):
+        store.add_entry("en", word, word)
+    assert store.recognition_vocabulary("en") == "alpha, bravo"  # 12 characters; "charlie" would pass the cap

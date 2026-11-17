@@ -146,6 +146,13 @@ def test_faster_whisper_calls_match_installed_api(monkeypatch, tmp_path):
     engine.transcribe(tmp_path / "clip.wav", "en", speech_only=True)
     assert whisper.return_value.transcribe.call_args.kwargs["vad_filter"] is True
 
+    from voxwell.features.pronunciation import store
+
+    store.add_entry("en", "Voxwell", "vox well")  # known words go in as `hotwords`
+    whisper.return_value.transcribe.return_value = (iter([segment]), mock.Mock(language="en"))
+    engine.transcribe(tmp_path / "clip.wav", "en")
+    assert whisper.return_value.transcribe.call_args.kwargs["hotwords"] == "Voxwell"
+
     word = mock.Mock(start=0.0, end=0.5, word=" hello")
     segment = mock.Mock(start=0.0, end=1.0, words=[word])
     whisper.return_value.transcribe.return_value = (iter([segment]), mock.Mock(language="en"))

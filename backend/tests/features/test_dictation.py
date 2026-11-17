@@ -134,6 +134,29 @@ def test_engine_transcribe_with_fake_model(monkeypatch, tmp_path):
     assert Model.vad_filter is False  # keeps singing, for a transcript that asks for it
 
 
+def test_transcribe_passes_known_words_to_the_model_only_when_there_are_some(monkeypatch, tmp_path):
+    from voxwell.features.pronunciation import store
+
+    class Info:
+        language, language_probability, duration = "en", 0.9, 0
+
+    class Model:
+        calls = []
+
+        def transcribe(self, path, **kwargs):
+            Model.calls.append(kwargs)
+            return iter([]), Info()
+
+    monkeypatch.setattr(engine, "_load_model", lambda: Model())
+    engine.transcribe(tmp_path / "a.wav", "en")
+    assert "hotwords" not in Model.calls[-1]
+    store.add_entry("en", "Voxwell", "vox well")
+    engine.transcribe(tmp_path / "a.wav", "en")
+    assert Model.calls[-1]["hotwords"] == "Voxwell"
+    engine.transcribe_words(tmp_path / "a.wav", "en")
+    assert Model.calls[-1]["hotwords"] == "Voxwell"
+
+
 def test_status_reports_ready_when_faster_whisper_is_installed():
     import importlib.util
 

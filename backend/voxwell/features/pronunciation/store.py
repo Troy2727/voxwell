@@ -160,3 +160,32 @@ def apply(text: str, language: str) -> str:
         raise ValueError("Speech needs a language; the shared words apply within it.")
     entries = [*list_entries(language), *list_entries(ALL)]
     return rewrite(text, entries) if entries else text
+
+
+MAX_VOCABULARY_CHARS = 500  # Whisper's prompt window is about 224 tokens; names cost 2 to 3 characters a token
+
+
+def recognition_vocabulary(language: str | None) -> str | None:
+    """The words to hand the speech recognizer as hints, or None when there are none.
+
+    The language's words come first, then the shared ones; with no language (auto-detect) every language's
+    list is included. Duplicates are dropped ignoring case, and the text is cut at a whole word to fit
+    MAX_VOCABULARY_CHARS.
+    """
+    if language is None:
+        folder = data_dir("pronunciation")
+        languages = sorted(p.stem for p in folder.glob("*.json") if _LANGUAGE.match(p.stem))
+    else:
+        languages = [language]
+    words, seen, length = [], set(), 0
+    for lang in [*languages, ALL]:
+        for entry in list_entries(lang):
+            key = entry.word.lower()
+            if key in seen:
+                continue
+            length += len(entry.word) + (2 if words else 0)  # ", " between words
+            if length > MAX_VOCABULARY_CHARS:
+                return ", ".join(words) or None
+            seen.add(key)
+            words.append(entry.word)
+    return ", ".join(words) or None

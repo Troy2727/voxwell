@@ -2597,7 +2597,7 @@ requires-dist = [
     { name = "chatterbox-tts", specifier = "==0.1.6" },
     { name = "diffusers", specifier = "==0.36.0" },
     { name = "fastapi", specifier = ">=0.115" },
-    { name = "faster-whisper", specifier = ">=1.0" },
+    { name = "faster-whisper", specifier = ">=1.0.2" },
     { name = "librosa", specifier = ">=0.11.0" },
     { name = "parler-tts", url = "https://github.com/huggingface/parler-tts/archive/d108732cd57788ec86bc857d99a6cabd66663d68.tar.gz" },
     { name = "platformdirs", specifier = ">=4" },

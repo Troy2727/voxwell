@@ -15,7 +15,7 @@ dependencies = [
     "chatterbox-tts==0.1.6",
     # Archives of fixed commits, not git+https: the desktop installer must work on a computer without Git.
     "parler-tts @ https://github.com/huggingface/parler-tts/archive/d108732cd57788ec86bc857d99a6cabd66663d68.tar.gz",
-    "faster-whisper>=1.0",
+    "faster-whisper>=1.0.2",
     "sherpa-onnx>=1.12",  # speaker diarization (Apache-2.0); wheels for Windows, macOS and Linux on Python 3.11
     "transformers==4.46.3",
     "torch",
