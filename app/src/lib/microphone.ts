@@ -7,7 +7,7 @@ export const NO_MICROPHONE = "This browser can't use a microphone here. Try Chro
  * dither); even a quiet room with noise suppression sits well above this, so it is never flagged.
  */
 export const SILENCE_RMS = 0.0003;
-export const SILENCE_AFTER_MS = 1800; // silence this long at the start (or after sound) triggers the warning
+export const SILENCE_AFTER_MS = 1800; // silence this long before any sound triggers the warning
 export const SILENCE_POLL_MS = 50; // one level reading; an analyser window of 2048 samples covers about this much
 
 /** Silent when the last SILENCE_AFTER_MS of readings were all at or below SILENCE_RMS. */
@@ -18,7 +18,8 @@ export function isSilent(levels: readonly number[]): boolean {
 
 /**
  * Mic check: watches a microphone stream and calls `onChange(true)` once it has been silent for a moment and
- * `onChange(false)` as soon as sound arrives. Returns a function that stops watching and closes the
+ * `onChange(false)` as soon as sound arrives. Once it has heard sound the microphone works, so it stops
+ * watching: a pause mid-dictation never warns. Returns a function that stops watching and closes the
  * audio context; call it when recording ends.
  */
 export function startMicCheck(stream: MediaStream, onChange: (silent: boolean) => void): () => void {
@@ -36,12 +37,17 @@ export function startMicCheck(stream: MediaStream, onChange: (silent: boolean) =
       return;
     }
     analyser.getFloatTimeDomainData(samples);
-    levels.push(Math.sqrt(samples.reduce((sum, v) => sum + v * v, 0) / samples.length));
+    const rms = Math.sqrt(samples.reduce((sum, v) => sum + v * v, 0) / samples.length);
+    if (rms > SILENCE_RMS) {
+      if (silent) onChange(false);
+      window.clearInterval(timer);
+      return;
+    }
+    levels.push(rms);
     if (levels.length > SILENCE_AFTER_MS / SILENCE_POLL_MS) levels.shift();
-    const now = isSilent(levels);
-    if (now !== silent) {
-      silent = now;
-      onChange(now);
+    if (!silent && isSilent(levels)) {
+      silent = true;
+      onChange(true);
     }
   }, SILENCE_POLL_MS);
   return () => {

@@ -16,7 +16,7 @@ test('a quiet room is not flagged', () => {
   expect(isSilent(Array<number>(NEEDED).fill(0.002))).toBe(false); // about -54 dBFS, noise-suppressed room tone
 });
 
-test('sound clears it at once, and a dead stretch after sound flags it again', () => {
+test('sound clears it at once, and only the latest readings count', () => {
   expect(isSilent([...quiet(NEEDED), 0.05])).toBe(false);
   expect(isSilent([0.05, ...quiet(NEEDED)])).toBe(true);
   expect(isSilent([...quiet(NEEDED - 1), SILENCE_RMS * 2])).toBe(false);
