@@ -2,6 +2,7 @@
 // Owned by the dictation feature; main.cjs only calls register/unregister.
 const path = require('node:path');
 const { BrowserWindow, globalShortcut, ipcMain, clipboard, screen } = require('electron');
+const { paste } = require('./paste.cjs');
 
 const SHORTCUT = 'CommandOrControl+Shift+Space';
 const OVERLAY_SIZE = { width: 420, height: 64 };
@@ -66,11 +67,14 @@ function presentStatus() {
 }
 
 function register(win, overlayUrl) {
-  // Never simulate keystrokes into other apps: no cross-platform way without native code.
+  // The text always goes on the clipboard. With Paste in place on, the OS's own tool then presses
+  // paste in the focused app (see paste.cjs); the overlay never takes focus, so that app keeps it.
+  // If pasting fails, the text stays on the clipboard and the reason goes back to the overlay.
   ipcMain.removeHandler('dictation:deliver');
-  ipcMain.handle('dictation:deliver', (_event, text) => {
-    if (typeof text !== 'string' || !text) return;
+  ipcMain.handle('dictation:deliver', async (event, text, pasteInPlace) => {
+    if (event.sender !== win.webContents || typeof text !== 'string' || !text) return { pasted: false };
     clipboard.writeText(text);
+    return pasteInPlace === true ? paste() : { pasted: false };
   });
 
   ipcMain.removeAllListeners('dictation:status');

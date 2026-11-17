@@ -22,14 +22,34 @@ function savedCleanup() {
   }
 }
 
-/** The Dictation page's microphone, language and clean-up, which the global shortcut uses too. */
-export const dictationChoices = { language: savedLanguage(), device: '', cleanup: savedCleanup() };
+const PASTE_IN_PLACE_KEY = 'voxwell.dictation.pasteInPlace';
+
+function savedPasteInPlace() {
+  try {
+    return localStorage.getItem(PASTE_IN_PLACE_KEY) === 'on';
+  } catch {
+    return false; // storage can be blocked
+  }
+}
+
+/** The Dictation page's microphone, language, clean-up and Paste in place, which the global shortcut uses too. */
+export const dictationChoices = { language: savedLanguage(), device: '', cleanup: savedCleanup(), pasteInPlace: savedPasteInPlace() };
 
 /** A clean-up preset key from /api/transcription/edit/presets, or 'off'. */
 export function rememberCleanup(cleanup: string) {
   dictationChoices.cleanup = cleanup;
   try {
     localStorage.setItem(CLEANUP_KEY, cleanup);
+  } catch {
+    /* storage can be blocked; the choice still holds until the page closes */
+  }
+}
+
+/** Desktop app only: after the shortcut, paste the text into the app being used, not just copy it. */
+export function rememberPasteInPlace(on: boolean) {
+  dictationChoices.pasteInPlace = on;
+  try {
+    localStorage.setItem(PASTE_IN_PLACE_KEY, on ? 'on' : 'off');
   } catch {
     /* storage can be blocked; the choice still holds until the page closes */
   }
