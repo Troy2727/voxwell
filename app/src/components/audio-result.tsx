@@ -81,7 +81,8 @@ function Player({ src, download, autoPlay, lazy, barTitle, barSource }: Props) {
   useEffect(() => {
     if (lazy) return;
     // Loads metadata so the duration shows before playing.
-    void player.setActiveItem(item).then(() => (autoPlay ? player.play(item) : undefined));
+    // A blocked autoplay just leaves the play button to press.
+    void player.setActiveItem(item).then(() => (autoPlay ? player.play(item) : undefined)).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [src]);
 
@@ -108,7 +109,7 @@ function Player({ src, download, autoPlay, lazy, barTitle, barSource }: Props) {
           <AudioPlayerDuration className="text-xs" />
         </div>
       </div>
-      {barTitle && (
+      {barTitle !== undefined && (
         <Button
           variant="ghost"
           size="icon"
