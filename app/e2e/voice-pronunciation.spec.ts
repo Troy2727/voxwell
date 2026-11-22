@@ -24,7 +24,7 @@ test('voice pronunciation: words for one voice go to that voice\'s list', async 
 
   for (const width of [390, 768, 1024, 1440]) {
     await page.setViewportSize({ width, height: 900 });
-    expect(await page.evaluate(() => document.documentElement.scrollWidth === window.innerWidth), `no sideways scroll at ${width} px`).toBe(true);
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth === window.innerWidth), { message: `no sideways scroll at ${width} px` }).toBe(true);
   }
 
   await pickVoice(page, 'Every voice', section);
