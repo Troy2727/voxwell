@@ -494,3 +494,51 @@ test.describe('errors the user can see', () => {
     await expect(page.getByRole('alert').filter({ hasText: 'The file has no audio or video.' })).toBeVisible();
   });
 });
+
+test.describe('run in background', () => {
+  test('a plain browser shows no Run in background control', async ({ app: page }) => {
+    await expect(page.getByText('Running on this computer', { exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Desktop app' })).toHaveCount(0);
+    await expect(page.getByRole('checkbox', { name: 'Run in background' })).toHaveCount(0);
+  });
+
+  test('the desktop app saves it, and a failed save puts it back and says so', async ({ page }) => {
+    await installMockBackend(page);
+    await page.addInitScript(() => {
+      const off = () => () => {};
+      const state = { calls: [] as boolean[], fail: false };
+      Object.assign(window, {
+        backgroundTest: state,
+        voxwell: {
+          backendUrl: 'http://127.0.0.1:8765',
+          dictation: { onToggle: off, onCancel: off },
+          auth: { onCallback: off },
+          background: {
+            get: async () => false,
+            set: async (on: boolean) => {
+              state.calls.push(on);
+              if (state.fail) throw new Error('disk full');
+              return on;
+            },
+          },
+        },
+      });
+    });
+    await page.goto('/');
+    const box = page.getByRole('checkbox', { name: 'Run in background' });
+    await expect(box).not.toBeChecked();
+    for (const width of [390, 768, 1024, 1440]) {
+      await page.setViewportSize({ width, height: 900 });
+      await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth === window.innerWidth), { message: `no sideways scroll at ${width} px` }).toBe(true);
+    }
+    await box.click();
+    await expect(box).toBeChecked();
+    const state = () => page.evaluate(() => (window as unknown as { backgroundTest: { calls: boolean[]; fail: boolean } }).backgroundTest);
+    expect((await state()).calls).toEqual([true]);
+
+    await page.evaluate(() => { (window as unknown as { backgroundTest: { fail: boolean } }).backgroundTest.fail = true; });
+    await box.click();
+    await expect(page.getByText("Couldn't save this setting. Try again.")).toBeVisible();
+    await expect(box).toBeChecked();
+  });
+});

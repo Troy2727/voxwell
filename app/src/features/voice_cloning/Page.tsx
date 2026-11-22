@@ -10,12 +10,16 @@ import { FileDrop } from '@/components/file-drop';
 import { ErrorAlert, Field, message, Page as PageLayout, Section } from '@/components/page';
 import { usePromptMenu, type PromptItem } from '@/components/prompt-menu';
 import { VoiceSelect } from '@/components/voice-select';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { usePersisted } from '@/lib/persisted';
 import { CuePicker, Cues } from './CuePicker';
+import { FreeTheGpu } from './FreeTheGpu';
 import { LANGUAGES } from './languages';
+import { addTake, MAX_WAITING, onFinished, useTakes, waitingCount } from './queue';
+import { TakeQueue } from './TakeQueue';
 
 const PAUSES: [string, number][] = [['Short', 0.5], ['Medium', 1], ['Long', 2]];
 
@@ -34,7 +38,9 @@ export default function Page() {
   const [text, setText] = useState('');
   const [language, setLanguage] = usePersisted('voxwell.voice_cloning.language', 'en');
   const [fx, setFx] = usePersisted('voxwell.voice_cloning.effects', NO_EFFECTS, reviveEffects);
-  const [busy, setBusy] = useState(false);
+  const takes = useTakes();
+  const inQueue = takes.some((t) => t.status === 'running' || t.status === 'waiting');
+  const waiting = takes.filter((t) => t.status === 'waiting').length;
   const [error, setError] = useState('');
   const [audioUrl, setAudioUrl] = useState('');
   const [cues, setCues] = useState<Cues | null>(null);
@@ -58,6 +64,20 @@ export default function Page() {
     // Without it (an older backend), the page just offers no cues.
     api<{ cues?: Cues }>('/api/voice_cloning/status').then((s) => setCues(s.cues ?? null), () => setCues(null));
   }, []);
+
+  // The newest take that finishes while the page is open becomes the result below.
+  useEffect(
+    () =>
+      onFinished((take) => {
+        setAudioUrl(apiUrl(take.url!));
+        setCueNote(!take.cuesIgnored
+          ? ''
+          : cues?.languages.includes(take.language)
+            ? 'The cues were left out this time: they need a voice clip longer than five seconds and the cue model, which could not be used. See the Voxwell log.'
+            : 'Cues work in English only, so they were left out.');
+      }),
+    [cues],
+  );
 
   // A remembered voice may have been deleted since.
   useEffect(() => {
@@ -114,7 +134,7 @@ export default function Page() {
     text,
     setText,
     onSubmit: () => {
-      if (!busy && text.trim()) void generate();
+      if (text.trim()) add();
     },
     sources: {
       '@': { title: 'Voices', items: (voices ?? []).map((v) => ({ label: v.name, hint: 'voice', pick: () => setVoiceId(v.id) })) },
@@ -129,28 +149,15 @@ export default function Page() {
     },
   });
 
-  async function generate() {
-    setBusy(true);
-    setError('');
-    setAudioUrl('');
-    setCueNote('');
-    try {
-      const res = await api<{ id: string; url: string; cues_ignored?: boolean }>('/api/voice_cloning/synthesize', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, language, voice_id: voiceId || null, effects: isNeutral(fx) ? null : fx }),
-      });
-      setAudioUrl(apiUrl(res.url));
-      if (res.cues_ignored) {
-        setCueNote(cuesHere
-          ? 'The cues were left out this time: they need a voice clip longer than five seconds and the cue model, which could not be used. See the Voxwell log.'
-          : 'Cues work in English only, so they were left out.');
-      }
-    } catch (e) {
-      setError(message(e));
-    } finally {
-      setBusy(false);
+  /** Generate, or add to the queue while another take renders: a snapshot of what is on screen now. */
+  function add() {
+    const voiceName = voices?.find((v) => v.id === voiceId)?.name ?? 'Default voice';
+    const queued = inQueue;
+    if (!addTake({ text, language, voiceId: voiceId || null, voiceName, effects: isNeutral(fx) ? null : fx })) {
+      toast.warning(`The queue is full (${MAX_WAITING} takes). Wait for some to finish first.`);
+      return;
     }
+    if (queued) toast.info(`Queued. ${waitingCount()} waiting.`);
   }
 
   return (
@@ -215,22 +222,27 @@ export default function Page() {
         </Field>
         <div className="flex flex-wrap items-center gap-2">
           {PAUSES.map(([label, seconds]) => (
-            <Button key={label} variant="outline" size="sm" aria-label={`${label} pause`} disabled={busy} onClick={() => insertTag(`[pause ${seconds}]`)}>
+            <Button key={label} variant="outline" size="sm" aria-label={`${label} pause`} onClick={() => insertTag(`[pause ${seconds}]`)}>
               <Pause /> {label}
             </Button>
           ))}
-          {cuesHere && <CuePicker groups={cues.groups} disabled={busy || !cues.available} onPick={insertTag} />}
+          {cuesHere && <CuePicker groups={cues.groups} disabled={!cues.available} onPick={insertTag} />}
         </div>
-        <EffectsControls value={fx} onChange={setFx} disabled={busy} resettable />
+        <EffectsControls value={fx} onChange={setFx} resettable />
         <div>
-          <Button disabled={busy || !text.trim()} onClick={generate}>
-            <Volume2 /> {busy ? 'Generating…' : 'Generate'}
+          <Button disabled={!text.trim()} onClick={add}>
+            <Volume2 /> {inQueue ? 'Queue this take' : 'Generate'}
+            {waiting > 0 && <Badge variant="secondary" aria-label={`${waiting} waiting`}>{waiting}</Badge>}
           </Button>
         </div>
         <ErrorAlert message={error} />
         {cueNote && <p className="text-sm text-muted-foreground">{cueNote}</p>}
         {audioUrl && <AudioResult src={audioUrl} download="voxwell-speech.wav" />}
       </Section>
+
+      <TakeQueue takes={takes} />
+
+      <FreeTheGpu />
     </PageLayout>
   );
 }

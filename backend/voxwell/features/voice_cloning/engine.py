@@ -14,6 +14,7 @@ from voxwell import voices
 from voxwell.features.audio_effects.dsp import Effects, apply_to_wav
 from voxwell.features.pronunciation import store as pronunciation
 from voxwell.features.voice_cloning import cues as cue_tags
+from voxwell.features.voice_cloning import gpu
 
 log = logging.getLogger(__name__)
 
@@ -390,20 +391,21 @@ def synthesize(
     if language not in LANGUAGES:
         raise ValueError(f"Unsupported language '{language}'.")
 
-    out = None
-    if cues and language in cue_tags.VOICED_LANGUAGES and cue_tags.find(text):
-        if not _turbo_accepts(reference_audio):
-            log.warning("This voice can't be used with cue tags (its clip must be longer than %s seconds); they are left out.", TURBO_MIN_REFERENCE)
-        elif (turbo := _load_turbo()) is not None:
-            try:
-                out = _speak(text, language, reference_audio, turbo, {})
-            except Exception:
-                # E.g. a clip just over the limit by its header but not after Turbo resamples it.
-                log.exception("Chatterbox-Turbo could not speak this; cue tags are left out.")
-                _turbo_rejected.add(str(reference_audio))
-    if out is None:
-        multilingual = {"language_id": language, "exaggeration": exaggeration, "cfg_weight": cfg_weight}
-        out = _speak(text, language, reference_audio, None, multilingual)
+    with gpu.working():  # Free the GPU: no move while speaking; the idle countdown starts after
+        out = None
+        if cues and language in cue_tags.VOICED_LANGUAGES and cue_tags.find(text):
+            if not _turbo_accepts(reference_audio):
+                log.warning("This voice can't be used with cue tags (its clip must be longer than %s seconds); they are left out.", TURBO_MIN_REFERENCE)
+            elif (turbo := _load_turbo()) is not None:
+                try:
+                    out = _speak(text, language, reference_audio, turbo, {})
+                except Exception:
+                    # E.g. a clip just over the limit by its header but not after Turbo resamples it.
+                    log.exception("Chatterbox-Turbo could not speak this; cue tags are left out.")
+                    _turbo_rejected.add(str(reference_audio))
+        if out is None:
+            multilingual = {"language_id": language, "exaggeration": exaggeration, "cfg_weight": cfg_weight}
+            out = _speak(text, language, reference_audio, None, multilingual)
     return apply_to_wav(out, effects) if effects is not None else out
 
 
@@ -434,6 +436,7 @@ def _speak(text: str, language: str, reference_audio: Path | None, turbo, kwargs
             # Per part, so a dictionary entry can't rewrite a pause tag.
             part = _pronounce(part, language, voice_id)
             with _lock:
+                gpu.restore_if_needed(model)  # Free the GPU moved it to system RAM while idle
                 if reference_audio is None and getattr(model, "voxwell_default_conds", None) is not None:
                     model.conds = model.voxwell_default_conds  # not the voice of an earlier call
                 audio.append(_flat(model.generate(part, **kwargs)))
