@@ -22,7 +22,7 @@ class Part:
         self.refuse = None  # a device this part can't move to, like a full GPU
 
     def to(self, device):
-        if device == self.refuse:
+        if self.refuse in (device, "any"):
             raise RuntimeError("CUDA out of memory")
         self.moves.append(device)
         self.device = device
@@ -164,6 +164,14 @@ def test_a_failed_move_back_still_speaks_on_the_processor(model):
     assert engine.synthesize("Hello again.", "en")
     assert model.spoken_on[-1] == "cpu" and moved_to_ram(model)
     assert model.voxwell_moved_from == "cuda"  # the next take tries again
+
+
+def test_a_restore_that_cannot_even_fall_back_does_not_raise(model):
+    gpu.set_enabled(True)
+    gpu.fire()
+    model.s3gen.refuse = "any"
+    gpu.restore_if_needed(model)  # logged; the take reports its own error if the model can't run
+    assert model.voxwell_moved_from == "cuda"
 
 
 def test_a_failed_move_to_ram_leaves_the_model_where_it_was(model):

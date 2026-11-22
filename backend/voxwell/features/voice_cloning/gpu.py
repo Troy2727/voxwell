@@ -40,8 +40,13 @@ def enabled() -> bool:
 def set_enabled(value: bool) -> None:
     target = _config()
     with tempfile.NamedTemporaryFile("w", dir=target.parent, suffix=".tmp", delete=False, encoding="utf-8") as tmp:
-        tmp.write(json.dumps({"enabled": value}))
-    replace_file(Path(tmp.name), target)
+        try:
+            tmp.write(json.dumps({"enabled": value}))
+        except OSError:
+            tmp.close()
+            Path(tmp.name).unlink(missing_ok=True)
+            raise
+    replace_file(Path(tmp.name), target)  # removes the temporary file itself when it fails
 
 
 @contextlib.contextmanager
@@ -122,8 +127,11 @@ def restore_if_needed(model) -> None:
         log.info("Free the GPU: moved the speech model back to %s.", device)
     except Exception as exc:
         log.warning("Free the GPU: could not move the speech model back to %s (%s); this take runs on the processor.", device, type(exc).__name__)
-        _move(model, CPU)
-        _empty_cache()
+        try:
+            _move(model, CPU)
+            _empty_cache()
+        except Exception as again:  # the take will report its own error if the model can't run
+            log.warning("Free the GPU: could not put the speech model back on the processor either (%s).", type(again).__name__)
 
 
 def _move(model, device: str) -> None:
