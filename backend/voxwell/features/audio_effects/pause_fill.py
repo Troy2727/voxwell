@@ -28,6 +28,7 @@ FLOOR_SPAN_DB = 6.0  # frames up to this much above the floor count as backgroun
 MIN_FRAMES = 10  # fewer live frames than this: too little speech to measure
 LOUDEST_BACKGROUND_DBFS = -35.0  # a floor louder than this is speech, not background
 FILTER_ORDER = 12
+MAX_FIT_FRAMES = 2000  # enough to fit the filter; a long chapter's frames are sampled evenly down to this
 EDGE_SECONDS = 0.03
 
 
@@ -67,10 +68,11 @@ def background(pieces: list, rate: int):
     if floor > 10 ** (LOUDEST_BACKGROUND_DBFS / 20):
         return None
     limit = floor * 10 ** (FLOOR_SPAN_DB / 20)
+    quiet = [np.flatnonzero((lv > 10 ** (SILENT_DBFS / 20)) & (lv <= limit)) for lv in levels]
+    every = max(1, sum(len(q) for q in quiet) // MAX_FIT_FRAMES)
     r, used, total = np.zeros(FILTER_ORDER + 1), 0, 0.0
-    for piece, lv in zip(pieces, levels):
-        picked = np.flatnonzero((lv > 10 ** (SILENT_DBFS / 20)) & (lv <= limit))
-        for start in picked * size:
+    for piece, lv, picked in zip(pieces, levels, quiet):
+        for start in picked[::every] * size:
             frame = np.asarray(piece[start : start + size], dtype=np.float64)
             r += [np.dot(frame[: size - lag], frame[lag:]) for lag in range(FILTER_ORDER + 1)]
         used += len(picked)
