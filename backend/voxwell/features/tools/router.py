@@ -1,5 +1,5 @@
-"""Tools: voice conversion, voice isolation, AI direction, speech-rate fit and file info.
-(Compare voices is a page that calls /speak once per voice.)"""
+"""Tools: voice conversion, video voice conversion, voice isolation, AI direction, speech-rate fit and
+file info. (Compare voices is a page that calls /speak once per voice.)"""
 
 import importlib.util
 import io
@@ -29,6 +29,10 @@ router = APIRouter(tags=["tools"])
 MAX_UPLOAD = 50 * 1024 * 1024
 MAX_COMPARE_TEXT = 300
 MAX_ISOLATE_SECONDS = 10 * 60  # about 1 GB of working memory; longer files take a while on CPU
+MAX_VIDEO_UPLOAD = 2 * 1024**3  # Convert video streams the upload to disk, so this is about disk space
+NO_SPEECH_PEAK = 1e-4
+NOTE_WHOLE_SOUNDTRACK = "The voice could not be separated from the background, so the whole soundtrack was converted, background included."
+NOTE_AUDIO_ONLY = "The video could not be rebuilt with the new voice, so this is the converted audio instead. Your original file is unchanged."
 OUTPUT_TTL_SECONDS = 24 * 60 * 60  # results are scratch files; download what you want to keep
 _OUTPUT_ID = re.compile(r"^[0-9a-f]{32}$")
 
@@ -68,7 +72,7 @@ async def _read_audio(file: UploadFile) -> tuple[bytes, float]:
 def _new_output() -> tuple[str, Path]:
     folder = data_dir("tools")
     cutoff = time.time() - OUTPUT_TTL_SECONDS
-    for old in folder.glob("*.wav"):
+    for old in [*folder.glob("*.wav"), *folder.glob("*.mp4")]:
         if old.stat().st_mtime < cutoff:
             old.unlink(missing_ok=True)
     output_id = uuid.uuid4().hex
@@ -97,6 +101,78 @@ async def convert(file: UploadFile = File(...), voice_id: str = Form(...)):
     finally:
         source.unlink(missing_ok=True)
     return _result(output_id)
+
+
+@router.post("/convert-video")
+def convert_video(file: UploadFile = File(...), voice_id: str = Form(...)):
+    """Convert video: the voice in a video re-spoken in a saved voice; picture and background kept."""
+    import soundfile as sf
+
+    try:
+        target = voices.voice_audio_path(voice_id)
+    except KeyError:
+        raise HTTPException(422, "Pick a saved voice.")
+    notes: list[str] = []
+    # Nothing here uses the upload's name: ffmpeg would read a name like .m3u8 as a playlist.
+    with tempfile.TemporaryDirectory(dir=data_dir("tools")) as tmp:
+        work = Path(tmp)
+        upload = work / "input"
+        size = 0
+        with upload.open("wb") as out:
+            while chunk := file.file.read(1 << 20):
+                size += len(chunk)
+                if size > MAX_VIDEO_UPLOAD:
+                    raise HTTPException(413, "The video is too large (2 GB max).")
+                out.write(chunk)
+        try:
+            picture, sound = engine.video_streams(upload)
+        except DubbingError as exc:
+            raise HTTPException(422, str(exc))
+        if not picture:
+            raise HTTPException(422, "This file has no video picture. Use Convert voice for audio files.")
+        if not sound:
+            raise HTTPException(422, "This video has no audio track to convert.")
+        soundtrack = work / "soundtrack.wav"
+        try:
+            engine.extract_soundtrack(upload, soundtrack, MAX_ISOLATE_SECONDS + 1)
+        except DubbingError as exc:
+            raise HTTPException(422, str(exc))
+        if sf.info(str(soundtrack)).duration > MAX_ISOLATE_SECONDS:
+            raise HTTPException(422, f"Use a video of up to {MAX_ISOLATE_SECONDS // 60} minutes.")
+
+        voice, background = work / "voice.wav", work / "background.wav"
+        try:
+            isolation.isolate(soundtrack, voice, background)
+        except Exception:  # e.g. the isolation weights can't be downloaded: convert everything instead
+            log.exception("Voice isolation failed; converting the whole soundtrack")
+            notes.append(NOTE_WHOLE_SOUNDTRACK)
+            voice, background = soundtrack, None
+        samples, _ = sf.read(str(voice), dtype="float32")
+        if not len(samples) or float(abs(samples).max()) < NO_SPEECH_PEAK:
+            raise HTTPException(422, "No speech was found, so there is nothing to convert.")
+
+        output_id, out = _new_output()
+        try:
+            converted, rate = engine.convert_long(voice, target, work)
+            if background is not None:
+                engine.mix_voice(background, converted, rate, out)
+            else:
+                sf.write(str(out), converted, rate, subtype="PCM_16")
+        except Exception as exc:
+            out.unlink(missing_ok=True)
+            log.exception("Voice conversion failed")
+            raise HTTPException(500, "Voice conversion failed; see the Voxwell log.") from exc
+
+        video_out = out.with_suffix(".mp4")
+        try:
+            engine.rebuild_video(upload, out, video_out)
+        except DubbingError:  # e.g. a picture codec MP4 can't hold
+            log.exception("Could not rebuild the video")
+            video_out.unlink(missing_ok=True)
+            notes.append(NOTE_AUDIO_ONLY)
+        seconds = sf.info(str(out)).duration
+    video_url = f"/api/tools/video/{output_id}" if video_out.exists() else None
+    return _result(output_id, video_url=video_url, seconds=round(seconds, 3), notes=notes)
 
 
 @router.post("/isolate")
@@ -250,6 +326,16 @@ def probe(file: UploadFile = File(...)):
             return engine.probe(path)
         except DubbingError as exc:
             raise HTTPException(422, str(exc))
+
+
+@router.get("/video/{output_id}")
+def video(output_id: str):
+    if not _OUTPUT_ID.match(output_id):
+        raise HTTPException(404, "Result not found.")
+    path = child_path(data_dir("tools"), f"{output_id}.mp4")
+    if not path.exists():
+        raise HTTPException(404, "Result not found.")
+    return FileResponse(path, media_type="video/mp4")
 
 
 @router.get("/audio/{output_id}")

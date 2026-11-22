@@ -429,6 +429,20 @@ def cmd_convert(client: Client, args) -> tuple[str, dict]:
     return f"Saved the converted recording to {out}", {"path": str(out)}
 
 
+def cmd_convert_video(client: Client, args) -> tuple[str, dict]:
+    source = _existing_file(args.file)
+    result = client.post_form("/api/tools/convert-video", {"voice_id": _voice_id(client, args.voice)}, source)
+    notes = result.get("notes") or []
+    if result.get("video_url"):
+        out = _output_path(args.output, f"{source.stem}.converted.mp4", ".mp4")
+        out.write_bytes(client.request("GET", result["video_url"]))
+        return "\n".join([f"Saved the converted video to {out}", *notes]), {"path": str(out), "notes": notes}
+    # The video could not be rebuilt (a note says so): the converted sound is saved instead.
+    out = _output_path(args.output, f"{source.stem}.converted.wav", ".wav")
+    out.write_bytes(client.request("GET", result["url"]))
+    return "\n".join([f"Saved the converted audio to {out}", *notes]), {"path": str(out), "notes": notes, "audio_only": True}
+
+
 def cmd_dub(client: Client, args) -> tuple[str, dict]:
     source = _existing_file(args.file)
     voice = "original" if args.voice == "original" else _voice_id(client, args.voice)
@@ -653,6 +667,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("-v", "--voice", required=True, help="saved voice name or id")
     p.add_argument("-o", "--output", help="WAV file or folder (default: <name>.converted.wav in the current folder)")
     p.set_defaults(run=cmd_convert)
+
+    p = sub.add_parser("convert-video", parents=[common], help="swap the voice in a video for a saved voice (MP4)")
+    p.add_argument("file", help="the video, up to 10 minutes")
+    p.add_argument("-v", "--voice", required=True, help="saved voice name or id")
+    p.add_argument("-o", "--output", help="MP4 file or folder (default: <name>.converted.mp4 in the current folder)")
+    p.set_defaults(run=cmd_convert_video)
 
     p = sub.add_parser("dub", parents=[common], help="dub a video into another language (MP4 + SRT)")
     p.add_argument("file", help="the video")

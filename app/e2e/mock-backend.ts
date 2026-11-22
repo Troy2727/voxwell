@@ -167,6 +167,7 @@ function routes(): [string | RegExp, Reply][] {
       return {};
     }],
 
+    ['POST /api/tools/convert-video', { url: TONE_URL, video_url: '/mock/converted/video', seconds: 2, notes: [] }],
     ['POST /api/dubbing/jobs', { id: 'd-1' }],
     ['GET /api/dubbing/jobs/d-1', dub()],
     ['POST /api/batch/jobs', { jobs: [{ name: 'video.mp4', id: 'd-2' }], errors: [{ name: 'bad.exe', error: 'Not a video or audio file.' }] }],
