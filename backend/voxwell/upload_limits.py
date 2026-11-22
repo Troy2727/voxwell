@@ -31,6 +31,7 @@ LIMITS = {
     "/api/dictation/transcribe": (dictation, "MAX_UPLOAD"),
     "/api/translation/file": (translation, "MAX_UPLOAD"),
     "/api/tools/convert": (tools, "MAX_UPLOAD"),
+    "/api/tools/convert-video": (tools, "MAX_VIDEO_UPLOAD"),
     "/api/tools/isolate": (tools, "MAX_UPLOAD"),
     "/api/tools/fit": (tools, "MAX_UPLOAD"),
     "/api/music/generate": (tools, "MAX_UPLOAD"),  # its style reference goes through tools._read_audio

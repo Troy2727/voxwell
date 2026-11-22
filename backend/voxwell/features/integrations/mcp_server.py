@@ -163,6 +163,16 @@ TOOLS = [
         }, ["file_path", "voice"]),
     },
     {
+        "name": "convert_video",
+        "description": "Swap the voice in a video (up to 10 minutes) for a saved voice, keeping the picture and background sound. "
+        "Takes minutes. Returns the MP4 path (a WAV, with a note, if the video can't be rebuilt).",
+        "inputSchema": _schema({
+            "file_path": _FILE,
+            "voice": _VOICE,
+            "output_path": {"type": "string", "description": "Where to save the MP4. Default: the Voxwell MCP folder."},
+        }, ["file_path", "voice"]),
+    },
+    {
         "name": "apply_effects",
         "description": "Change the speed or pitch of a recording, or add reverb, distance, background noise or stereo pan. Saves a WAV (stereo when pan is "
         "not 0; reverb adds a short tail) and returns its path. Leave an effect out to leave it off.",
@@ -351,6 +361,11 @@ def convert_voice(args: dict) -> str:
                 output=args.get("output_path") or _default_folder())
 
 
+def convert_video(args: dict) -> str:
+    return _run(cli.cmd_convert_video, file=_required(args, "file_path"), voice=_required(args, "voice"),
+                output=args.get("output_path") or _default_folder())
+
+
 def dub_video(args: dict) -> str:
     return _run(cli.cmd_dub, file=_required(args, "file_path"), to=_required(args, "target_language").lower(),
                 voice=args.get("voice") or "original", output=args.get("output_path") or _default_folder(), **_speaker_args(args))
@@ -395,7 +410,7 @@ def chat_with_agent(args: dict) -> str:
 
 HANDLERS = {
     "list_voices": list_voices, "voice_collections": voice_collections, "speak": speak, "generate_sound": generate_sound, "make_music": make_music, "transcribe": transcribe, "edit_transcript": edit_transcript, "align_script": align_script, "isolate_voice": isolate_voice,
-    "clone_voice": clone_voice, "design_voice": design_voice, "remix_voice": remix_voice, "convert_voice": convert_voice, "dub_video": dub_video,
+    "clone_voice": clone_voice, "design_voice": design_voice, "remix_voice": remix_voice, "convert_voice": convert_voice, "convert_video": convert_video, "dub_video": dub_video,
     "chat_with_agent": chat_with_agent,
     "translate_speech": translate_speech,
     "apply_effects": apply_effects,

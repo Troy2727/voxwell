@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Compare } from './Compare';
 import { Convert } from './Convert';
+import { ConvertVideo } from './ConvertVideo';
 import { Direct } from './Direct';
 import { Fit } from './Fit';
 import { Isolate } from './Isolate';
@@ -12,6 +13,7 @@ import { Probe } from './Probe';
 
 const TOOLS = [
   { id: 'convert', title: 'Convert voice', hint: 'Re-speak a recording in one of your saved voices. The words and timing stay the same.' },
+  { id: 'convert-video', title: 'Convert video', hint: 'Swap the voice in a video for one of your saved voices. The picture, music and background sound stay.' },
   { id: 'isolate', title: 'Isolate voice', hint: 'Split a recording into the voice alone and everything else: music, noise and effects.' },
   { id: 'direct', title: 'AI direction', hint: 'Say how a line should sound, in your own words. A local AI turns it into settings you can adjust.' },
   { id: 'compare', title: 'Compare voices', hint: 'Hear the same sentence in several voices, side by side.' },
@@ -46,6 +48,7 @@ export default function Page() {
               </CardHeader>
               <CardContent className="flex flex-col gap-4">
                 {t.id === 'convert' && <Convert voices={voices} />}
+                {t.id === 'convert-video' && <ConvertVideo voices={voices} />}
                 {t.id === 'isolate' && <Isolate />}
                 {t.id === 'direct' && <Direct voices={voices} />}
                 {t.id === 'compare' && <Compare voices={voices} />}

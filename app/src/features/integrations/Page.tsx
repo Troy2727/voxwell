@@ -42,6 +42,7 @@ const TOOLS: { cli: string; mcp: string; what: string }[] = [
   { cli: 'effects', mcp: 'apply_effects', what: 'Add reverb, distance, noise or pan to a recording' },
   { cli: 'pronounce', mcp: 'manage_pronunciations', what: 'List, add or remove how a word is pronounced' },
   { cli: 'convert', mcp: 'convert_voice', what: 'Re-speak a recording in a saved voice' },
+  { cli: 'convert-video', mcp: 'convert_video', what: 'Swap the voice in a video for a saved voice' },
   { cli: 'dub', mcp: 'dub_video', what: 'Dub a video into another language (MP4 + SRT)' },
   { cli: 'chat', mcp: 'chat_with_agent', what: 'Send a message to a saved voice agent' },
   { cli: 'translate', mcp: 'translate_speech', what: 'Translate text or a recording and speak it' },

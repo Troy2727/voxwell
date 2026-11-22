@@ -29,6 +29,33 @@ test('convert voice: re-speak a recording in a saved voice', async ({ app: page,
   await expectAudio(page, 1);
 });
 
+test('convert video: swap the voice in a video for a saved voice', async ({ app: page, mode }) => {
+  const voice = await ensureVoice(page, mode);
+  const panel = await openTool(page, 'Convert video');
+  await dropFile(page, 'video.mp4', panel);
+  await pickVoice(page, mode === 'mock' ? 'Narrator' : voice, panel);
+  await panel.getByRole('button', { name: 'Convert video' }).click();
+  await expect(panel.locator('video[src]')).toBeVisible({ timeout: mode === 'real' ? 600_000 : 10_000 });
+  await expect(panel.getByRole('link', { name: 'Download video' })).toBeVisible();
+  for (const width of [390, 768, 1024, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth === window.innerWidth), { message: `no sideways scroll at ${width} px` }).toBe(true);
+  }
+});
+
+test('convert video: when the video cannot be rebuilt, the audio and the reason are shown', async ({ app: page, mode }) => {
+  test.skip(mode === 'real', 'stubs the reply');
+  await page.route('**/api/tools/convert-video', (route) =>
+    route.fulfill({ json: { url: '/mock/tone.wav', video_url: null, seconds: 2, notes: ['The video could not be rebuilt with the new voice, so this is the converted audio instead. Your original file is unchanged.'] } }));
+  const panel = await openTool(page, 'Convert video');
+  await dropFile(page, 'video.mp4', panel);
+  await pickVoice(page, 'Narrator', panel);
+  await panel.getByRole('button', { name: 'Convert video' }).click();
+  await expect(panel.getByText('The video could not be rebuilt with the new voice')).toBeVisible();
+  await expect(panel.locator('video')).toHaveCount(0);
+  await expectAudio(page, 0.5);
+});
+
 test('isolate voice: split a song into the voice and the background', async ({ app: page }) => {
   const panel = await openTool(page, 'Isolate voice');
   await dropFile(page, 'song.wav', panel);

@@ -254,7 +254,7 @@ def test_mcp_handshake_and_tool_list(mcp):
     assert init["result"]["protocolVersion"] == "2025-03-26" and "tools" in init["result"]["capabilities"]
     assert mcp_server.handle({"jsonrpc": "2.0", "method": "notifications/initialized"}) is None
     names = {t["name"] for t in mcp("tools/list")["result"]["tools"]}
-    assert names == {"list_voices", "voice_collections", "speak", "generate_sound", "make_music", "transcribe", "edit_transcript", "align_script", "isolate_voice", "clone_voice", "design_voice", "remix_voice", "convert_voice", "dub_video", "manage_pronunciations", "apply_effects", "translate_speech", "chat_with_agent"}
+    assert names == {"list_voices", "voice_collections", "speak", "generate_sound", "make_music", "transcribe", "edit_transcript", "align_script", "isolate_voice", "clone_voice", "design_voice", "remix_voice", "convert_voice", "convert_video", "dub_video", "manage_pronunciations", "apply_effects", "translate_speech", "chat_with_agent"}
     assert names == set(mcp_server.HANDLERS)
     assert mcp("ping")["result"] == {}
     assert mcp("resources/list")["error"]["code"] == -32601
@@ -264,7 +264,8 @@ def test_integrations_page_lists_every_tool():
     """The page's tool table is static (it must show while the backend is offline), so keep it in step."""
     page = (integrations_router.BACKEND_DIR.parent / "app/src/features/integrations/Page.tsx").read_text(encoding="utf-8")
     assert set(re.findall(r"mcp: '(\w+)'", page)) == set(mcp_server.HANDLERS)
-    assert set(re.findall(r"cli: '(\w+)'", page)) == {n[4:] for n in dir(cli) if n.startswith("cmd_")} - {"status"}
+    # cmd_convert_video is the command convert-video.
+    assert set(re.findall(r"cli: '([\w-]+)'", page)) == {n[4:].replace("_", "-") for n in dir(cli) if n.startswith("cmd_")} - {"status"}
 
 
 def test_mcp_speak_saves_a_wav(mcp, fake_tts, tmp_path):
@@ -618,3 +619,20 @@ def test_a_skipped_transcription_answers_499_and_cleans_up(monkeypatch, isolated
     monkeypatch.setattr(openai_api, "_transcribe", after_the_watcher)
     assert transcribe().status_code == 499
     assert not list((isolated_data_dir / "integrations").glob("*.audio"))
+
+
+def test_mcp_convert_video(mcp, monkeypatch, tmp_path, isolated_data_dir):
+    from voxwell.features.tools import engine as tools_engine
+    from voxwell.features.tools import isolation
+
+    clip = tmp_path / "clip.mp4"
+    clip.write_bytes(b"\x00\x00 a video")
+    voices.save_voice("Anna", wav_bytes(), "upload")
+    monkeypatch.setattr(tools_engine, "video_streams", lambda path: (0, True))
+    monkeypatch.setattr(tools_engine, "extract_soundtrack", lambda video, out, limit: out.write_bytes(wav_bytes()))
+    monkeypatch.setattr(isolation, "isolate", lambda s, v, b: (v.write_bytes(wav_bytes()), b.write_bytes(wav_bytes())))
+    monkeypatch.setattr(tools_engine, "convert", lambda source, target: wav_bytes())
+    monkeypatch.setattr(tools_engine, "rebuild_video", lambda video, track, out, picture: out.write_bytes(b"an mp4"))
+    result = tool(mcp, "convert_video", file_path=str(clip), voice="anna")
+    assert result["isError"] is False
+    assert (isolated_data_dir / "mcp" / "clip.converted.mp4").read_bytes() == b"an mp4"

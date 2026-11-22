@@ -203,7 +203,7 @@ Voxwell is **MIT licensed**, and every model it runs allows commercial use ([one
 | --- | --- |
 | **Voice agents** | Talk with a local AI model, live or push-to-talk. It answers in a saved voice and can use a few safe, read-only tools: the time, a calculator and your saved voices. With **Language follow** on, it answers in whichever of its languages you switch to when you talk to it, in the same voice. In a live conversation, **Flow replies** speaks each sentence as soon as it is written, instead of after the whole answer, and with **Cut-in** you can talk over it to stop it. With **Mood match** on, its voice follows the mood of what you say. |
 | **AI direction** | Describe how a line should sound, and a local AI model sets the delivery. |
-| **Voice tools** | Convert a recording to another voice, isolate a voice from music and noise, compare voices, fit audio to a length, inspect media files. |
+| **Voice tools** | Convert a recording to another voice, swap the voice in a video for a saved one (picture and background stay), isolate a voice from music and noise, compare voices, fit audio to a length, inspect media files. |
 | **Projects** | Everything you make, in one list. |
 
 <br/>
@@ -313,7 +313,7 @@ Model weights download on first use of each feature.
 
 The app's **Integrations** page shows how to connect each of these.
 
-**Command line.** The `voxwell` command can speak, transcribe, edit, align, isolate, clone, design, convert, dub, translate and chat with an agent. Add `--json` to any command for one JSON object per run, ready for scripts.
+**Command line.** The `voxwell` command can speak, transcribe, edit, align, isolate, clone, design, convert recordings and videos, dub, translate and chat with an agent. Add `--json` to any command for one JSON object per run, ready for scripts.
 
 ```sh
 voxwell speak "Welcome to the show." --voice Narrator -o welcome.wav

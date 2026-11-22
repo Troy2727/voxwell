@@ -292,3 +292,199 @@ def test_old_results_are_cleaned_up(monkeypatch, isolated_data_dir):
 @pytest.mark.parametrize("bad", ["0" * 32, "..", "%2e%2e%2fsecret"])
 def test_unknown_results(bad):
     assert client.get(f"/api/tools/audio/{bad}").status_code in (404, 405)
+
+
+# --- Convert video ---------------------------------------------------------------------------------
+
+from voxwell.features.dubbing.ffmpeg import DubbingError  # noqa: E402
+from voxwell.features.tools import router as tools_router  # noqa: E402
+
+
+def stereo_wav(seconds: float, level: float = 0.1, rate: int = 44100) -> bytes:
+    import numpy as np
+    import soundfile as sf
+
+    t = np.arange(int(seconds * rate)) / rate
+    tone = (level * np.sin(2 * np.pi * 220 * t)).astype("float32")
+    buf = io.BytesIO()
+    sf.write(buf, np.stack([tone, tone], axis=1), rate, format="WAV", subtype="PCM_16")
+    return buf.getvalue()
+
+
+@pytest.fixture
+def fake_video(monkeypatch):
+    """Everything around the models faked: a 2 s video with sound, isolation and conversion."""
+    calls = {"convert": [], "isolate": 0, "rebuild": 0}
+    monkeypatch.setattr(engine, "video_streams", lambda path: (0, True))
+    monkeypatch.setattr(engine, "extract_soundtrack", lambda video, out, limit: out.write_bytes(stereo_wav(2)))
+
+    def fake_isolate(source, voice_out, background_out):
+        calls["isolate"] += 1
+        voice_out.write_bytes(stereo_wav(2, 0.2))
+        background_out.write_bytes(stereo_wav(2, 0.05))
+        return 2.0
+
+    def fake_convert(source, target):
+        calls["convert"].append(duration(source.read_bytes()))
+        return wav_bytes(duration(source.read_bytes()), 24000)
+
+    def fake_rebuild(video, track, out, picture):
+        calls["rebuild"] += 1
+        out.write_bytes(b"an mp4")
+
+    monkeypatch.setattr(isolation, "isolate", fake_isolate)
+    monkeypatch.setattr(engine, "convert", fake_convert)
+    monkeypatch.setattr(engine, "rebuild_video", fake_rebuild)
+    return calls
+
+
+def convert_video(voice_id, data=b"\x00\x00\x00\x18ftypmp42 a video"):
+    return client.post("/api/tools/convert-video", files={"file": ("clip.mp4", data)}, data={"voice_id": voice_id})
+
+
+def test_piece_bounds_cut_long_speech_in_its_quiet_moments():
+    import numpy as np
+
+    rate = 1000
+    track = np.ones(60 * rate, dtype="float32")
+    for gap in (22, 44):  # a quiet moment in the last 5 s of each 25 s stretch
+        track[gap * rate : gap * rate + 100] = 0
+    bounds = engine.piece_bounds(track, rate)
+    assert len(bounds) == 3 and all(end - start <= 25 * rate for start, end in bounds)
+    assert bounds[0][0] == 0 and bounds[-1][1] == len(track)
+    assert all(a[1] == b[0] for a, b in zip(bounds, bounds[1:]))  # nothing lost or repeated
+    assert all(track[start] == 0 for start, _ in bounds[1:])  # every cut is in a quiet moment
+    assert engine.piece_bounds(np.ones(20 * rate), rate) == [(0, 20 * rate)]
+    assert engine.piece_bounds(np.ones(25 * rate), rate) == [(0, 25 * rate)]
+
+
+def test_mixing_keeps_the_background_level_and_never_clips(tmp_path):
+    import numpy as np
+    import soundfile as sf
+
+    bed = tmp_path / "bed.wav"
+    bed.write_bytes(stereo_wav(1, 0.1))
+    out = tmp_path / "mix.wav"
+    engine.mix_voice(bed, np.zeros(24000, dtype="float32"), 24000, out)
+    mixed, rate = sf.read(str(out), dtype="float32")
+    original, _ = sf.read(str(bed), dtype="float32")
+    assert rate == 44100 and mixed.shape == original.shape
+    assert abs(20 * np.log10(np.abs(mixed).max() / np.abs(original).max())) < 1
+    engine.mix_voice(bed, np.ones(24000, dtype="float32"), 24000, out)
+    assert np.abs(sf.read(str(out), dtype="float32")[0]).max() <= engine.MIX_CEILING + 1e-3
+    # A loud voice doesn't turn the background down where the voice is silent.
+    voice = np.zeros(44100, dtype="float32")
+    voice[:4410] = 1.0
+    engine.mix_voice(bed, voice, 44100, out)
+    tail = sf.read(str(out), dtype="float32")[0][22050:]
+    np.testing.assert_allclose(tail, original[22050:], atol=1e-3)
+
+
+def test_convert_video_swaps_the_voice_and_keeps_the_picture(fake_video):
+    voice = voices.save_voice("Target", wav_bytes(1), "upload")
+    r = convert_video(voice.id)
+    body = r.json()
+    assert r.status_code == 200, body
+    assert body["notes"] == [] and body["video_url"].startswith("/api/tools/video/")
+    assert client.get(body["video_url"]).content == b"an mp4"
+    assert duration(client.get(body["url"]).content) == pytest.approx(2, abs=0.01)
+    assert fake_video["convert"] == [pytest.approx(2, abs=0.01)]  # a short track is one call, like Convert voice
+
+
+def test_without_isolation_the_whole_soundtrack_is_converted(fake_video, monkeypatch):
+    def offline(*a):
+        raise isolation.IsolationError("Could not download the voice isolation model: offline")
+
+    monkeypatch.setattr(isolation, "isolate", offline)
+    body = convert_video(voices.save_voice("Target", wav_bytes(1), "upload").id).json()
+    assert body["notes"] == [tools_router.NOTE_WHOLE_SOUNDTRACK] and body["video_url"]
+    assert len(fake_video["convert"]) == 1
+
+
+@pytest.mark.parametrize("error", [DubbingError("ffmpeg could not process the file; see the Voxwell log."), OSError("disk full")])
+def test_a_video_that_cannot_be_rebuilt_comes_back_as_audio(fake_video, monkeypatch, error):
+    def cannot(*a):
+        raise error
+
+    monkeypatch.setattr(engine, "rebuild_video", cannot)
+    body = convert_video(voices.save_voice("Target", wav_bytes(1), "upload").id).json()
+    assert body["video_url"] is None and body["notes"] == [tools_router.NOTE_AUDIO_ONLY]
+    assert duration(client.get(body["url"]).content) > 0
+
+
+def test_convert_video_refusals(fake_video, monkeypatch):
+    voice = voices.save_voice("Target", wav_bytes(1), "upload").id
+    assert convert_video("000000000000").json() == {"detail": "Pick a saved voice."}
+    monkeypatch.setattr(engine, "video_streams", lambda path: (None, True))
+    assert convert_video(voice).json()["detail"] == "This file has no video picture. Use Convert voice for audio files."
+    monkeypatch.setattr(engine, "video_streams", lambda path: (0, False))
+    assert convert_video(voice).json()["detail"] == "This video has no audio track to convert."
+    monkeypatch.setattr(engine, "video_streams", lambda path: (0, True))
+    monkeypatch.setattr(tools_router, "MAX_ISOLATE_SECONDS", 1)
+    assert convert_video(voice).json()["detail"] == "Use a video of up to 0 minutes."
+    monkeypatch.setattr(tools_router, "MAX_ISOLATE_SECONDS", 600)
+    monkeypatch.setattr(isolation, "isolate", lambda s, v, b: (v.write_bytes(stereo_wav(2, 0)), b.write_bytes(stereo_wav(2, 0))))
+    r = convert_video(voice)
+    assert (r.status_code, r.json()["detail"]) == (422, "No speech was found, so there is nothing to convert.")
+    monkeypatch.setattr(tools_router, "MAX_VIDEO_UPLOAD", 10)
+    assert convert_video(voice, b"\x00" * 100).status_code == 413
+
+
+def test_text_is_never_read_as_a_video(fake_video, monkeypatch, tmp_path):
+    monkeypatch.undo()  # the real stream check
+    secret = tmp_path / "secret.ts"
+    secret.write_bytes(b"\x00" * 10)
+    playlist = f"#EXTM3U\n#EXTINF:1,\n{secret}\n#EXT-X-ENDLIST\n".encode()
+    voice = voices.save_voice("Target", wav_bytes(1), "upload").id
+    for data in (playlist, b"ffconcat version 1.0\nfile 'x.mp4'\n", b""):
+        r = convert_video(voice, data)
+        assert (r.status_code, r.json()["detail"]) == (422, engine.NOT_A_VIDEO)
+
+
+def test_a_conversion_error_is_a_plain_500(fake_video, monkeypatch):
+    def boom(*a):
+        raise RuntimeError("weights at C:/secret")
+
+    monkeypatch.setattr(engine, "convert", boom)
+    r = convert_video(voices.save_voice("Target", wav_bytes(1), "upload").id)
+    assert r.status_code == 500 and r.json()["detail"] == "Voice conversion failed; see the Voxwell log."
+
+
+def test_old_videos_are_cleaned_up(fake_video, isolated_data_dir):
+    old = isolated_data_dir / "tools" / ("a" * 32 + ".mp4")
+    old.parent.mkdir(parents=True, exist_ok=True)
+    old.write_bytes(b"old")
+    os.utime(old, (time.time() - 2 * 86400,) * 2)
+    convert_video(voices.save_voice("Target", wav_bytes(1), "upload").id)
+    assert not old.exists()
+
+
+@pytest.mark.parametrize("bad", ["0" * 32, "..", "%2e%2e%2fsecret"])
+def test_unknown_videos(bad):
+    assert client.get(f"/api/tools/video/{bad}").status_code in (404, 405)
+
+
+@needs_ffmpeg
+def test_convert_video_with_real_ffmpeg(monkeypatch, tmp_path):
+    video = tmp_path / "talk.mp4"
+    subprocess.run([shutil.which("ffmpeg"), "-loglevel", "error", "-f", "lavfi", "-i", "color=s=160x120:d=2:r=10",
+                    "-f", "lavfi", "-i", "sine=frequency=300:duration=2", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", str(video)], check=True)
+
+    def fake_isolate(source, voice_out, background_out):
+        data = source.read_bytes()
+        voice_out.write_bytes(data)
+        background_out.write_bytes(data)
+        return 2.0
+
+    monkeypatch.setattr(isolation, "isolate", fake_isolate)
+    monkeypatch.setattr(engine, "convert", lambda source, target: wav_bytes(duration(source.read_bytes()), 24000))
+    body = convert_video(voices.save_voice("Target", wav_bytes(1), "upload").id, video.read_bytes()).json()
+    assert body["notes"] == [] and body["video_url"]
+    out = tmp_path / "out.mp4"
+    out.write_bytes(client.get(body["video_url"]).content)
+    streams = engine.probe(out)["streams"]
+    assert [s["type"] for s in streams] == ["video", "audio"] and "AAC" in streams[1]["codec"]
+    audio_only = tmp_path / "a.wav"
+    audio_only.write_bytes(wav_bytes(1))
+    r = convert_video(voices.save_voice("Other", wav_bytes(1), "upload").id, audio_only.read_bytes())
+    assert r.json()["detail"] == "This file has no video picture. Use Convert voice for audio files."
