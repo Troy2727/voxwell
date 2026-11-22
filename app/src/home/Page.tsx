@@ -8,6 +8,8 @@ import { EmptyState, Muted, Section } from '@/components/page';
 import { PhoneDictation, savedPhoneAddress } from '@/components/phone-dictation';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { INSTALL_URL } from '@/lib/links';
 import { cn } from '@/lib/utils';
@@ -78,6 +80,36 @@ function PlayButton({ name, src, clip }: { name: string; src: string; clip: Retu
     <Button variant="ghost" size="icon" className="size-11 shrink-0 md:size-9" aria-label={`${playing ? 'Pause' : 'Play'} ${name}`} onClick={() => clip.toggle(src)}>
       {playing ? <Pause /> : <Play />}
     </Button>
+  );
+}
+
+/** Desktop app only: closing the window can hide Voxwell in the system tray instead of quitting. */
+function RunInBackground({ bridge }: { bridge: VoxwellBridge['background'] }) {
+  const [on, setOn] = useState<boolean | null>(null);
+  useEffect(() => {
+    bridge.get().then(setOn, () => setOn(false));
+  }, [bridge]);
+  if (on === null) return null; // No flash of the wrong state while it loads.
+
+  const change = (next: boolean) => {
+    setOn(next);
+    bridge.set(next).then(setOn, (e: unknown) => {
+      setOn(!next);
+      toast.error(String(e).includes('tray icon') ? "This computer can't show a tray icon." : "Couldn't save this setting. Try again.");
+    });
+  };
+  return (
+    <Section title="Desktop app">
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-2">
+          <Checkbox id="run-in-background" checked={on} onCheckedChange={(v) => change(v === true)} />
+          <Label htmlFor="run-in-background">Run in background</Label>
+        </div>
+        <p className="text-muted-foreground text-xs">
+          Closing the window hides Voxwell in the system tray instead of quitting, so running jobs keep going. Open it again from the tray icon. Quit from the tray menu. On some Linux desktops the tray icon needs extra desktop support; opening Voxwell again also brings the window back.
+        </p>
+      </div>
+    </Section>
   );
 }
 
@@ -283,6 +315,8 @@ export function HomePage({ name, online, onOpen, onRetry }: { name?: string; onl
           </Button>
         </Section>
       </div>
+
+      {window.voxwell?.background && <RunInBackground bridge={window.voxwell.background} />}
     </section>
   );
 }
