@@ -10,6 +10,7 @@ import threading
 import wave
 from pathlib import Path
 
+from voxwell.features.audio_effects import pause_fill
 from voxwell.features.audio_effects.dsp import Effects, apply_to_wav
 from voxwell.features.pronunciation import store as pronunciation
 from voxwell.features.voice_cloning import cues as cue_tags
@@ -371,6 +372,7 @@ def synthesize(
     cfg_weight: float = 0.5,
     effects: Effects | None = None,
     cues: bool = True,
+    natural_pauses: bool = False,
 ) -> bytes:
     """Return WAV bytes of `text` spoken in the voice of `reference_audio` (a default voice if None).
 
@@ -378,6 +380,7 @@ def synthesize(
     intensity; a lower `cfg_weight` (0-1) gives slower, more deliberate delivery. The defaults
     are Chatterbox's own. The language's pronunciation dictionary is applied to `text` first.
     `[pause]` or `[pause 2.5]` in `text` becomes that many seconds of silence (at most MAX_PAUSE).
+    With `natural_pauses`, those pauses carry the speech's own quiet background instead of silence.
     `effects` (speed, pitch, reverb, distance, noise, pan) is applied to the finished audio; without
     it, or with neutral settings, the bytes are exactly the model's.
 
@@ -395,18 +398,18 @@ def synthesize(
             log.warning("This voice can't be used with cue tags (its clip must be longer than %s seconds); they are left out.", TURBO_MIN_REFERENCE)
         elif (turbo := _load_turbo()) is not None:
             try:
-                out = _speak(text, language, reference_audio, turbo, {})
+                out = _speak(text, language, reference_audio, turbo, {}, natural_pauses)
             except Exception:
                 # E.g. a clip just over the limit by its header but not after Turbo resamples it.
                 log.exception("Chatterbox-Turbo could not speak this; cue tags are left out.")
                 _turbo_rejected.add(str(reference_audio))
     if out is None:
         multilingual = {"language_id": language, "exaggeration": exaggeration, "cfg_weight": cfg_weight}
-        out = _speak(text, language, reference_audio, None, multilingual)
+        out = _speak(text, language, reference_audio, None, multilingual, natural_pauses)
     return apply_to_wav(out, effects) if effects is not None else out
 
 
-def _speak(text: str, language: str, reference_audio: Path | None, turbo, kwargs: dict) -> bytes:
+def _speak(text: str, language: str, reference_audio: Path | None, turbo, kwargs: dict, natural: bool = False) -> bytes:
     """synthesize() with Turbo (`turbo`, the loaded model) or, when it is None, Multilingual."""
     import numpy as np
 
@@ -436,8 +439,8 @@ def _speak(text: str, language: str, reference_audio: Path | None, turbo, kwargs
                     model.conds = model.voxwell_default_conds  # not the voice of an earlier call
                 audio.append(_flat(model.generate(part, **kwargs)))
         else:
-            audio.append(np.zeros(int(part * model.sr), dtype=np.float32))
-    return _to_wav(np.concatenate(audio), model.sr)
+            audio.append(int(part * model.sr) if natural else np.zeros(int(part * model.sr), dtype=np.float32))
+    return _to_wav(pause_fill.join(audio, model.sr) if natural else np.concatenate(audio), model.sr)
 
 
 SAMPLE_RATE = 24000  # both Chatterbox models' output rate (their .sr); see test_model_api_contracts
@@ -451,11 +454,11 @@ def silent_clip() -> bytes:
     return _to_wav(np.zeros(int(SKIPPED_LINE * SAMPLE_RATE), dtype=np.float32), SAMPLE_RATE)
 
 
-def synthesize_line(text: str, language: str, reference_audio: Path | None = None) -> bytes:
+def synthesize_line(text: str, language: str, reference_audio: Path | None = None, **options) -> bytes:
     """synthesize() for one line of a longer job (dubbing, stories): a line with nothing left to say
     once its cue tags are removed ("[Music]" in a transcript) becomes a short silence, so the job goes on."""
     try:
-        return synthesize(text, language, reference_audio)
+        return synthesize(text, language, reference_audio, **options)
     except NothingToSay:
         log.info("Skipped a line with only cue tags: %r", text[:80])
         return silent_clip()

@@ -18,6 +18,7 @@ from pathlib import Path
 
 from voxwell import voices
 from voxwell.errors import user_message
+from voxwell.features.audio_effects import pause_fill
 from voxwell.features.audiobook import tone
 from voxwell.features.audiobook.chunking import chapter_chunks
 from voxwell.features.audiobook.importer import Chapter
@@ -56,6 +57,7 @@ class Book:
     percent: int = 0
     error: str | None = None
     tone_memory: bool = False  # steady delivery across each chapter (see tone)
+    natural_pauses: bool = False  # pauses carry the chapter's quiet background, not silence
 
 
 _books: dict[str, Book] = {}
@@ -167,7 +169,7 @@ def _join(parts: list[tuple[bytes, float]]) -> bytes:
 
 def render_text(
     paragraphs: list[list[str]], language: str, reference: Path | None, progress=None,
-    deliveries: list | None = None, settings: dict | None = None,
+    deliveries: list | None = None, settings: dict | None = None, natural_pauses: bool = False,
 ) -> bytes:
     """How the text is read: `deliveries`, one tone.Delivery per paragraph, or `settings` for every
     synthesize() call (e.g. exaggeration); with neither, the engine's defaults."""
@@ -179,6 +181,8 @@ def render_text(
                 progress(len(parts), total)
             last_in_paragraph = c_index == len(paragraph) - 1
             chunk_settings = tone.engine_args(deliveries[p_index]) if deliveries else (settings or {})
+            if natural_pauses:
+                chunk_settings = {**chunk_settings, "natural_pauses": True}
             try:
                 clip = engine.synthesize(chunk, language, reference, **chunk_settings)
             except engine.NothingToSay:  # only cue tags in this chunk; the rest of the text goes on
@@ -186,6 +190,8 @@ def render_text(
             parts.append((clip, PARAGRAPH_PAUSE if last_in_paragraph else SENTENCE_PAUSE))
     if total and skipped == total:
         raise engine.NothingToSay("Nothing to say after removing cue tags.")
+    if natural_pauses and parts:  # the whole text (a chapter) is the take its gaps match
+        return pause_fill.join_wavs([*parts[:-1], (parts[-1][0], 0)])
     return _join(parts)
 
 
@@ -204,7 +210,7 @@ def preview(book: Book, index: int) -> bytes:
         if size >= PREVIEW_CHARS or len(take) < len(paragraph):
             break
     deliveries = tone.plan_chapter(paragraphs, count=len(kept))[0] if book.tone_memory else None
-    return render_text(kept, book.language, _reference(book.voice), deliveries=deliveries)
+    return render_text(kept, book.language, _reference(book.voice), deliveries=deliveries, natural_pauses=book.natural_pauses)
 
 
 def _work(book: Book) -> None:
@@ -228,7 +234,7 @@ def _work(book: Book) -> None:
                     deliveries, raw = tone.plan_chapter(paragraphs)
                     log.info("Tone memory for %r: raw %s, smoothed %s", ch.title, tone.stats(raw), tone.stats(deliveries))
                 try:
-                    audio = render_text(paragraphs, book.language, reference, progress, deliveries)
+                    audio = render_text(paragraphs, book.language, reference, progress, deliveries, natural_pauses=book.natural_pauses)
                 except engine.NothingToSay:  # a chapter of only cue tags: a short silence, not a book stuck in error
                     audio = engine.silent_clip()
                 chapter_audio(book, index).write_bytes(audio)

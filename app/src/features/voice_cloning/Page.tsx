@@ -7,6 +7,7 @@ import { ChoiceSelect } from '@/components/choice-select';
 import { EffectsControls, isNeutral, NO_EFFECTS, reviveEffects } from '@/components/effects-controls';
 import { ApprovalCard } from '@/components/approval-card';
 import { FileDrop } from '@/components/file-drop';
+import { NaturalPauses } from '@/components/natural-pauses';
 import { ErrorAlert, Field, message, Page as PageLayout, Section } from '@/components/page';
 import { usePromptMenu, type PromptItem } from '@/components/prompt-menu';
 import { VoiceSelect } from '@/components/voice-select';
@@ -34,6 +35,7 @@ export default function Page() {
   const [text, setText] = useState('');
   const [language, setLanguage] = usePersisted('voxwell.voice_cloning.language', 'en');
   const [fx, setFx] = usePersisted('voxwell.voice_cloning.effects', NO_EFFECTS, reviveEffects);
+  const [naturalPauses, setNaturalPauses] = usePersisted('voxwell.voice_cloning.natural_pauses', false, (saved) => saved === true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [audioUrl, setAudioUrl] = useState('');
@@ -138,7 +140,7 @@ export default function Page() {
       const res = await api<{ id: string; url: string; cues_ignored?: boolean }>('/api/voice_cloning/synthesize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, language, voice_id: voiceId || null, effects: isNeutral(fx) ? null : fx }),
+        body: JSON.stringify({ text, language, voice_id: voiceId || null, effects: isNeutral(fx) ? null : fx, natural_pauses: naturalPauses }),
       });
       setAudioUrl(apiUrl(res.url));
       if (res.cues_ignored) {
@@ -221,6 +223,7 @@ export default function Page() {
           ))}
           {cuesHere && <CuePicker groups={cues.groups} disabled={busy || !cues.available} onPick={insertTag} />}
         </div>
+        <NaturalPauses checked={naturalPauses} onChange={setNaturalPauses} disabled={busy} />
         <EffectsControls value={fx} onChange={setFx} disabled={busy} resettable />
         <div>
           <Button disabled={busy || !text.trim()} onClick={generate}>

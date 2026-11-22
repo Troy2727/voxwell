@@ -30,6 +30,7 @@ class StoryRequest(BaseModel):
     script: str
     cast: dict[str, str] = {}  # speaker -> voice id; missing speakers use the default voice
     effects: Effects | None = None
+    natural_pauses: bool = False
 
 
 def summary(job: jobs.Job) -> dict:
@@ -79,7 +80,7 @@ def create_job(req: StoryRequest):
                 raise HTTPException(422, f"Unknown voice for {speaker}.")
         cast[speaker] = voice
     title = req.title.strip()[:MAX_TITLE] or lines[0].text[:60]
-    job = jobs.create(title, req.language, req.script, cast, req.effects.model_dump() if req.effects else None)
+    job = jobs.create(title, req.language, req.script, cast, req.effects.model_dump() if req.effects else None, natural_pauses=req.natural_pauses)
     jobs.start(job)
     return {"id": job.id}
 

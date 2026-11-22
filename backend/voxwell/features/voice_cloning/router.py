@@ -28,6 +28,7 @@ class SynthesizeRequest(BaseModel):
     language: str = "en"
     voice_id: str | None = None
     effects: Effects | None = None
+    natural_pauses: bool = False  # pauses carry the speech's quiet background, not silence
 
 
 @router.get("/status")
@@ -88,6 +89,8 @@ def synthesize(req: SynthesizeRequest):
             raise HTTPException(404, "Unknown voice.")
     try:
         extra = {"effects": req.effects} if req.effects else {}
+        if req.natural_pauses:
+            extra["natural_pauses"] = True
         wav = engine.synthesize(text, req.language, reference, **extra)
     except engine.NothingToSay:
         raise HTTPException(422, "Nothing to say after removing cue tags.")

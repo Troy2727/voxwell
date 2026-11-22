@@ -21,6 +21,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { NaturalPauses } from '@/components/natural-pauses';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { LANGUAGES } from '../voice_cloning/languages';
@@ -33,6 +34,9 @@ interface ChapterInfo {
   audio_url: string | null;
 }
 
+/** The settings that change how the book sounds: changing one renders the chapters again. */
+type SoundSettings = { language?: string; voice?: string; tone_memory?: boolean; natural_pauses?: boolean };
+
 interface Book {
   id: string;
   title: string;
@@ -40,6 +44,7 @@ interface Book {
   language: string;
   voice: string;
   tone_memory: boolean;
+  natural_pauses: boolean;
   state: 'draft' | 'queued' | 'running' | 'paused' | 'done' | 'error';
   step: string;
   percent: number;
@@ -142,7 +147,7 @@ function BookEditor({ book, voices, onChanged }: { book: Book; voices: Voice[]; 
   const [preview, setPreview] = useState<{ chapter: number; url: string } | null>(null);
   const [previewing, setPreviewing] = useState<number | null>(null);
   // Changing the sound after rendering throws finished chapters away, so ask first.
-  const [pending, setPending] = useState<{ language?: string; voice?: string; tone_memory?: boolean } | null>(null);
+  const [pending, setPending] = useState<SoundSettings | null>(null);
   const locked = working(book);
   const rendered = book.chapters.some((c) => c.status === 'done');
 
@@ -161,7 +166,7 @@ function BookEditor({ book, voices, onChanged }: { book: Book; voices: Voice[]; 
 
   const patch = (body: object) => run(() => sendJson(`/api/audiobook/books/${book.id}`, 'PATCH', body));
 
-  const changeSound = (body: { language?: string; voice?: string; tone_memory?: boolean }) => (rendered ? setPending(body) : void patch(body));
+  const changeSound = (body: SoundSettings) => (rendered ? setPending(body) : void patch(body));
 
   const toggle = (index: number) =>
     patch({ chapters: book.chapters.map((c, i) => ({ include: i === index ? !c.include : c.include })) });
@@ -216,6 +221,7 @@ function BookEditor({ book, voices, onChanged }: { book: Book; voices: Voice[]; 
           </span>
         </span>
       </label>
+      <NaturalPauses checked={book.natural_pauses} disabled={locked || busy} onChange={(on) => changeSound({ natural_pauses: on })} />
 
       <Card className="max-h-[360px] gap-0 overflow-auto py-0">
         <CardContent className="divide-y px-0">
@@ -270,7 +276,7 @@ function BookEditor({ book, voices, onChanged }: { book: Book; voices: Voice[]; 
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Render every chapter again?</AlertDialogTitle>
-            <AlertDialogDescription>Changing the voice, language or tone memory means every chapter is rendered again.</AlertDialogDescription>
+            <AlertDialogDescription>Changing the voice, language, tone memory or natural pauses means every chapter is rendered again.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
