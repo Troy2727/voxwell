@@ -151,6 +151,12 @@ Voxwell is **MIT licensed**, and every model it runs allows commercial use ([one
 | **Mic check** | Dictation | If your microphone hears nothing, you're warned while you're still recording. |
 | **Dictation clean-up** | Dictation | A local AI model removes filler words, fixes punctuation, or makes the text formal or concise, with the original one click away. |
 
+### New: everyday work
+
+| Feature | Where | What it does |
+| --- | --- | --- |
+| **Run in background** | Home (desktop app) | Turn it on and closing the window keeps Voxwell working from the system tray, so running jobs and the dictation shortcut carry on. Quit from the tray menu. |
+
 ### Voices
 
 | Feature | What it does |
