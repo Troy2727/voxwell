@@ -503,7 +503,7 @@ test.describe('run in background', () => {
   test('a plain browser shows no Run in background control', async ({ app: page }) => {
     await expect(page.getByText('Running on this computer', { exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Desktop app' })).toHaveCount(0);
-    await expect(page.getByRole('checkbox', { name: 'Run in background' })).toHaveCount(0);
+    await expect(page.getByRole('switch', { name: 'Run in background' })).toHaveCount(0);
   });
 
   test('the desktop app saves it, and a failed save puts it back and says so', async ({ page }) => {
@@ -529,7 +529,7 @@ test.describe('run in background', () => {
       });
     });
     await page.goto('/');
-    const box = page.getByRole('checkbox', { name: 'Run in background' });
+    const box = page.getByRole('switch', { name: 'Run in background' });
     await expect(box).not.toBeChecked();
     for (const width of [390, 768, 1024, 1440]) {
       await page.setViewportSize({ width, height: 900 });

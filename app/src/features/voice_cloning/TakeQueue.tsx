@@ -1,15 +1,10 @@
-import { AlertCircle, Check, Clock, Loader2, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { Section } from '@/components/page';
+import { TaskRow, type TaskState } from '@/components/task-row';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
 import { clearFinished, removeTake, removeWaiting, takeLabel, type Take } from './queue';
 
-const ICONS = {
-  waiting: { icon: Clock, className: 'text-muted-foreground' },
-  running: { icon: Loader2, className: 'text-primary animate-spin' },
-  done: { icon: Check, className: 'text-success' },
-  failed: { icon: AlertCircle, className: 'text-destructive' },
-};
+const STATES: Record<Take['status'], TaskState> = { waiting: 'queued', running: 'running', done: 'done', failed: 'failed' };
 
 const WORDS = { waiting: 'Waiting', running: 'Generating', done: 'Done', failed: 'Failed' };
 
@@ -34,22 +29,23 @@ export function TakeQueue({ takes }: { takes: Take[] }) {
       <p className="sr-only" aria-live="polite">{waiting} waiting</p>
       <ol className="max-h-56 divide-y overflow-y-auto">
         {takes.map((t) => {
-          const { icon: Icon, className } = ICONS[t.status];
           const label = takeLabel(t.text);
-          const state = t.status === 'waiting' ? `Position ${++place}` : WORDS[t.status];
+          const status = t.status === 'waiting' ? `Position ${++place}` : WORDS[t.status];
           return (
-            <li key={t.id} className="flex items-start gap-3 py-2">
-              <Icon className={cn('mt-0.5 size-4 shrink-0', className)} aria-hidden />
-              <div className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate text-sm font-medium">{label}</span>
-                <span className="text-muted-foreground text-xs">{t.voiceName} · {state}</span>
-                {t.error && <span role="alert" className="text-destructive line-clamp-2 text-xs break-words">{t.error}</span>}
-              </div>
-              {t.status === 'waiting' && (
-                <Button variant="ghost" size="icon" className="size-8 shrink-0" aria-label={`Drop this take: ${label}`} onClick={() => removeTake(t.id)}>
-                  <X />
-                </Button>
-              )}
+            <li key={t.id}>
+              <TaskRow
+                name={label}
+                state={STATES[t.status]}
+                status={status}
+                detail={t.error ?? `Voice: ${t.voiceName}`}
+                action={
+                  t.status === 'waiting' && (
+                    <Button variant="ghost" size="icon" className="size-7 shrink-0" aria-label={`Drop this take: ${label}`} onClick={() => removeTake(t.id)}>
+                      <X />
+                    </Button>
+                  )
+                }
+              />
             </li>
           );
         })}
