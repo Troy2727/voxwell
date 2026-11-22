@@ -28,6 +28,11 @@ contextBridge.exposeInMainWorld('voxwell', {
     },
     overlayAction: (action) => ipcRenderer.send('dictation:overlay-action', action),
   },
+  // Run in background: closing the window hides Voxwell in the tray. Both resolve to the saved value.
+  background: {
+    get: () => ipcRenderer.invoke('background:get'),
+    set: (enabled) => ipcRenderer.invoke('background:set', enabled),
+  },
   auth: {
     // Main process sends voxwell://auth/callback links (from account emails and Google) here,
     // including one the app was started with.

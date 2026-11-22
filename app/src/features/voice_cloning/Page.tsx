@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { usePersisted } from '@/lib/persisted';
 import { CuePicker, Cues } from './CuePicker';
+import { FreeTheGpu } from './FreeTheGpu';
 import { LANGUAGES } from './languages';
 import { addTake, MAX_WAITING, onFinished, useTakes, waitingCount } from './queue';
 import { TakeQueue } from './TakeQueue';
@@ -240,6 +241,8 @@ export default function Page() {
       </Section>
 
       <TakeQueue takes={takes} />
+
+      <FreeTheGpu />
     </PageLayout>
   );
 }
