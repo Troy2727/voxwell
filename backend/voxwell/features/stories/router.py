@@ -1,5 +1,6 @@
 import importlib.util
 import re
+from dataclasses import asdict
 from pathlib import Path
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
@@ -9,7 +10,7 @@ from pydantic import BaseModel
 from voxwell import voices
 from voxwell.features.audio_effects.dsp import Effects
 from voxwell.features.stories import jobs, subtitles
-from voxwell.features.stories.script import NARRATOR, ScriptError, parse, speakers
+from voxwell.features.stories.script import NARRATOR, ScriptError, join_lines, parse, speakers
 from voxwell.features.voice_cloning.engine import LANGUAGES
 from voxwell.paths import download_name
 
@@ -22,6 +23,12 @@ _JOB_ID = re.compile(r"^[0-9a-f]{12}$")
 
 class ParseRequest(BaseModel):
     script: str
+
+
+class JoinRequest(BaseModel):
+    script: str
+    first_line: int  # 1-based raw lines, inclusive
+    last_line: int
 
 
 class StoryRequest(BaseModel):
@@ -60,6 +67,15 @@ def parse_script(req: ParseRequest):
     except ScriptError as exc:
         raise HTTPException(422, str(exc))
     return {"speakers": speakers(lines), "lines": len(lines)}
+
+
+@router.post("/join")
+def join(req: JoinRequest):
+    """Join lines: neighbouring lines of one speaker become one line, spoken with no gap."""
+    try:
+        return asdict(join_lines(req.script, req.first_line, req.last_line))
+    except ScriptError as exc:
+        raise HTTPException(422, str(exc))
 
 
 @router.post("/jobs")

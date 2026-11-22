@@ -100,6 +100,8 @@ function routes(): [string | RegExp, Reply][] {
     [/^(PATCH|DELETE) \/api\/voices\/[^/]+$/, {}],
 
     ['POST /api/voice_cloning/voices', { id: 'v-new', name: 'E2E voice', source: 'upload' }],
+    ['GET /api/voice_cloning/free-the-gpu', { enabled: false, device: 'cuda' }],
+    ['PUT /api/voice_cloning/free-the-gpu', (_url: URL, request: Request) => ({ enabled: request.postDataJSON().enabled, device: 'cuda' })],
     ['GET /api/voice_cloning/status', { ready: true, languages: { en: 'English', es: 'Spanish', fr: 'French' }, cues: CUES }],
     // Like the server: cue tags in a language without cues come back flagged as left out.
     ['POST /api/voice_cloning/synthesize', (_url: URL, request: Request) => {

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Captions, Play } from 'lucide-react';
+import { Captions, Merge, Play, Undo2 } from 'lucide-react';
 import { api, apiUrl, listVoices, sendJson, type Voice } from '../../api';
 import { AudioResult } from '@/components/audio-result';
 import { ChoiceSelect } from '@/components/choice-select';
@@ -32,6 +32,20 @@ Anna: That was not the wind.`;
 
 const DEFAULT_VOICE = 'default';
 
+interface JoinResult {
+  script: string;
+  joined: number;
+  too_long: number;
+  line: number;
+}
+
+/** What a Join lines click did, in words. */
+function joinNote({ joined, too_long: tooLong }: JoinResult) {
+  if (!joined) return tooLong ? 'Those lines are too long to join (250 characters max).' : 'Nothing to join. Lines need the same speaker and no blank line between them.';
+  const done = `Joined ${joined} ${joined === 1 ? 'line' : 'lines'}.`;
+  return tooLong ? `${done} ${tooLong} ${tooLong === 1 ? 'pair was' : 'pairs were'} too long to join (250 characters max).` : done;
+}
+
 export default function Page() {
   const [voices, setVoices] = useState<Voice[]>([]);
   const [title, setTitle] = useState('');
@@ -49,6 +63,10 @@ export default function Page() {
   const [subtitleVoice, setSubtitleVoice] = useState('');
   const timer = useRef<number | undefined>(undefined);
   const parseTimer = useRef<number | undefined>(undefined);
+  const scriptBox = useRef<HTMLTextAreaElement>(null);
+  const [joining, setJoining] = useState(false);
+  const [joinStatus, setJoinStatus] = useState('');
+  const [beforeJoin, setBeforeJoin] = useState<string | null>(null);
 
   useEffect(() => {
     listVoices().then(setVoices, () => setVoices([]));
@@ -86,6 +104,37 @@ export default function Page() {
       },
       (e) => setError(message(e)),
     );
+
+  /** Join lines: the line at the cursor with the next one, or every line the selection touches. */
+  async function joinLines() {
+    const box = scriptBox.current;
+    const start = box?.selectionStart ?? 0;
+    // A selection that ends at the start of a line doesn't take that line in.
+    const end = Math.max(start, (box?.selectionEnd ?? 0) - (script[(box?.selectionEnd ?? 0) - 1] === '\n' ? 1 : 0));
+    const lineAt = (offset: number) => script.slice(0, offset).split('\n').length;
+    const total = script.replace(/\n$/, '').split('\n').length; // as the backend counts them
+    const first = Math.min(lineAt(start), total);
+    const last = Math.min(Math.max(lineAt(end), first + 1), total);
+    setJoining(true);
+    setError('');
+    try {
+      const res = await sendJson<JoinResult>('/api/stories/join', 'POST', { script, first_line: first, last_line: last });
+      setJoinStatus(joinNote(res));
+      if (res.joined) {
+        setBeforeJoin(script);
+        setScript(res.script);
+        const at = res.script.split('\n').slice(0, res.line - 1).join('\n').length + (res.line > 1 ? 1 : 0);
+        requestAnimationFrame(() => {
+          scriptBox.current?.focus();
+          scriptBox.current?.setSelectionRange(at, at);
+        });
+      }
+    } catch (e) {
+      setError(message(e));
+    } finally {
+      setJoining(false);
+    }
+  }
 
   async function generate() {
     setError('');
@@ -130,11 +179,51 @@ export default function Page() {
           </Field>
         </div>
         <Field label="Script" htmlFor="story-script" hint="One line each, as “Name: what they say”. Lines without a name are read by the Narrator.">
-          <Textarea id="story-script" rows={10} value={script} placeholder={EXAMPLE} onChange={(e) => setScript(e.target.value)} className="font-mono text-sm" />
+          <Textarea
+            ref={scriptBox}
+            id="story-script"
+            rows={10}
+            value={script}
+            readOnly={joining} // a join's result would overwrite typing meanwhile
+            placeholder={EXAMPLE}
+            onChange={(e) => {
+              setScript(e.target.value);
+              setBeforeJoin(null);
+              setJoinStatus('');
+            }}
+            className="font-mono text-sm"
+          />
         </Field>
         {!script && (
           <div>
             <Button variant="outline" size="sm" onClick={() => setScript(EXAMPLE)}>Use the example</Button>
+          </div>
+        )}
+        {script && (
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={joining || !script.trim()}
+              title="Merge the line at the cursor, or the selected lines, with the next line when the same person speaks them."
+              onClick={() => void joinLines()}
+            >
+              <Merge /> Join lines
+            </Button>
+            {beforeJoin !== null && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setScript(beforeJoin);
+                  setBeforeJoin(null);
+                  setJoinStatus('');
+                }}
+              >
+                <Undo2 /> Undo join
+              </Button>
+            )}
+            <p role="status" className="text-muted-foreground text-xs">{joinStatus}</p>
           </div>
         )}
         <ErrorAlert message={scriptError} />
