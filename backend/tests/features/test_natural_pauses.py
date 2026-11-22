@@ -99,7 +99,10 @@ def test_touching_pauses_are_one_pause():
 def test_the_mix_never_clips_and_has_no_click_at_the_edges():
     loud = take() * 3.2  # tone peaks near full scale
     out = pause_fill.join([loud, GAP, loud], RATE)
-    assert np.max(np.abs(out)) <= CEILING + 1e-6
+    # The noise never pushes past the ceiling, or past the speech's own peak when that is higher;
+    # the speech itself keeps its level.
+    assert np.max(np.abs(out)) <= max(CEILING, float(np.max(np.abs(loud)))) + 1e-6
+    np.testing.assert_array_equal(out[: len(loud) // 2], loud[: len(loud) // 2])
     a, b = take(1), take(2)
     out = pause_fill.join([a, GAP, b], RATE)
     for edge in (len(a), len(a) + GAP):
@@ -199,3 +202,23 @@ def test_a_book_setting_change_renders_the_chapters_again(monkeypatch):
     del state["natural_pauses"]
     (book.dir / books.STATE_FILE).write_text(json.dumps(state))
     assert books._load(book.dir).natural_pauses is False
+
+
+def test_a_short_word_between_pauses_never_doubles_the_background():
+    a = take(1)
+    word = take(2)[: int(0.01 * RATE)]  # 10 ms, shorter than the fades
+    out = pause_fill.join([a, GAP, word, GAP, a], RATE)
+    middle = out[len(a) + GAP - 200 : len(a) + GAP + len(word) + 200]
+    assert rms(middle) < 2.5 * HISS
+
+
+def test_pauses_in_different_takes_are_different_noise():
+    one = pause_fill.join([take(1), GAP, take(2)], RATE)
+    two = pause_fill.join([take(3), GAP, take(4)], RATE)
+    gap = slice(len(take()) + 2000, len(take()) + 4000)
+    assert not np.allclose(one[gap], two[gap])
+
+
+def test_joining_no_wav_clips_is_refused():
+    with pytest.raises(ValueError):
+        pause_fill.join_wavs([])
