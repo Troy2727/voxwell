@@ -166,7 +166,7 @@ Voxwell is **MIT licensed**, and every model it runs allows commercial use ([one
 | **Voice remix** | Turn a saved voice into a new one by describing it, from a light touch (Low) to a full change (Max). The original stays as it is. |
 | **Gallery** | Start from one of 40 ready-made voices. <img src="docs/readme/labels/search.svg" alt="Search" height="24" align="absmiddle" /> by name or description ("whispering" finds Sleep Story), filter by <img src="docs/readme/labels/category.svg" alt="category" height="24" align="absmiddle" /> and <img src="docs/readme/labels/gender.svg" alt="gender" height="24" align="absmiddle" /> (Wellness + Female shows 3 voices), or star your favorites. |
 | **Collections** | Keep saved voices organized in folders. |
-| **Pronunciation** | Teach every voice how to say names, brands and jargon. Each language has one list, and it applies to all speech. **Shared words** go in an All languages list that every language uses; a language's own entry wins there. **Known words:** dictation and transcription recognize the words in these lists too, so your names and jargon are spelled your way. |
+| **Pronunciation** | Teach every voice how to say names, brands and jargon. Each language has one list, and it applies to all speech. **Shared words** go in an All languages list that every language uses; a language's own entry wins there. **Known words:** dictation and transcription recognize the words in these lists too, so your names and jargon are spelled your way. **Voice pronunciation** keeps a word list for one saved voice; it wins over the language list whenever that voice speaks. |
 
 ### Speech and sound
 

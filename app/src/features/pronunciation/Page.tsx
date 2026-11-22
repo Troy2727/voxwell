@@ -28,6 +28,7 @@ const SCOPES: [string, string][] = [['all', 'All languages'], ...LANGUAGES];
 
 export default function Page() {
   const [language, setLanguage] = useState('en');
+  const [owner, setOwner] = useState(''); // Voice pronunciation: a saved voice whose own list is shown; '' for every voice
   const [hearLanguage, setHearLanguage] = useState('en'); // Hear it needs a real language when the scope is all
   const [entries, setEntries] = useState<Entry[] | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
@@ -46,22 +47,24 @@ export default function Page() {
   const [hearError, setHearError] = useState('');
   const [audioUrl, setAudioUrl] = useState('');
 
-  // The list shown is the scope's that is selected now: a reply for a scope left meanwhile is dropped.
-  const shownScope = useRef(language);
-  shownScope.current = language;
+  // The list shown is the one selected now: a reply for a list left meanwhile is dropped.
+  const listQuery = `language=${language}${owner ? `&voice_id=${owner}` : ''}`;
+  const shownList = useRef(listQuery);
+  shownList.current = listQuery;
   const refresh = useCallback(() => {
-    const asked = language;
-    return api<Entry[]>(`/api/pronunciation/entries?language=${asked}`).then(
+    const asked = listQuery;
+    return api<Entry[]>(`/api/pronunciation/entries?${asked}`).then(
       (list) => {
-        if (shownScope.current === asked) setEntries(list);
+        if (shownList.current === asked) setEntries(list);
       },
       (e: Error) => {
-        if (shownScope.current !== asked) return;
+        if (shownList.current !== asked) return;
         setEntries([]);
         setError(e.message);
+        if (owner && e.message === 'Unknown voice.') setOwner(''); // deleted meanwhile: back to every voice
       },
     );
-  }, [language]);
+  }, [listQuery, owner]);
   useEffect(() => {
     setEntries(null);
     setRewritten('');
@@ -75,6 +78,11 @@ export default function Page() {
   useEffect(() => {
     listVoices().then(setVoices, () => setVoices([]));
   }, []);
+  // A voice's words are kept per language, so the All languages list has none.
+  useEffect(() => {
+    if (language === 'all') setOwner('');
+  }, [language]);
+  const ownerName = voices?.find((v) => v.id === owner)?.name ?? 'this voice';
 
   function reset() {
     setEditing(null);
@@ -95,7 +103,7 @@ export default function Page() {
   async function save() {
     setSaving(true);
     setError('');
-    const body = { language, word, respelling, case_sensitive: caseSensitive, whole_word: wholeWord };
+    const body = { language, word, respelling, case_sensitive: caseSensitive, whole_word: wholeWord, voice_id: owner };
     try {
       if (editing) await sendJson(`/api/pronunciation/entries/${editing}`, 'PUT', body);
       else await sendJson('/api/pronunciation/entries', 'POST', body);
@@ -112,7 +120,7 @@ export default function Page() {
   async function remove(e: Entry) {
     setError('');
     try {
-      await api(`/api/pronunciation/entries/${e.id}?language=${language}`, { method: 'DELETE' });
+      await api(`/api/pronunciation/entries/${e.id}?${listQuery}`, { method: 'DELETE' });
       if (editing === e.id) reset();
       await refresh();
     } catch (err) {
@@ -126,7 +134,7 @@ export default function Page() {
     setHearError('');
     setAudioUrl('');
     try {
-      const preview = await sendJson<{ text: string }>('/api/pronunciation/preview', 'POST', { text: sample, language: spoken });
+      const preview = await sendJson<{ text: string }>('/api/pronunciation/preview', 'POST', { text: sample, language: spoken, voice_id: voiceId });
       setRewritten(preview.text);
       // Speech applies the dictionary itself, so the original text goes in.
       const res = await sendJson<{ url: string }>('/api/voice_cloning/synthesize', 'POST', {
@@ -153,6 +161,19 @@ export default function Page() {
         }
       >
         <ChoiceSelect options={SCOPES} value={language} onChange={setLanguage} disabled={editing !== null || saving || hearing} aria-label="Language" />
+      </Section>
+
+      <Section title="Voice pronunciation" description="Keep words for one saved voice. They win over the language list whenever that voice speaks.">
+        <Field label="Words for" hint={language === 'all' ? "A voice's words are kept per language. Pick a language above to keep words for one voice." : undefined}>
+          <VoiceSelect
+            voices={voices}
+            value={owner}
+            onChange={setOwner}
+            disabled={voices === null || language === 'all' || editing !== null || saving}
+            defaultLabel="Every voice"
+            defaultDescription="Words for all voices in this language"
+          />
+        </Field>
       </Section>
 
       <Section title={editing ? 'Edit word' : 'Add a word'} description="Write the respelling the way it should sound, e.g. Nguyen becomes win.">
@@ -187,11 +208,13 @@ export default function Page() {
         <ErrorAlert message={error} />
       </Section>
 
-      <Section title="Your words">
+      <Section title="Your words" description={owner ? `Only for ${ownerName}. Everything else comes from the language list.` : undefined}>
         {entries === null ? (
           <Skeleton className="h-16 w-full" />
         ) : entries.length === 0 ? (
-          <p className="text-muted-foreground text-sm">{language === 'all' ? 'No words for all languages yet.' : 'No words for this language yet.'}</p>
+          <p className="text-muted-foreground text-sm">
+            {owner ? 'No words for this voice in this language yet.' : language === 'all' ? 'No words for all languages yet.' : 'No words for this language yet.'}
+          </p>
         ) : (
           <ul className="flex flex-col divide-y">
             {entries.map((e) => (

@@ -10,6 +10,7 @@ import threading
 import wave
 from pathlib import Path
 
+from voxwell import voices
 from voxwell.features.audio_effects.dsp import Effects, apply_to_wav
 from voxwell.features.pronunciation import store as pronunciation
 from voxwell.features.voice_cloning import cues as cue_tags
@@ -425,6 +426,7 @@ def _speak(text: str, language: str, reference_audio: Path | None, turbo, kwargs
         raise NothingToSay("Nothing to say after removing cue tags.")
 
     model = turbo if turbo is not None else _load_model()
+    voice_id = voices.voice_id_for_path(reference_audio)  # a saved voice brings its own words
     # Turbo has no language, exaggeration or cfg_weight (it warns when they are set).
     if reference_audio is not None:
         kwargs = {**kwargs, "audio_prompt_path": str(reference_audio)}
@@ -432,7 +434,7 @@ def _speak(text: str, language: str, reference_audio: Path | None, turbo, kwargs
     for part in plan:
         if isinstance(part, str):
             # Per part, so a dictionary entry can't rewrite a pause tag.
-            part = _pronounce(part, language)
+            part = _pronounce(part, language, voice_id)
             with _lock:
                 gpu.restore_if_needed(model)  # Free the GPU moved it to system RAM while idle
                 if reference_audio is None and getattr(model, "voxwell_default_conds", None) is not None:
@@ -474,11 +476,11 @@ def _prepare(part: str, language: str, turbo: bool) -> str:
     return part
 
 
-def _pronounce(text: str, language: str) -> str:
+def _pronounce(text: str, language: str, voice_id: str | None = None) -> str:
     """The pronunciation dictionary applied to the text between cue tags, never to a tag."""
     out, start = [], 0
     for begin, end in cue_tags.spans(text):
-        out += [pronunciation.apply(text[start:begin], language), text[begin:end]]
+        out += [pronunciation.apply(text[start:begin], language, voice_id), text[begin:end]]
         start = end
-    out.append(pronunciation.apply(text[start:], language))
+    out.append(pronunciation.apply(text[start:], language, voice_id))
     return "".join(out)
