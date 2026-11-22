@@ -204,7 +204,7 @@ function SpeechBody({ item }: { item: Speech }) {
   return (
     <>
       {item.text !== item.title && <Muted>{item.text}</Muted>}
-      <AudioResult src={apiUrl(item.audio_url)} download={`${item.title}.wav`} lazy />
+      <AudioResult src={apiUrl(item.audio_url)} download={`${item.title}.wav`} lazy barTitle={item.title} barSource="Speech" />
     </>
   );
 }
@@ -232,7 +232,7 @@ function StoryBody({ item }: { item: Story }) {
   return (
     <>
       <Muted>Speakers: {item.speakers.join(', ')}</Muted>
-      <AudioResult src={apiUrl(item.audio_url)} download={`${item.title}.wav`} lazy />
+      <AudioResult src={apiUrl(item.audio_url)} download={`${item.title}.wav`} lazy barTitle={item.title} barSource="Story" />
     </>
   );
 }

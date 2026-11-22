@@ -10,9 +10,12 @@ import threading
 import wave
 from pathlib import Path
 
+from voxwell import voices
+from voxwell.features.audio_effects import pause_fill
 from voxwell.features.audio_effects.dsp import Effects, apply_to_wav
 from voxwell.features.pronunciation import store as pronunciation
 from voxwell.features.voice_cloning import cues as cue_tags
+from voxwell.features.voice_cloning import gpu
 
 log = logging.getLogger(__name__)
 
@@ -371,6 +374,7 @@ def synthesize(
     cfg_weight: float = 0.5,
     effects: Effects | None = None,
     cues: bool = True,
+    natural_pauses: bool = False,
 ) -> bytes:
     """Return WAV bytes of `text` spoken in the voice of `reference_audio` (a default voice if None).
 
@@ -378,6 +382,7 @@ def synthesize(
     intensity; a lower `cfg_weight` (0-1) gives slower, more deliberate delivery. The defaults
     are Chatterbox's own. The language's pronunciation dictionary is applied to `text` first.
     `[pause]` or `[pause 2.5]` in `text` becomes that many seconds of silence (at most MAX_PAUSE).
+    With `natural_pauses`, those pauses carry the speech's own quiet background instead of silence.
     `effects` (speed, pitch, reverb, distance, noise, pan) is applied to the finished audio; without
     it, or with neutral settings, the bytes are exactly the model's.
 
@@ -389,24 +394,25 @@ def synthesize(
     if language not in LANGUAGES:
         raise ValueError(f"Unsupported language '{language}'.")
 
-    out = None
-    if cues and language in cue_tags.VOICED_LANGUAGES and cue_tags.find(text):
-        if not _turbo_accepts(reference_audio):
-            log.warning("This voice can't be used with cue tags (its clip must be longer than %s seconds); they are left out.", TURBO_MIN_REFERENCE)
-        elif (turbo := _load_turbo()) is not None:
-            try:
-                out = _speak(text, language, reference_audio, turbo, {})
-            except Exception:
-                # E.g. a clip just over the limit by its header but not after Turbo resamples it.
-                log.exception("Chatterbox-Turbo could not speak this; cue tags are left out.")
-                _turbo_rejected.add(str(reference_audio))
-    if out is None:
-        multilingual = {"language_id": language, "exaggeration": exaggeration, "cfg_weight": cfg_weight}
-        out = _speak(text, language, reference_audio, None, multilingual)
+    with gpu.working():  # Free the GPU: no move while speaking; the idle countdown starts after
+        out = None
+        if cues and language in cue_tags.VOICED_LANGUAGES and cue_tags.find(text):
+            if not _turbo_accepts(reference_audio):
+                log.warning("This voice can't be used with cue tags (its clip must be longer than %s seconds); they are left out.", TURBO_MIN_REFERENCE)
+            elif (turbo := _load_turbo()) is not None:
+                try:
+                    out = _speak(text, language, reference_audio, turbo, {}, natural_pauses)
+                except Exception:
+                    # E.g. a clip just over the limit by its header but not after Turbo resamples it.
+                    log.exception("Chatterbox-Turbo could not speak this; cue tags are left out.")
+                    _turbo_rejected.add(str(reference_audio))
+        if out is None:
+            multilingual = {"language_id": language, "exaggeration": exaggeration, "cfg_weight": cfg_weight}
+            out = _speak(text, language, reference_audio, None, multilingual, natural_pauses)
     return apply_to_wav(out, effects) if effects is not None else out
 
 
-def _speak(text: str, language: str, reference_audio: Path | None, turbo, kwargs: dict) -> bytes:
+def _speak(text: str, language: str, reference_audio: Path | None, turbo, kwargs: dict, natural: bool = False) -> bytes:
     """synthesize() with Turbo (`turbo`, the loaded model) or, when it is None, Multilingual."""
     import numpy as np
 
@@ -423,6 +429,7 @@ def _speak(text: str, language: str, reference_audio: Path | None, turbo, kwargs
         raise NothingToSay("Nothing to say after removing cue tags.")
 
     model = turbo if turbo is not None else _load_model()
+    voice_id = voices.voice_id_for_path(reference_audio)  # a saved voice brings its own words
     # Turbo has no language, exaggeration or cfg_weight (it warns when they are set).
     if reference_audio is not None:
         kwargs = {**kwargs, "audio_prompt_path": str(reference_audio)}
@@ -430,14 +437,15 @@ def _speak(text: str, language: str, reference_audio: Path | None, turbo, kwargs
     for part in plan:
         if isinstance(part, str):
             # Per part, so a dictionary entry can't rewrite a pause tag.
-            part = _pronounce(part, language)
+            part = _pronounce(part, language, voice_id)
             with _lock:
+                gpu.restore_if_needed(model)  # Free the GPU moved it to system RAM while idle
                 if reference_audio is None and getattr(model, "voxwell_default_conds", None) is not None:
                     model.conds = model.voxwell_default_conds  # not the voice of an earlier call
                 audio.append(_flat(model.generate(part, **kwargs)))
         else:
-            audio.append(np.zeros(int(part * model.sr), dtype=np.float32))
-    return _to_wav(np.concatenate(audio), model.sr)
+            audio.append(int(part * model.sr) if natural else np.zeros(int(part * model.sr), dtype=np.float32))
+    return _to_wav(pause_fill.join(audio, model.sr) if natural else np.concatenate(audio), model.sr)
 
 
 SAMPLE_RATE = 24000  # both Chatterbox models' output rate (their .sr); see test_model_api_contracts
@@ -471,11 +479,11 @@ def _prepare(part: str, language: str, turbo: bool) -> str:
     return part
 
 
-def _pronounce(text: str, language: str) -> str:
+def _pronounce(text: str, language: str, voice_id: str | None = None) -> str:
     """The pronunciation dictionary applied to the text between cue tags, never to a tag."""
     out, start = [], 0
     for begin, end in cue_tags.spans(text):
-        out += [pronunciation.apply(text[start:begin], language), text[begin:end]]
+        out += [pronunciation.apply(text[start:begin], language, voice_id), text[begin:end]]
         start = end
-    out.append(pronunciation.apply(text[start:], language))
+    out.append(pronunciation.apply(text[start:], language, voice_id))
     return "".join(out)

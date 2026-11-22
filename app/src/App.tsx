@@ -7,6 +7,7 @@ import { FEATURES } from './features';
 import { useShortcutDictation } from './features/dictation/useShortcutDictation';
 import { HomePage } from './home/Page';
 import { LogoMark } from '@/components/logo';
+import { NowPlayingBar } from '@/components/now-playing-bar';
 import { PageSearch } from '@/components/page-search';
 import { Button } from '@/components/ui/button';
 import {
@@ -28,6 +29,7 @@ import {
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { supabase, useSession } from '@/lib/auth';
+import { useSingleAudio } from '@/lib/now-playing';
 import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 
@@ -117,6 +119,7 @@ const BACKEND_START_MS = 2 * 60_000;
 
 function Shell({ user }: { user?: User }) {
   useShortcutDictation();
+  useSingleAudio();
   const [active, setActive] = useState(HOME);
   const [online, setOnline] = useState<boolean | null>(null);
   // Bumped when the backend comes back, so the open page reloads its data.
@@ -214,6 +217,7 @@ function Shell({ user }: { user?: User }) {
             <HomePage key={connection} name={user?.user_metadata.full_name || user?.email} online={online} onOpen={setActive} onRetry={recheck} />
           )}
         </main>
+        <NowPlayingBar />
       </SidebarInset>
     </SidebarProvider>
   );
