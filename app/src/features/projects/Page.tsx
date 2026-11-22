@@ -68,10 +68,23 @@ interface Audiobook extends Base {
   download_url: string;
 }
 
-type Item = Speech | Story | Audiobook | Dub | Transcript;
+/** Music, sound effects and kept results from Tools, Audio effects and Translation: files to play or download. */
+interface Kept extends Base {
+  kind: 'music' | 'sound' | 'conversion' | 'video' | 'isolation' | 'fit' | 'effects' | 'translation';
+  state: Dub['state'];
+  step: string;
+  percent: number;
+  error: string | null;
+  text: string;
+  files: { label: string; url: string; video: boolean }[];
+}
+
+type Item = Speech | Story | Audiobook | Dub | Transcript | Kept;
 
 const KIND_LABELS: Record<Item['kind'], string> = {
   speech: 'Speech', story: 'Story', audiobook: 'Audiobook', dub: 'Dub', transcript: 'Transcript',
+  music: 'Music', sound: 'Sound effect', conversion: 'Voice conversion', video: 'Video conversion',
+  isolation: 'Voice isolation', fit: 'Fit length', effects: 'Audio effects', translation: 'Translation',
 };
 const PREVIEW_LENGTH = 300;
 
@@ -118,7 +131,8 @@ export default function Page() {
       {items === null && <Skeleton className="h-32 w-full" />}
       {items?.length === 0 && !error && (
         <EmptyState icon={FolderOpen} title="Nothing here yet">
-          Speech, stories and audiobooks you make, videos you dub and files you transcribe appear here.
+          Speech, stories, audiobooks, music and sound effects you make appear here, along with videos you dub, files you
+          transcribe, translations, and results from Tools and Audio effects.
         </EmptyState>
       )}
       {!!items?.length && (
@@ -185,6 +199,7 @@ function ProjectCard({ item, focused, onChanged, onError }: { item: Item; focuse
         {item.kind === 'audiobook' && <AudiobookBody item={item} />}
         {item.kind === 'dub' && <DubBody item={item} />}
         {item.kind === 'transcript' && <TranscriptBody item={item} />}
+        {'files' in item && <KeptBody item={item} />}
       </CardContent>
     </Card>
   );
@@ -237,14 +252,16 @@ function StoryBody({ item }: { item: Story }) {
   );
 }
 
-function Progress({ item }: { item: Story | Audiobook | Dub | Transcript }) {
+function Progress({ item }: { item: Story | Audiobook | Dub | Transcript | Kept }) {
   if (item.state === 'error') return <ErrorAlert message={item.error ?? 'Failed'} />;
   return <JobProgress step={item.step} percent={item.percent} />;
 }
 
+const shorten = (text: string) => (text.length > PREVIEW_LENGTH ? text.slice(0, PREVIEW_LENGTH - 1) + '…' : text);
+
 function TranscriptBody({ item }: { item: Transcript }) {
   if (item.state !== 'done') return <Progress item={item} />;
-  const preview = item.text.length > PREVIEW_LENGTH ? item.text.slice(0, PREVIEW_LENGTH - 1) + '…' : item.text;
+  const preview = shorten(item.text);
   return (
     <>
       <Muted>{preview}</Muted>
@@ -268,6 +285,37 @@ function DubBody({ item }: { item: Dub }) {
         <DownloadLink href={item.video_url} name={`${item.title}.mp4`}>Download video</DownloadLink>
         <DownloadLink href={item.subtitles_url} name={`${item.title}.srt`}>Download subtitles</DownloadLink>
       </div>
+    </>
+  );
+}
+
+function KeptBody({ item }: { item: Kept }) {
+  if (item.state !== 'done') return <Progress item={item} />;
+  const several = item.files.length > 1;
+  return (
+    <>
+      {item.text && item.text !== item.title && <Muted>{shorten(item.text)}</Muted>}
+      {item.files.map((file) =>
+        file.video ? (
+          <div key={file.url} className="flex flex-col gap-2">
+            <video controls preload="none" src={apiUrl(file.url)} />
+            <div>
+              <DownloadLink href={file.url} name={`${item.title}.mp4`}>Download video</DownloadLink>
+            </div>
+          </div>
+        ) : (
+          <div key={file.url} className="flex flex-col gap-1">
+            {several && <Muted>{file.label}</Muted>}
+            <AudioResult
+              src={apiUrl(file.url)}
+              download={several ? `${item.title} (${file.label.toLowerCase()}).wav` : `${item.title}.wav`}
+              lazy
+              barTitle={item.title}
+              barSource={KIND_LABELS[item.kind]}
+            />
+          </div>
+        ),
+      )}
     </>
   );
 }

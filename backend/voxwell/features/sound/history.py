@@ -19,6 +19,7 @@ class Sound:
     seed: int
     steps: int
     created: float
+    title: str = ""  # set when renamed in Projects; until then the prompt is the title
 
 
 def _paths(sound_id: str) -> tuple[Path, Path]:
@@ -48,6 +49,14 @@ def list_sounds() -> list[Sound]:
     folder = data_dir("sound")
     sounds = [Sound(**json.loads(p.read_text(encoding="utf-8"))) for p in folder.glob("*.json")]
     return sorted(sounds, key=lambda s: s.created, reverse=True)
+
+
+def rename(sound_id: str, title: str) -> Sound:
+    _, meta = _paths(sound_id)
+    sound = Sound(**json.loads(meta.read_text(encoding="utf-8")))
+    sound.title = title
+    meta.write_text(json.dumps(asdict(sound)), encoding="utf-8")
+    return sound
 
 
 def delete(sound_id: str) -> None:

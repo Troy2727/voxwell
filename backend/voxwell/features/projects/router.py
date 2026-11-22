@@ -1,7 +1,8 @@
-"""Projects: everything you have made (speech, stories, audiobooks, dubs, transcripts), newest first.
+"""Projects: everything you have made, newest first.
 
 Each kind stays owned by its feature (voice_cloning.history, stories.jobs, audiobook.books,
-dubbing.jobs, transcription.jobs); this router only lists, renames and deletes through them.
+dubbing.jobs, transcription.jobs, music.history, sound.history, and voxwell.results for Tools,
+Audio effects and Translation); this router only lists, renames and deletes through them.
 """
 
 import re
@@ -10,10 +11,13 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from voxwell import voices
+from voxwell import results, voices
 from voxwell.features.audiobook import books as audiobooks
 from voxwell.features.audiobook.router import summary as audiobook_summary
 from voxwell.features.dubbing import jobs as dub_jobs
+from voxwell.features.music import history as music
+from voxwell.features.music.router import _settle as settle_track
+from voxwell.features.sound import history as sounds
 from voxwell.features.stories import jobs as story_jobs
 from voxwell.features.stories.router import summary as story_summary
 from voxwell.features.transcription import jobs as transcript_jobs
@@ -21,7 +25,15 @@ from voxwell.features.voice_cloning import history
 
 router = APIRouter(tags=["projects"])
 
-Kind = Literal["speech", "story", "audiobook", "dub", "transcript"]
+Kind = Literal[
+    "speech", "story", "audiobook", "dub", "transcript", "music", "sound",
+    "conversion", "video", "isolation", "fit", "effects", "translation",
+]
+RESULT_KINDS = {  # kept results: kind -> the feature whose folder holds them
+    "conversion": "tools", "video": "tools", "isolation": "tools", "fit": "tools",
+    "effects": "audio_effects", "translation": "translation",
+}
+_MUSIC_STATE = {"queued": "queued", "generating": "running", "done": "done", "failed": "error"}
 MAX_TITLE = 100
 _JOB_ID = re.compile(r"^[0-9a-f]{12}$")
 
@@ -88,6 +100,57 @@ JOB_KINDS = {
 }
 
 
+def _file(label: str, url: str, video: bool = False) -> dict:
+    return {"label": label, "url": url, "video": video}
+
+
+def _music(track: music.Track) -> dict:
+    track = settle_track(track)
+    files = []
+    if track.status == "done":
+        files.append(_file("Song", f"/api/music/audio/{track.id}"))
+        if track.stems:
+            files += [_file(part.title(), f"/api/music/audio/{track.id}?part={part}") for part in ("vocals", "instrumental")]
+    return {
+        "kind": "music", "id": track.id, "title": track.title or results.title_from(track.prompt, "Music"),
+        "created": track.created, "language": track.language, "voice": "",
+        "state": _MUSIC_STATE.get(track.status, "error"), "step": track.stage, "percent": round(track.progress * 100),
+        "error": track.error or None, "text": track.prompt, "files": files,
+    }
+
+
+def _sound(sound: sounds.Sound) -> dict:
+    return {
+        "kind": "sound", "id": sound.id, "title": sound.title or results.title_from(sound.prompt, "Sound effect"),
+        "created": sound.created, "language": "", "voice": "",
+        "state": "done", "step": "", "percent": 100, "error": None,
+        "text": sound.prompt, "files": [_file("Sound", f"/api/sound/audio/{sound.id}")],
+    }
+
+
+def _kept(result: results.Result) -> dict:
+    def url(name: str) -> str:
+        stem, ext = name.rsplit(".", 1)
+        return f"/api/{result.feature}/{'video' if ext == 'mp4' else 'audio'}/{stem}"
+
+    return {
+        "kind": result.kind, "id": result.id, "title": result.title, "created": result.created,
+        "language": result.language, "voice": _voice_name(result.voice) if result.voice else "",
+        "state": "done", "step": "", "percent": 100, "error": None, "text": result.text,
+        "files": [_file(label, url(name), name.endswith(".mp4")) for label, name in result.files.items()],
+    }
+
+
+def _result(kind: str, item_id: str) -> results.Result:
+    try:
+        result = results.get(RESULT_KINDS[kind], item_id)
+    except KeyError:
+        raise HTTPException(404, "Project not found.")
+    if result.kind != kind:
+        raise HTTPException(404, "Project not found.")
+    return result
+
+
 def _job(kind: str, item_id: str):
     module, _ = JOB_KINDS[kind]
     job = module.get(item_id) if _JOB_ID.match(item_id) else None
@@ -106,6 +169,9 @@ def items():
     found = [_speech(c) for c in history.list_clips()]
     for module, show in JOB_KINDS.values():
         found += [show(j) for j in module.list_jobs()]
+    found += [_music(t) for t in music.list_tracks()]
+    found += [_sound(s) for s in sounds.list_sounds()]
+    found += [_kept(r) for r in results.list_results()]
     return sorted(found, key=lambda item: item["created"], reverse=True)
 
 
@@ -116,11 +182,17 @@ def rename(kind: Kind, item_id: str, req: RenameRequest):
         raise HTTPException(422, "Title is required.")
     if len(title) > MAX_TITLE:
         raise HTTPException(422, f"Title is too long ({MAX_TITLE} characters max).")
-    if kind == "speech":
-        try:
+    try:
+        if kind == "speech":
             return _speech(history.rename(item_id, title))
-        except KeyError:
-            raise HTTPException(404, "Project not found.")
+        if kind == "music":
+            return _music(music.update(item_id, title=title))
+        if kind == "sound":
+            return _sound(sounds.rename(item_id, title))
+    except KeyError:
+        raise HTTPException(404, "Project not found.")
+    if kind in RESULT_KINDS:
+        return _kept(results.rename(RESULT_KINDS[kind], _result(kind, item_id).id, title))
     module, show = JOB_KINDS[kind]
     job = _job(kind, item_id)
     module.rename(job, title)
@@ -129,11 +201,13 @@ def rename(kind: Kind, item_id: str, req: RenameRequest):
 
 @router.delete("/items/{kind}/{item_id}")
 def delete(kind: Kind, item_id: str):
-    if kind == "speech":
+    if kind in ("speech", "music", "sound"):
         try:
-            history.delete(item_id)
+            {"speech": history.delete, "music": music.delete, "sound": sounds.delete}[kind](item_id)
         except KeyError:
             raise HTTPException(404, "Project not found.")
+    elif kind in RESULT_KINDS:
+        results.delete(RESULT_KINDS[kind], _result(kind, item_id).id)
     else:
         module, _ = JOB_KINDS[kind]
         try:

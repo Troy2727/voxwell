@@ -7,7 +7,6 @@ import logging
 import re
 import shutil
 import tempfile
-import time
 import uuid
 from dataclasses import asdict
 from pathlib import Path
@@ -16,7 +15,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from voxwell import voices
+from voxwell import results, voices
 from voxwell.features.dubbing.ffmpeg import DubbingError, ffmpeg_path
 from voxwell.features.tools import direction, engine, isolation
 from voxwell.features.voice_cloning import engine as cloning_engine
@@ -33,7 +32,6 @@ MAX_VIDEO_UPLOAD = 2 * 1024**3  # Convert video streams the upload to disk, so t
 NO_SPEECH_PEAK = 1e-4
 NOTE_WHOLE_SOUNDTRACK = "The voice could not be separated from the background, so the whole soundtrack was converted, background included."
 NOTE_AUDIO_ONLY = "The video could not be rebuilt with the new voice, so this is the converted audio instead. Your original file is unchanged."
-OUTPUT_TTL_SECONDS = 24 * 60 * 60  # results are scratch files; download what you want to keep
 _OUTPUT_ID = re.compile(r"^[0-9a-f]{32}$")
 
 
@@ -70,13 +68,13 @@ async def _read_audio(file: UploadFile) -> tuple[bytes, float]:
 
 
 def _new_output() -> tuple[str, Path]:
-    folder = data_dir("tools")
-    cutoff = time.time() - OUTPUT_TTL_SECONDS
-    for old in [*folder.glob("*.wav"), *folder.glob("*.mp4")]:
-        if old.stat().st_mtime < cutoff:
-            old.unlink(missing_ok=True)
+    results.prune("tools")
     output_id = uuid.uuid4().hex
-    return output_id, folder / f"{output_id}.wav"
+    return output_id, data_dir("tools") / f"{output_id}.wav"
+
+
+def _title(file: UploadFile, fallback: str) -> str:
+    return results.title_from(Path(file.filename or "").stem, fallback)  # display only, never a path
 
 
 def _result(output_id: str, **extra) -> dict:
@@ -100,6 +98,7 @@ async def convert(file: UploadFile = File(...), voice_id: str = Form(...)):
         raise HTTPException(500, "Voice conversion failed; see the Voxwell log.") from exc
     finally:
         source.unlink(missing_ok=True)
+    results.keep("tools", output_id, "conversion", _title(file, "Convert voice"), {"Audio": out.name}, voice=voice_id)
     return _result(output_id)
 
 
@@ -171,6 +170,8 @@ def convert_video(file: UploadFile = File(...), voice_id: str = Form(...)):
             video_out.unlink(missing_ok=True)
             notes.append(NOTE_AUDIO_ONLY)
         seconds = sf.info(str(out)).duration
+    files = {"Video": video_out.name} if video_out.exists() else {}
+    results.keep("tools", output_id, "video", _title(file, "Convert video"), {**files, "Audio": out.name}, voice=voice_id, text=" ".join(notes))
     video_url = f"/api/tools/video/{output_id}" if video_out.exists() else None
     return _result(output_id, video_url=video_url, seconds=round(seconds, 3), notes=notes)
 
@@ -194,6 +195,8 @@ async def isolate(file: UploadFile = File(...)):
         raise HTTPException(500, "Voice isolation failed; see the Voxwell log.") from exc
     finally:
         source.unlink(missing_ok=True)
+    files = {"Voice": voice_out.name, "Background": background_out.name}
+    results.keep("tools", voice_id, "isolation", _title(file, "Isolate voice"), files)
     return {"voice": _result(voice_id), "background": _result(background_id), "seconds": round(seconds, 3)}
 
 
@@ -311,6 +314,8 @@ async def fit(file: UploadFile = File(...), target_seconds: float = Form(...)):
         raise HTTPException(422, str(exc))
     finally:
         source.unlink(missing_ok=True)
+    text = f"{seconds:.1f} s fitted to {target_seconds:.1f} s"
+    results.keep("tools", output_id, "fit", _title(file, "Fit length"), {"Audio": out.name}, text=text)
     return _result(output_id, original_seconds=round(seconds, 3), target_seconds=target_seconds)
 
 
