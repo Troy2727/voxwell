@@ -184,7 +184,7 @@ def test_text_with_only_pauses_gives_silence_without_generating(fake_model):
 
 
 def test_pronunciation_cannot_break_a_pause_tag(fake_model, monkeypatch):
-    monkeypatch.setattr(engine.pronunciation, "apply", lambda text, language: text.replace("pause", "stop"))
+    monkeypatch.setattr(engine.pronunciation, "apply", lambda text, language, voice_id=None: text.replace("pause", "stop"))
     engine.synthesize("A pause here. [pause 1] Done.", "en")
     assert fake_model.texts == ["A stop here.", "Done."]
 

@@ -91,16 +91,17 @@ jobs:
           cache: npm
           cache-dependency-path: app/package-lock.json
       - run: npm ci
+      - run: node --test electron/background.test.cjs
       - run: npm run build
       - name: Run on macOS
         if: runner.os == 'macOS'
-        run: node e2e-electron/overlay-smoke.cjs
+        run: node e2e-electron/overlay-smoke.cjs && node e2e-electron/background-smoke.cjs
       - name: Run on Linux, under a window manager and a compositor
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq xvfb xdotool imagemagick openbox picom libnss3 libatk1.0-0t64 libatk-bridge2.0-0t64 libgtk-3-0t64 libgbm1 libasound2t64
-          xvfb-run -a -s "-screen 0 1920x1080x24" bash -c 'openbox & picom --backend xrender & sleep 2; node e2e-electron/overlay-smoke.cjs'
+          xvfb-run -a -s "-screen 0 1920x1080x24" bash -c 'openbox & picom --backend xrender & sleep 2; node e2e-electron/overlay-smoke.cjs && node e2e-electron/background-smoke.cjs'
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         if: failure()
         with:

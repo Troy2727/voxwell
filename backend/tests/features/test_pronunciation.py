@@ -404,3 +404,128 @@ def test_known_words_stop_at_a_whole_word_within_the_cap(monkeypatch):
     for word in ("alpha", "bravo", "charlie"):
         store.add_entry("en", word, word)
     assert store.recognition_vocabulary("en") == "alpha, bravo"  # 12 characters; "charlie" would pass the cap
+
+
+# --- voice words (one saved voice's own list) -----------------------------------------------------
+
+
+def make_voice(name="Ana"):
+    from voxwell import voices
+
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(16000)
+        w.writeframes(b"\x00\x00" * 1600)
+    return voices.save_voice(name, buf.getvalue(), "upload").id
+
+
+def test_a_voice_list_is_kept_apart_from_the_language_list():
+    ana = make_voice()
+    store.add_entry("en", "Nguyen", "win", voice_id=ana)
+    assert [e.word for e in store.list_entries("en", ana)] == ["Nguyen"]
+    assert store.list_entries("en") == [] and store.list_entries("es", ana) == []
+    folder = store.data_dir("pronunciation", "voices")
+    assert [p.name for p in folder.iterdir()] == [f"{ana}.en.json"]  # no temporary files left
+    for bad in ("../evil", "ABCDEF123456", "abc"):
+        with pytest.raises(ValueError):
+            store.list_entries("en", bad)
+
+
+def test_voice_words_win_over_the_language_list_only_for_that_voice():
+    ana, ben = make_voice("Ana"), make_voice("Ben")
+    store.add_entry("en", "Nguyen", "win")
+    store.add_entry("en", "SQL", "sequel")
+    store.add_entry("en", "nguyen", "nuyen", voice_id=ana)  # same word, other capitals
+    assert store.apply("Ask Nguyen about SQL", "en", ana) == "Ask nuyen about sequel"
+    assert store.apply("Ask Nguyen about SQL", "en", ben) == "Ask win about sequel"
+    assert store.apply("Ask Nguyen about SQL", "en") == "Ask win about sequel"
+
+
+def test_a_longer_language_word_still_beats_a_shorter_voice_word():
+    ana = make_voice()
+    store.add_entry("en", "New York", "nu york")
+    store.add_entry("en", "New", "niu", voice_id=ana)
+    assert store.apply("New York, New", "en", ana) == "nu york, niu"
+
+
+def test_synthesize_uses_the_words_of_the_saved_voice_it_speaks_with(monkeypatch, tmp_path):
+    from voxwell import voices
+
+    seen = []
+
+    class Model:
+        sr = 24000
+
+        def generate(self, text, **kwargs):
+            seen.append(text)
+            return np.zeros(10, dtype="float32")
+
+    monkeypatch.setattr(engine, "_load_model", lambda: Model())
+    ana = make_voice()
+    store.add_entry("en", "Nguyen", "win")
+    store.add_entry("en", "Nguyen", "nuyen", voice_id=ana)
+    engine.synthesize("Ask Nguyen.", "en", voices.voice_audio_path(ana))
+    outside = tmp_path / f"{ana}.wav"  # looks like the voice's clip but isn't in the library
+    outside.write_bytes(voices.voice_audio_path(ana).read_bytes())
+    engine.synthesize("Ask Nguyen.", "en", outside)
+    engine.synthesize("Ask Nguyen.", "en")
+    assert seen == ["Ask nuyen.", "Ask win.", "Ask win."]
+
+
+def test_voice_words_through_the_api():
+    ana = make_voice()
+    r = client.post("/api/pronunciation/entries", json={"language": "en", "word": "Nguyen", "respelling": "nuyen", "voice_id": ana})
+    assert r.status_code == 200
+    entry_id = r.json()["id"]
+    # The same word may also be in the language list.
+    assert client.post("/api/pronunciation/entries", json={"language": "en", "word": "Nguyen", "respelling": "win"}).status_code == 200
+    listed = client.get("/api/pronunciation/entries", params={"language": "en", "voice_id": ana}).json()
+    assert [e["respelling"] for e in listed] == ["nuyen"]
+    r = client.put(f"/api/pronunciation/entries/{entry_id}", json={"language": "en", "word": "Nguyen", "respelling": "noo-yen", "voice_id": ana})
+    assert r.json()["respelling"] == "noo-yen"
+    preview = client.post("/api/pronunciation/preview", json={"text": "Hi Nguyen", "language": "en", "voice_id": ana}).json()
+    assert preview == {"text": "Hi noo-yen"}
+    assert client.post("/api/pronunciation/preview", json={"text": "Hi Nguyen", "language": "en"}).json() == {"text": "Hi win"}
+    # An entry of the voice list isn't in the language list, and the other way round.
+    assert client.delete(f"/api/pronunciation/entries/{entry_id}", params={"language": "en"}).status_code == 404
+    assert client.delete(f"/api/pronunciation/entries/{entry_id}", params={"language": "en", "voice_id": ana}).status_code == 200
+    assert store.list_entries("en", ana) == []
+
+
+def test_unknown_voices_and_the_shared_scope_are_refused():
+    unknown = {"detail": "Unknown voice."}
+    assert client.get("/api/pronunciation/entries", params={"language": "en", "voice_id": "0123456789ab"}).json() == unknown
+    r = client.post("/api/pronunciation/entries", json={"language": "en", "word": "a", "respelling": "b", "voice_id": "../x"})
+    assert (r.status_code, r.json()) == (404, unknown)
+    assert client.post("/api/pronunciation/preview", json={"text": "a", "voice_id": "nope"}).status_code == 404
+    r = client.get("/api/pronunciation/entries", params={"language": "all", "voice_id": make_voice()})
+    assert r.status_code == 422
+
+
+def test_deleting_a_voice_removes_its_words():
+    ana, ben = make_voice("Ana"), make_voice("Ben")
+    store.add_entry("en", "Nguyen", "nuyen", voice_id=ana)
+    store.add_entry("es", "Nguyen", "nuyen", voice_id=ana)
+    store.add_entry("en", "Nguyen", "win", voice_id=ben)
+    assert client.delete(f"/api/voices/{ana}").status_code == 200
+    names = sorted(p.name for p in store.data_dir("pronunciation", "voices").iterdir())
+    assert names == [f"{ben}.en.json"]
+
+
+def test_cli_and_mcp_keep_words_for_one_voice(capsys, monkeypatch):
+    ana = make_voice("Ana")
+    code, out, _ = run(capsys, "pronounce", "add", "Nguyen", "nuyen", "--voice", "ana")
+    assert code == 0 and "by 'ana'" in out
+    assert [e.word for e in store.list_entries("en", ana)] == ["Nguyen"] and store.list_entries("en") == []
+    assert "Nguyen -> nuyen" in run(capsys, "pronounce", "list", "--voice", "Ana")[1]
+    assert run(capsys, "pronounce", "remove", "Nguyen", "--voice", "Ana")[0] == 0
+    code, _, err = run(capsys, "pronounce", "list", "--voice", "Nobody")
+    assert code == 1 and "Unknown voice" in err
+
+    monkeypatch.setattr(mcp_server, "_client", AppClient)
+    result = mcp_server.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {
+        "name": "manage_pronunciations", "arguments": {"action": "add", "word": "SQL", "respelling": "sequel", "voice": "Ana"}}})["result"]
+    assert result["isError"] is False
+    assert [e.word for e in store.list_entries("en", ana)] == ["SQL"]

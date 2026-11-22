@@ -1,5 +1,6 @@
 import importlib.util
 import re
+from dataclasses import asdict
 from pathlib import Path
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
@@ -9,7 +10,7 @@ from pydantic import BaseModel
 from voxwell import voices
 from voxwell.features.audio_effects.dsp import Effects
 from voxwell.features.stories import jobs, subtitles
-from voxwell.features.stories.script import NARRATOR, ScriptError, parse, speakers
+from voxwell.features.stories.script import MOODS, NARRATOR, ScriptError, join_lines, parse, speakers
 from voxwell.features.voice_cloning.engine import LANGUAGES
 from voxwell.paths import download_name
 
@@ -24,12 +25,19 @@ class ParseRequest(BaseModel):
     script: str
 
 
+class JoinRequest(BaseModel):
+    script: str
+    first_line: int  # 1-based raw lines, inclusive
+    last_line: int
+
+
 class StoryRequest(BaseModel):
     title: str = ""
     language: str = "en"
     script: str
     cast: dict[str, str] = {}  # speaker -> voice id; missing speakers use the default voice
     effects: Effects | None = None
+    natural_pauses: bool = False
 
 
 def summary(job: jobs.Job) -> dict:
@@ -49,7 +57,7 @@ def _job(job_id: str) -> jobs.Job:
 
 @router.get("/status")
 def status():
-    return {"ready": importlib.util.find_spec("chatterbox") is not None, "languages": LANGUAGES}
+    return {"ready": importlib.util.find_spec("chatterbox") is not None, "languages": LANGUAGES, "moods": list(MOODS)}
 
 
 @router.post("/parse")
@@ -59,6 +67,15 @@ def parse_script(req: ParseRequest):
     except ScriptError as exc:
         raise HTTPException(422, str(exc))
     return {"speakers": speakers(lines), "lines": len(lines)}
+
+
+@router.post("/join")
+def join(req: JoinRequest):
+    """Join lines: neighbouring lines of one speaker become one line, spoken with no gap."""
+    try:
+        return asdict(join_lines(req.script, req.first_line, req.last_line))
+    except ScriptError as exc:
+        raise HTTPException(422, str(exc))
 
 
 @router.post("/jobs")
@@ -79,7 +96,7 @@ def create_job(req: StoryRequest):
                 raise HTTPException(422, f"Unknown voice for {speaker}.")
         cast[speaker] = voice
     title = req.title.strip()[:MAX_TITLE] or lines[0].text[:60]
-    job = jobs.create(title, req.language, req.script, cast, req.effects.model_dump() if req.effects else None)
+    job = jobs.create(title, req.language, req.script, cast, req.effects.model_dump() if req.effects else None, natural_pauses=req.natural_pauses)
     jobs.start(job)
     return {"id": job.id}
 

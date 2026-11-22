@@ -18,9 +18,10 @@ from pathlib import Path
 
 from voxwell import voices
 from voxwell.errors import user_message
+from voxwell.features.audio_effects import pause_fill
 from voxwell.features.audio_effects.dsp import Effects, apply_to_wav
 from voxwell.features.stories import subtitles
-from voxwell.features.stories.script import NARRATOR, parse
+from voxwell.features.stories.script import MOODS, NARRATOR, parse
 from voxwell.features.voice_cloning import engine
 from voxwell.paths import child_path, data_dir
 
@@ -48,6 +49,7 @@ class Job:
     error: str | None = None
     effects: dict | None = None  # Effects settings applied to the finished story
     timed: bool = False  # `script` is a subtitle file
+    natural_pauses: bool = False  # pauses carry the story's quiet background, not silence (not for subtitles)
 
 
 _jobs: dict[str, Job] = {}
@@ -75,11 +77,11 @@ def _load(folder: Path) -> Job | None:
     return job
 
 
-def create(title: str, language: str, script: str, cast: dict[str, str], effects: dict | None = None, *, timed: bool = False) -> Job:
+def create(title: str, language: str, script: str, cast: dict[str, str], effects: dict | None = None, *, timed: bool = False, natural_pauses: bool = False) -> Job:
     job_id = uuid.uuid4().hex[:12]
     folder = _root() / job_id
     folder.mkdir(parents=True)
-    job = Job(job_id, folder, title, language, script, cast, time.time(), effects=effects, timed=timed)
+    job = Job(job_id, folder, title, language, script, cast, time.time(), effects=effects, timed=timed, natural_pauses=natural_pauses)
     with _lock:
         _jobs[job_id] = job
     return job
@@ -156,9 +158,13 @@ def _speak_script(job: Job) -> bytes:
     lines = parse(job.script)
     refs = {speaker: _reference(voice) for speaker, voice in job.cast.items()}
     clips = []
+    extra = {"natural_pauses": True} if job.natural_pauses else {}
     for i, line in enumerate(lines):
         job.step, job.percent = f"Speaking line {i + 1} of {len(lines)}", int(99 * i / len(lines))
-        clips.append(engine.synthesize_line(line.text, job.language, refs.get(line.speaker)))
+        mood = {"exaggeration": MOODS[line.mood]} if line.mood else {}  # no mood: exactly as before
+        clips.append(engine.synthesize_line(line.text, job.language, refs.get(line.speaker), **extra, **mood))
+    if job.natural_pauses:  # the whole story is the take its line gaps match
+        return pause_fill.join_wavs([(clip, PAUSE_SECONDS) for clip in clips[:-1]] + [(clips[-1], 0)])
     return _join(clips)
 
 

@@ -1,6 +1,10 @@
 """Story scripts: one line per utterance, written as "Speaker: what they say".
 
 Lines without a "Speaker:" prefix are spoken by the Narrator. Blank lines are ignored.
+
+Line moods: a line's text may start with "[mood NAME]" (after the speaker label), e.g.
+"Anna: [mood dramatic] Get out." The marker is not spoken; it sets how strongly the whole line is
+delivered (the speech model's exaggeration), from MOODS.
 """
 
 import re
@@ -11,6 +15,13 @@ MAX_LINES = 500
 MAX_LINE_LENGTH = 1000
 MAX_SPEAKERS = 20
 MAX_SPEAKER_LENGTH = 40
+MAX_JOINED_LENGTH = 250  # characters; longer pieces make the model drift (the Audiobook chunk size too)
+
+# Line moods, quietest to strongest: the exaggeration each one gives the speech model. neutral is the
+# model's normal delivery. First guesses, to be tuned by ear.
+MOODS = {"calm": 0.3, "neutral": 0.5, "lively": 0.8, "dramatic": 1.2, "intense": 1.6}
+# "[mood NAME]", any case and spacing; "[moods]" or "[mood-board]" is ordinary text.
+_MOOD = re.compile(r"\[\s*mood(?:\s+([^\]]*?))?\s*\]", re.IGNORECASE)
 
 # A speaker name is a short label before the first colon, followed by a space or the end of the
 # line, e.g. "Anna: Hi" or "Old Tom:". A colon inside a word ("3:30", "https://") is not one.
@@ -25,6 +36,7 @@ class ScriptError(ValueError):
 class Line:
     speaker: str
     text: str
+    mood: str | None = None  # a name from MOODS
 
 
 def _split(raw: str) -> Line:
@@ -36,8 +48,28 @@ def _split(raw: str) -> Line:
     return Line(NARRATOR, raw.strip())
 
 
+def _mood_names() -> str:
+    names = list(MOODS)
+    return f"{', '.join(names[:-1])} or {names[-1]}"
+
+
+def _with_mood(line: Line, number: int) -> Line:
+    """`line` with its mood marker taken off the text; `number` is its line in the script, for errors."""
+    found = list(_MOOD.finditer(line.text))
+    if not found:
+        return line
+    if found[0].start() != 0 or len(found) > 1:
+        raise ScriptError(f"Line {number}: put the mood at the start of the line, right after the speaker.")
+    name = (found[0].group(1) or "").strip()
+    if not name:
+        raise ScriptError(f"Line {number} has a mood with no name. Use {_mood_names()}.")
+    if name.lower() not in MOODS:
+        raise ScriptError(f"Line {number} has an unknown mood '{name}'. Use {_mood_names()}.")
+    return Line(line.speaker, line.text[found[0].end() :].strip(), name.lower())
+
+
 def parse(script: str) -> list[Line]:
-    lines = [_split(raw) for raw in script.splitlines() if raw.strip()]
+    lines = [_with_mood(_split(raw), number) for number, raw in enumerate(script.splitlines(), 1) if raw.strip()]
     lines = [line for line in lines if line.text]
     if not lines:
         raise ScriptError("The script is empty.")
@@ -54,3 +86,48 @@ def parse(script: str) -> list[Line]:
 def speakers(lines: list[Line]) -> list[str]:
     """Speakers in order of first appearance."""
     return list(dict.fromkeys(line.speaker for line in lines))
+
+
+@dataclass
+class Joined:
+    script: str
+    joined: int  # lines merged into the line before them
+    too_long: int  # pairs left apart because together they'd pass MAX_JOINED_LENGTH
+    line: int  # 1-based: the first line that changed, or first_line when none did
+
+
+def join_lines(script: str, first_line: int, last_line: int) -> Joined:
+    """Join lines: merge neighbouring lines of one speaker within raw lines first_line..last_line.
+
+    The words of a later line go after its neighbour's, one space between, and its label is
+    dropped; the first line of a run keeps its form. A blank line, a line with no words or a
+    different speaker ends a run, and a pair whose words would pass MAX_JOINED_LENGTH stays apart.
+    Lines outside the range are untouched. Joined lines are spoken as one clip, with no gap.
+    """
+    # Only line breaks the page can count too (splitlines would also split on rarer separators).
+    raw = script.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    if raw and raw[-1] == "":
+        raw.pop()
+    if not 1 <= first_line <= last_line <= len(raw):
+        raise ScriptError("Pick lines inside the script.")
+    out = raw[: first_line - 1]
+    joined = too_long = 0
+    changed = None
+    run: Line | None = None  # the previous line in the range, while a next one may join it
+    for text in raw[first_line - 1 : last_line]:
+        line = _split(text) if text.strip() else None
+        # A line with its own mood keeps it: joined, its marker would land mid-line.
+        if run and line and line.text and line.speaker == run.speaker and not _MOOD.match(line.text):
+            if len(run.text) + 1 + len(line.text) > MAX_JOINED_LENGTH:
+                too_long += 1
+            else:
+                out[-1] = f"{out[-1].rstrip()} {line.text}"
+                run = Line(run.speaker, f"{run.text} {line.text}")
+                joined += 1
+                changed = changed or len(out)
+                continue
+        out.append(text)
+        run = line if line and line.text else None
+    out += raw[last_line:]
+    ending = "\n" if script.endswith(("\n", "\r")) else ""
+    return Joined("\n".join(out) + ending, joined, too_long, changed or first_line)

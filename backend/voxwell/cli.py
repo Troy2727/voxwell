@@ -508,9 +508,12 @@ def cmd_effects(client: Client, args) -> tuple[str, dict]:
 
 
 def cmd_pronounce(client: Client, args) -> tuple[str, dict]:
-    language = urllib.parse.quote(args.language)
-    entries = client.get_json(f"/api/pronunciation/entries?language={language}")
+    voice = _voice_id(client, args.voice) if getattr(args, "voice", None) else ""
+    query = f"language={urllib.parse.quote(args.language)}" + (f"&voice_id={voice}" if voice else "")
+    entries = client.get_json(f"/api/pronunciation/entries?{query}")
     scope = "all languages" if args.language == "all" else f"'{args.language}'"
+    if voice:
+        scope += f" with the voice '{args.voice}'"
     if args.action == "list":
         if not entries:
             return f"No pronunciations for {scope} yet. Add one with `voxwell pronounce add WORD RESPELLING`.", {"entries": []}
@@ -521,18 +524,19 @@ def cmd_pronounce(client: Client, args) -> tuple[str, dict]:
     if args.action == "remove":
         if existing is None:
             raise CliError(f"'{args.word}' has no pronunciation for {scope}.")
-        client.request("DELETE", f"/api/pronunciation/entries/{existing['id']}?language={language}")
+        client.request("DELETE", f"/api/pronunciation/entries/{existing['id']}?{query}")
         return f"Removed the pronunciation of '{existing['word']}'.", {"removed": existing}
     if not args.respelling:
         raise CliError("Give the respelling, e.g. `voxwell pronounce add Nguyen win`.")
     body = {"language": args.language, "word": args.word, "respelling": args.respelling,
-            "case_sensitive": args.case_sensitive, "whole_word": not args.partial}
+            "case_sensitive": args.case_sensitive, "whole_word": not args.partial, "voice_id": voice}
     if existing is None:
         entry = json.loads(client.post_json("/api/pronunciation/entries", body))
     else:
         entry = json.loads(client.request("PUT", f"/api/pronunciation/entries/{existing['id']}", json.dumps(body).encode(),
                                           {"Content-Type": "application/json"}))
-    return f"'{entry['word']}' will be spoken as '{entry['respelling']}'.", entry
+    who = f" by '{args.voice}'" if voice else ""
+    return f"'{entry['word']}' will be spoken{who} as '{entry['respelling']}'.", entry
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -660,6 +664,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("-l", "--language", default="en", help="ISO 639-1 code, or all for a word every language uses (default en)")
     p.add_argument("--case-sensitive", action="store_true", help="match only this exact capitalization")
     p.add_argument("--partial", action="store_true", help="also match inside longer words")
+    p.add_argument("--voice", help="a saved voice name or id: keep the word for that voice only; it wins over the language's list")
     p.set_defaults(run=cmd_pronounce)
 
     p = sub.add_parser("convert", parents=[common], help="re-speak a recording in a saved voice")

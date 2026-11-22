@@ -37,6 +37,7 @@ class BookSettings(BaseModel):
     voice: str | None = None
     chapters: list[ChapterSettings] | None = None
     tone_memory: bool | None = None
+    natural_pauses: bool | None = None
 
 
 class PreviewRequest(BaseModel):
@@ -47,7 +48,7 @@ def summary(book: books.Book) -> dict:
     return {
         "id": book.id, "title": book.title, "created": book.created, "language": book.language,
         "voice": book.voice, "state": book.state, "step": book.step, "percent": book.percent,
-        "error": book.error, "tone_memory": book.tone_memory,
+        "error": book.error, "tone_memory": book.tone_memory, "natural_pauses": book.natural_pauses,
         "chapters": [
             {**c.__dict__, "audio_url": f"/api/audiobook/books/{book.id}/chapters/{i}/audio" if c.status == "done" else None}
             for i, c in enumerate(book.chapters)
@@ -128,8 +129,11 @@ def update(book_id: str, req: BookSettings):
     tone_changed = req.tone_memory is not None and req.tone_memory != book.tone_memory
     if tone_changed:
         book.tone_memory = req.tone_memory
-    if req.language is not None or req.voice is not None or tone_changed:
-        # New voice, language or tone: finished chapters no longer match, so they render again.
+    pauses_changed = req.natural_pauses is not None and req.natural_pauses != book.natural_pauses
+    if pauses_changed:
+        book.natural_pauses = req.natural_pauses
+    if req.language is not None or req.voice is not None or tone_changed or pauses_changed:
+        # New voice, language, tone or pauses: finished chapters no longer match, so they render again.
         for i, ch in enumerate(book.chapters):
             ch.status = "pending"
             books.chapter_audio(book, i).unlink(missing_ok=True)

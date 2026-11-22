@@ -210,3 +210,118 @@ def test_a_line_with_only_cue_tags_is_skipped_and_the_story_goes_on(monkeypatch)
     with wave.open(io.BytesIO(client.get(f"/api/stories/jobs/{r.json()['id']}/audio").content)) as w:
         seconds = w.getnframes() / w.getframerate()
     assert seconds == pytest.approx(2 * 1.0 + engine.SKIPPED_LINE + 2 * jobs.PAUSE_SECONDS, abs=0.01)
+
+
+# --- line moods ----------------------------------------------------------------------------------
+
+
+def test_a_mood_marker_sets_the_line_mood_and_is_not_spoken():
+    lines = parse("Anna: [mood dramatic] Get out of my house.\n[MOOD   Calm  ] The door creaked.\nTom: Fine.")
+    assert lines == [
+        Line("Anna", "Get out of my house.", "dramatic"),
+        Line(NARRATOR, "The door creaked.", "calm"),
+        Line("Tom", "Fine."),
+    ]
+
+
+@pytest.mark.parametrize("script,error", [
+    ("Anna: Hi.\n\nTom: [mood angry] Out.", "Line 3 has an unknown mood 'angry'. Use calm, neutral, lively, dramatic or intense."),
+    ("Anna: Get [mood calm] out.", "Line 1: put the mood at the start of the line, right after the speaker."),
+    ("Anna: [mood calm] [mood lively] Out.", "Line 1: put the mood at the start of the line, right after the speaker."),
+    ("Anna: Hi.\nTom: [mood] Out.", "Line 2 has a mood with no name. Use calm, neutral, lively, dramatic or intense."),
+])
+def test_mood_mistakes_name_their_line(script, error):
+    with pytest.raises(ScriptError, match=error.replace("(", r"\(").replace(")", r"\)").replace(".", r"\.")):
+        parse(script)
+    r = client.post("/api/stories/jobs", json={"script": script, "language": "en"})
+    assert (r.status_code, r.json()["detail"]) == (422, error)
+
+
+def test_mood_look_alikes_are_read_as_written_and_a_marker_alone_is_skipped():
+    assert parse("Anna: [moods] and [mood-board] stay.\nTom: [mood calm]") == [Line("Anna", "[moods] and [mood-board] stay.")]
+
+
+def test_a_mood_sets_the_lines_exaggeration_and_no_mood_changes_nothing(monkeypatch):
+    calls = []
+
+    def synth(text, language, reference_audio=None, **kw):
+        calls.append((text, kw))
+        return wav_bytes(0.5)
+
+    monkeypatch.setattr(engine, "synthesize", synth)
+    monkeypatch.setattr(jobs, "start", jobs._work)
+    script = "Anna: [mood dramatic] Out! [pause 1] Now.\nTom: Fine.\n[mood calm] Quiet again."
+    assert create(script=script).status_code == 200
+    assert calls == [
+        ("Out! [pause 1] Now.", {"exaggeration": 1.2}),
+        ("Fine.", {}),
+        ("Quiet again.", {"exaggeration": 0.3}),
+    ]
+
+
+def test_status_lists_the_moods_in_order():
+    assert client.get("/api/stories/status").json()["moods"] == ["calm", "neutral", "lively", "dramatic", "intense"]
+
+
+def join(script, first, last):
+    r = client.post("/api/stories/join", json={"script": script, "first_line": first, "last_line": last})
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+def test_join_two_lines_of_one_speaker():
+    res = join("Anna: Did you hear that?\nAnna: Over there.\nTom: No.", 1, 2)
+    assert res == {"script": "Anna: Did you hear that? Over there.\nTom: No.", "joined": 1, "too_long": 0, "line": 1}
+    assert parse(res["script"])[0] == Line("Anna", "Did you hear that? Over there.")
+
+
+def test_join_needs_the_same_speaker_and_counts_narration_as_the_narrator():
+    assert join("Anna: Hi.\nTom: Hello.", 1, 2)["joined"] == 0
+    assert join("anna: Hi.\nAnna: Hello.", 1, 2)["joined"] == 0  # names compare exactly, as in the cast
+    assert join("It was dark.\nNarrator: And cold.", 1, 2)["script"] == "It was dark. And cold."
+
+
+def test_join_collapses_a_run_and_leaves_other_lines_alone():
+    script = "Tom: Before.\nAnna: One.\nAnna: Two.\nAnna: Three.\nAnna: After."
+    res = join(script, 2, 4)
+    assert res["script"] == "Tom: Before.\nAnna: One. Two. Three.\nAnna: After."
+    assert (res["joined"], res["line"]) == (2, 2)
+
+
+def test_blank_and_label_only_lines_are_never_joined():
+    assert join("Anna: One.\n\nAnna: Two.", 1, 3)["joined"] == 0
+    assert join("Anna: One.\nAnna:\nAnna: Two.", 1, 3)["joined"] == 0
+
+
+def test_a_pair_too_long_to_join_is_left_apart_and_counted():
+    long = "word " * 50  # 250 characters before the strip
+    res = join(f"Anna: {long}\nAnna: {long}\nTom: A.\nTom: B.", 1, 4)
+    assert (res["joined"], res["too_long"]) == (1, 1)
+    assert res["script"].endswith("Tom: A. B.")
+
+
+def test_join_keeps_a_final_line_break():
+    assert join("Anna: One.\nAnna: Two.\n", 1, 2)["script"] == "Anna: One. Two.\n"
+
+
+@pytest.mark.parametrize("first,last", [(0, 1), (2, 1), (1, 4)])
+def test_join_rejects_lines_outside_the_script(first, last):
+    r = client.post("/api/stories/join", json={"script": "Anna: One.\nAnna: Two.\nTom: Three.", "first_line": first, "last_line": last})
+    assert r.status_code == 422 and r.json()["detail"] == "Pick lines inside the script."
+
+
+def test_joined_lines_are_spoken_as_one_clip(fake):
+    script = join("Anna: Did you hear that?\nAnna: Over there.", 1, 2)["script"]
+    create(script=script)
+    assert [text for text, _, _ in fake] == ["Did you hear that? Over there."]
+
+
+def test_join_counts_only_line_breaks_the_page_can_count():
+    script = "Anna: One\x0cstill one.\r\nAnna: Two."
+    assert join(script, 1, 2)["script"] == "Anna: One\x0cstill one. Two."
+
+
+def test_join_lines_keeps_a_line_with_its_own_mood_apart():
+    res = join("Anna: [mood calm] Hush.\nAnna: Listen.\nAnna: [mood intense] Run!", 1, 3)
+    assert res["script"] == "Anna: [mood calm] Hush. Listen.\nAnna: [mood intense] Run!"
+    assert [(line.text, line.mood) for line in parse(res["script"])] == [("Hush. Listen.", "calm"), ("Run!", "intense")]
