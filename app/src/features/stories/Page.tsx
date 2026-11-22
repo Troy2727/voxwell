@@ -31,6 +31,13 @@ Anna: That was not the wind.`;
 
 const DEFAULT_VOICE = 'default';
 
+/** " Start a line with [mood calm], … or [mood intense] to change how it is delivered." ('' without moods) */
+function moodHint(moods: string[]) {
+  const markers = moods.filter((m) => m !== 'neutral').map((m) => `[mood ${m}]`);
+  if (markers.length < 2) return '';
+  return ` Start a line with ${markers.slice(0, -1).join(', ')} or ${markers.at(-1)} to change how it is delivered.`;
+}
+
 export default function Page() {
   const [voices, setVoices] = useState<Voice[]>([]);
   const [title, setTitle] = useState('');
@@ -45,11 +52,14 @@ export default function Page() {
   const [error, setError] = useState('');
   const [subtitles, setSubtitles] = useState<File | null>(null);
   const [subtitleVoice, setSubtitleVoice] = useState('');
+  const [moods, setMoods] = useState<string[]>([]);
   const timer = useRef<number | undefined>(undefined);
   const parseTimer = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     listVoices().then(setVoices, () => setVoices([]));
+    // Line moods: the names come from the backend, which owns the script format. No hint if it fails.
+    api<{ moods?: string[] }>('/api/stories/status').then((s) => setMoods(s.moods ?? []), () => setMoods([]));
     return () => {
       window.clearTimeout(timer.current);
       window.clearTimeout(parseTimer.current);
@@ -127,7 +137,11 @@ export default function Page() {
             <ChoiceSelect id="story-language" options={LANGUAGES} value={language} onChange={setLanguage} />
           </Field>
         </div>
-        <Field label="Script" htmlFor="story-script" hint="One line each, as “Name: what they say”. Lines without a name are read by the Narrator.">
+        <Field
+          label="Script"
+          htmlFor="story-script"
+          hint={`One line each, as “Name: what they say”. Lines without a name are read by the Narrator.${moodHint(moods)}`}
+        >
           <Textarea id="story-script" rows={10} value={script} placeholder={EXAMPLE} onChange={(e) => setScript(e.target.value)} className="font-mono text-sm" />
         </Field>
         {!script && (

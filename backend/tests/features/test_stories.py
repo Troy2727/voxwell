@@ -210,3 +210,54 @@ def test_a_line_with_only_cue_tags_is_skipped_and_the_story_goes_on(monkeypatch)
     with wave.open(io.BytesIO(client.get(f"/api/stories/jobs/{r.json()['id']}/audio").content)) as w:
         seconds = w.getnframes() / w.getframerate()
     assert seconds == pytest.approx(2 * 1.0 + engine.SKIPPED_LINE + 2 * jobs.PAUSE_SECONDS, abs=0.01)
+
+
+# --- line moods ----------------------------------------------------------------------------------
+
+
+def test_a_mood_marker_sets_the_line_mood_and_is_not_spoken():
+    lines = parse("Anna: [mood dramatic] Get out of my house.\n[MOOD   Calm  ] The door creaked.\nTom: Fine.")
+    assert lines == [
+        Line("Anna", "Get out of my house.", "dramatic"),
+        Line(NARRATOR, "The door creaked.", "calm"),
+        Line("Tom", "Fine."),
+    ]
+
+
+@pytest.mark.parametrize("script,error", [
+    ("Anna: Hi.\n\nTom: [mood angry] Out.", "Line 3 has an unknown mood 'angry'. Use calm, neutral, lively, dramatic or intense."),
+    ("Anna: Get [mood calm] out.", "Line 1: put the mood at the start of the line, right after the speaker."),
+    ("Anna: [mood calm] [mood lively] Out.", "Line 1: put the mood at the start of the line, right after the speaker."),
+    ("Anna: Hi.\nTom: [mood] Out.", "Line 2 has a mood with no name. Use calm, neutral, lively, dramatic or intense."),
+])
+def test_mood_mistakes_name_their_line(script, error):
+    with pytest.raises(ScriptError, match=error.replace("(", r"\(").replace(")", r"\)").replace(".", r"\.")):
+        parse(script)
+    r = client.post("/api/stories/jobs", json={"script": script, "language": "en"})
+    assert (r.status_code, r.json()["detail"]) == (422, error)
+
+
+def test_mood_look_alikes_are_read_as_written_and_a_marker_alone_is_skipped():
+    assert parse("Anna: [moods] and [mood-board] stay.\nTom: [mood calm]") == [Line("Anna", "[moods] and [mood-board] stay.")]
+
+
+def test_a_mood_sets_the_lines_exaggeration_and_no_mood_changes_nothing(monkeypatch):
+    calls = []
+
+    def synth(text, language, reference_audio=None, **kw):
+        calls.append((text, kw))
+        return wav_bytes(0.5)
+
+    monkeypatch.setattr(engine, "synthesize", synth)
+    monkeypatch.setattr(jobs, "start", jobs._work)
+    script = "Anna: [mood dramatic] Out! [pause 1] Now.\nTom: Fine.\n[mood calm] Quiet again."
+    assert create(script=script).status_code == 200
+    assert calls == [
+        ("Out! [pause 1] Now.", {"exaggeration": 1.2}),
+        ("Fine.", {}),
+        ("Quiet again.", {"exaggeration": 0.3}),
+    ]
+
+
+def test_status_lists_the_moods_in_order():
+    assert client.get("/api/stories/status").json()["moods"] == ["calm", "neutral", "lively", "dramatic", "intense"]

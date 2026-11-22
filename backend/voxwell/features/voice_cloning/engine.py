@@ -451,11 +451,11 @@ def silent_clip() -> bytes:
     return _to_wav(np.zeros(int(SKIPPED_LINE * SAMPLE_RATE), dtype=np.float32), SAMPLE_RATE)
 
 
-def synthesize_line(text: str, language: str, reference_audio: Path | None = None) -> bytes:
+def synthesize_line(text: str, language: str, reference_audio: Path | None = None, **options) -> bytes:
     """synthesize() for one line of a longer job (dubbing, stories): a line with nothing left to say
     once its cue tags are removed ("[Music]" in a transcript) becomes a short silence, so the job goes on."""
     try:
-        return synthesize(text, language, reference_audio)
+        return synthesize(text, language, reference_audio, **options)
     except NothingToSay:
         log.info("Skipped a line with only cue tags: %r", text[:80])
         return silent_clip()

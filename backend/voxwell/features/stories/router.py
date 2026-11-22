@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from voxwell import voices
 from voxwell.features.audio_effects.dsp import Effects
 from voxwell.features.stories import jobs, subtitles
-from voxwell.features.stories.script import NARRATOR, ScriptError, parse, speakers
+from voxwell.features.stories.script import MOODS, NARRATOR, ScriptError, parse, speakers
 from voxwell.features.voice_cloning.engine import LANGUAGES
 from voxwell.paths import download_name
 
@@ -49,7 +49,7 @@ def _job(job_id: str) -> jobs.Job:
 
 @router.get("/status")
 def status():
-    return {"ready": importlib.util.find_spec("chatterbox") is not None, "languages": LANGUAGES}
+    return {"ready": importlib.util.find_spec("chatterbox") is not None, "languages": LANGUAGES, "moods": list(MOODS)}
 
 
 @router.post("/parse")

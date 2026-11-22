@@ -140,6 +140,7 @@ function routes(): [string | RegExp, Reply][] {
     }],
     ['GET /api/music/tracks', () => (tracks.length ? [trackJob()] : [])],
 
+    ['GET /api/stories/status', { ready: true, languages: { en: 'English' }, moods: ['calm', 'neutral', 'lively', 'dramatic', 'intense'] }],
     ['POST /api/stories/parse', (_url: URL, request: Request) => {
       const lines: string[] = request.postDataJSON().script.split('\n').filter((l: string) => l.trim());
       const speakers = [...new Set(lines.map((l) => (/^(\w+):/.exec(l)?.[1] ?? 'Narrator')))];

@@ -20,7 +20,7 @@ from voxwell import voices
 from voxwell.errors import user_message
 from voxwell.features.audio_effects.dsp import Effects, apply_to_wav
 from voxwell.features.stories import subtitles
-from voxwell.features.stories.script import NARRATOR, parse
+from voxwell.features.stories.script import MOODS, NARRATOR, parse
 from voxwell.features.voice_cloning import engine
 from voxwell.paths import child_path, data_dir
 
@@ -158,7 +158,8 @@ def _speak_script(job: Job) -> bytes:
     clips = []
     for i, line in enumerate(lines):
         job.step, job.percent = f"Speaking line {i + 1} of {len(lines)}", int(99 * i / len(lines))
-        clips.append(engine.synthesize_line(line.text, job.language, refs.get(line.speaker)))
+        mood = {"exaggeration": MOODS[line.mood]} if line.mood else {}  # no mood: exactly as before
+        clips.append(engine.synthesize_line(line.text, job.language, refs.get(line.speaker), **mood))
     return _join(clips)
 
 

@@ -32,3 +32,4 @@ Voxwell runs every model locally; the `voxwell` CLI drives the running Voxwell s
 - `edit` cleans up transcript text (a file, or `-` for stdin) with a local AI model: `--preset filler|punctuation|formal|concise`, or `--instruction "..."`. It edits chunk by chunk and keeps the original wording of any chunk the model garbles, so review the result; it prints the text, or saves it with `-o`.
 - Speed is CPU-bound without a GPU: a minute of audio takes tens of seconds to isolate or transcribe, and a dub several minutes. Long commands block until finished; let them run.
 - Each model downloads on its first use, so the first call of a command is the slowest.
+- Stories scripts (in the app and `POST /api/stories/jobs`) take a line mood at the start of a line's text: `Anna: [mood dramatic] Get out.` The names are calm, neutral, lively, dramatic and intense; the marker isn't spoken, and an unknown name is an error that names the line.
