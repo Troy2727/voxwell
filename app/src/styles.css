@@ -161,7 +161,17 @@
   color: transparent;
   animation: shimmer-text 1.4s linear infinite;
 }
+/* Home greeting (home/Page.tsx): each letter drifts in out of a blur. */
+@keyframes vapor-in {
+  from { opacity: 0; filter: blur(20px); transform: translateY(20px) scale(1.5) rotate(5deg); }
+}
+.vapor-letter {
+  display: inline-block;
+  transform-origin: bottom;
+  animation: vapor-in 1.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
 @media (prefers-reduced-motion: reduce) {
   .pixel-on { animation: none; }
+  .vapor-letter { animation: none; }
   .shimmer-text { animation: none; color: var(--foreground); }
 }
