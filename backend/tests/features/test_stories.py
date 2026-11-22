@@ -263,3 +263,8 @@ def test_joined_lines_are_spoken_as_one_clip(fake):
     script = join("Anna: Did you hear that?\nAnna: Over there.", 1, 2)["script"]
     create(script=script)
     assert [text for text, _, _ in fake] == ["Did you hear that? Over there."]
+
+
+def test_join_counts_only_line_breaks_the_page_can_count():
+    script = "Anna: One\x0cstill one.\r\nAnna: Two."
+    assert join(script, 1, 2)["script"] == "Anna: One\x0cstill one. Two."

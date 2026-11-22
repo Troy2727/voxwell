@@ -73,7 +73,10 @@ def join_lines(script: str, first_line: int, last_line: int) -> Joined:
     different speaker ends a run, and a pair whose words would pass MAX_JOINED_LENGTH stays apart.
     Lines outside the range are untouched. Joined lines are spoken as one clip, with no gap.
     """
-    raw = script.splitlines()
+    # Only line breaks the page can count too (splitlines would also split on rarer separators).
+    raw = script.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    if raw and raw[-1] == "":
+        raw.pop()
     if not 1 <= first_line <= last_line <= len(raw):
         raise ScriptError("Pick lines inside the script.")
     out = raw[: first_line - 1]

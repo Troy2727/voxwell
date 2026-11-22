@@ -182,6 +182,7 @@ export default function Page() {
             id="story-script"
             rows={10}
             value={script}
+            readOnly={joining} // a join's result would overwrite typing meanwhile
             placeholder={EXAMPLE}
             onChange={(e) => {
               setScript(e.target.value);

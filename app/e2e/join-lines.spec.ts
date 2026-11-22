@@ -4,6 +4,8 @@ const SCRIPT = 'Anna: Did you hear that?\nAnna: Over there.\nTom: No.';
 const JOINED = 'Anna: Did you hear that? Over there.\nTom: No.';
 
 test.describe('join lines', () => {
+  test.skip(({ mode }) => mode === 'real', 'stubs the join request to check what the page sends');
+
   test('joins the line at the cursor with the next, says so, and can be undone', async ({ app: page }) => {
     const sent: unknown[] = [];
     await page.route(`${BACKEND}/api/stories/join`, (route) => {
