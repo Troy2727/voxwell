@@ -237,6 +237,8 @@ test.describe('errors the user can see', () => {
   test.skip(({ mode }) => mode === 'real', 'These fake the failures, so they only run against the mock backend.');
 
   test('backend offline: the app says so, then recovers when it comes back', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(e.message));
     await installMockBackend(page); // not the app fixture: health must fail before the first load
     await page.route(`${BACKEND}/api/health`, (route) => route.abort('connectionrefused'));
     await page.goto('/');
@@ -244,6 +246,8 @@ test.describe('errors the user can see', () => {
     await expect(page.getByRole('alert')).toHaveCount(0); // no banner above every page
     await page.unroute(`${BACKEND}/api/health`);
     await expect(page.getByText('Running on this computer', { exact: true })).toBeVisible({ timeout: 15_000 });
+    await page.evaluate(() => new Promise((done) => setTimeout(done, 500))); // a few wave frames after Home remounts
+    expect(errors).toEqual([]);
   });
 
   test('backend offline on the website: Home links to the install steps', async ({ page }) => {

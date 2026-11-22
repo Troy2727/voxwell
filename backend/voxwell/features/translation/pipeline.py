@@ -9,7 +9,7 @@ from pathlib import Path
 
 from voxwell import live_audio, voices
 from voxwell.features.audiobook.books import render_text
-from voxwell.features.audiobook.chunking import chapter_chunks, chunks
+from voxwell.features.audiobook.chunking import _SENTENCE_END, chapter_chunks, chunks
 from voxwell.features.dubbing import translate
 from voxwell.features.voice_cloning.engine import LANGUAGES as SPEECH_LANGUAGES
 
@@ -49,11 +49,17 @@ def check(source: str | None, target: str, voice: str | None) -> Path | None:
         raise TranslationError(f"Unknown voice '{voice}'.")
 
 
+def _sentences(paragraph: str) -> list[str]:
+    """One sentence per piece: given several at once, M2M100 glues them together ("todos.Gracias") or
+    mistranslates them. chunks() still cuts a sentence too long for one call."""
+    return [s for chunk in chunks(paragraph) for s in _SENTENCE_END.split(chunk) if s.strip()]
+
+
 def translate_text(text: str, source: str, target: str) -> str:
-    """Translate sentence-sized pieces (M2M100 output is capped per call), keeping paragraphs."""
+    """Translate sentence by sentence (M2M100 output is capped per call), keeping paragraphs."""
     if source not in translate.LANGUAGES:
         raise TranslationError(f"Translation does not support the language '{source}'.")
-    paragraphs = [c for c in (chunks(p) for p in text.split("\n\n")) if c]
+    paragraphs = [s for s in (_sentences(p) for p in text.split("\n\n")) if s]
     return "\n\n".join(" ".join(translate.translate(pieces, source, target)) for pieces in paragraphs)
 
 

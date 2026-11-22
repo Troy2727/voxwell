@@ -57,6 +57,8 @@ export function WaveStage() {
       ctx!.globalAlpha = 1;
     }
     const loop = () => {
+      // React removes the canvas before it runs this effect's cleanup, so a frame can land in between.
+      if (!canvas.isConnected) return;
       t += 0.016;
       energy *= 0.965;
       draw();
