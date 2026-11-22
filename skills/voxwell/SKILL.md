@@ -33,3 +33,4 @@ Voxwell runs every model locally; the `voxwell` CLI drives the running Voxwell s
 - Speed is CPU-bound without a GPU: a minute of audio takes tens of seconds to isolate or transcribe, and a dub several minutes. Long commands block until finished; let them run.
 - Each model downloads on its first use, so the first call of a command is the slowest.
 - A first take after a pause can be a few seconds slower when the user has turned on Free the GPU in the app: the speech model is moved back from system RAM before it speaks.
+- Stories scripts (in the app and `POST /api/stories/jobs`) take a line mood at the start of a line's text: `Anna: [mood dramatic] Get out.` The names are calm, neutral, lively, dramatic and intense; the marker isn't spoken, and an unknown name is an error that names the line. A mood has no effect on an English line with cue tags such as `[laugh]`.
