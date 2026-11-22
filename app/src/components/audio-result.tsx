@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Download } from 'lucide-react';
+import { Download, PanelBottom } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiUrl, backendUnreachable, errorMessage } from '@/api';
 import {
@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/audio-player';
 import { Button } from '@/components/ui/button';
 import { AudioScrubber } from '@/components/ui/waveform';
+import { playInBar } from '@/lib/now-playing';
 
 const BARS = 120;
 // Above this the file is not decoded for a waveform (a whole audiobook would take too much memory).
@@ -69,7 +70,7 @@ async function saveAsMp3(src: string, name: string) {
   URL.revokeObjectURL(url);
 }
 
-function Player({ src, download, autoPlay, lazy }: Props) {
+function Player({ src, download, autoPlay, lazy, barTitle, barSource }: Props) {
   const [converting, setConverting] = useState(false);
   const player = useAudioPlayer();
   const time = useAudioPlayerTime();
@@ -107,6 +108,21 @@ function Player({ src, download, autoPlay, lazy }: Props) {
           <AudioPlayerDuration className="text-xs" />
         </div>
       </div>
+      {barTitle && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="shrink-0"
+          aria-label="Play in Now playing bar"
+          title="Keep playing while you browse"
+          onClick={() => {
+            player.pause();
+            playInBar({ src, title: barTitle, source: barSource ?? '' });
+          }}
+        >
+          <PanelBottom />
+        </Button>
+      )}
       {download && (
         <Button asChild variant="ghost" size="icon" className="shrink-0" aria-label="Download">
           <a href={src} download={download}>
@@ -140,6 +156,9 @@ interface Props {
   download?: string;
   autoPlay?: boolean;
   lazy?: boolean;
+  /** With a title, a button hands the clip to the Now playing bar; `barSource` says where it's from. */
+  barTitle?: string;
+  barSource?: string;
 }
 
 /** A playable result: play button, real waveform you can click to seek, time, optional download. */

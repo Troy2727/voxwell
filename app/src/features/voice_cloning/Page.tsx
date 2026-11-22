@@ -37,6 +37,7 @@ export default function Page() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [audioUrl, setAudioUrl] = useState('');
+  const [audioTitle, setAudioTitle] = useState(''); // the text that was spoken, for the Now playing bar
   const [cues, setCues] = useState<Cues | null>(null);
   const [cueNote, setCueNote] = useState('');
   const textBox = useRef<HTMLTextAreaElement>(null);
@@ -141,6 +142,7 @@ export default function Page() {
         body: JSON.stringify({ text, language, voice_id: voiceId || null, effects: isNeutral(fx) ? null : fx }),
       });
       setAudioUrl(apiUrl(res.url));
+      setAudioTitle(text.trim().slice(0, 60));
       if (res.cues_ignored) {
         setCueNote(cuesHere
           ? 'The cues were left out this time: they need a voice clip longer than five seconds and the cue model, which could not be used. See the Voxwell log.'
@@ -229,7 +231,7 @@ export default function Page() {
         </div>
         <ErrorAlert message={error} />
         {cueNote && <p className="text-sm text-muted-foreground">{cueNote}</p>}
-        {audioUrl && <AudioResult src={audioUrl} download="voxwell-speech.wav" />}
+        {audioUrl && <AudioResult src={audioUrl} download="voxwell-speech.wav" barTitle={audioTitle} barSource="Voice cloning" />}
       </Section>
     </PageLayout>
   );
