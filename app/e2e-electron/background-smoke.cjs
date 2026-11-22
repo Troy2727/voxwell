@@ -32,7 +32,7 @@ async function main() {
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(async () => { try { return (await fetch(`${window.voxwell.backendUrl}/api/health`)).ok; } catch { return false; } }, null, { timeout: 60000, polling: 500 });
   await page.getByRole('heading', { level: 1 }).first().waitFor({ timeout: 30000 });
-  check('Home shows the setting on', await page.getByRole('checkbox', { name: 'Run in background' }).isChecked({ timeout: 10000 }));
+  check('Home shows the setting on', await page.getByRole('switch', { name: 'Run in background' }).isChecked({ timeout: 10000 }));
 
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => !w.webContents.getURL().includes('overlay.html')).close());
   await sleep(2000);

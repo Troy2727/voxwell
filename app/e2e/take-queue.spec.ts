@@ -49,7 +49,7 @@ test.describe('take queue', () => {
     expect(speech.sent.map((s) => s.text)).toEqual(['First take.']);
 
     speech.release();
-    await expect(queue(page).getByText(/· Done/)).toHaveCount(3);
+    await expect(queue(page).getByText('Done', { exact: true })).toHaveCount(3);
     await expect(page.getByText('Take ready: Third take.')).toBeVisible();
     expect(speech.sent.map((s) => s.text)).toEqual(['First take.', 'Second take.', 'Third take.']);
     for (let i = 1; i < speech.sent.length; i++) expect(speech.sent[i].start).toBeGreaterThanOrEqual(speech.sent[i - 1].end!);
@@ -74,9 +74,9 @@ test.describe('take queue', () => {
     await openFeature(page, 'Voice cloning');
     await add(page, 'Fail this one.');
     await add(page, 'After the failure.');
-    await expect(queue(page).getByText(/· Failed/)).toBeVisible();
+    await expect(queue(page).getByText('Failed', { exact: true })).toBeVisible();
     await expect(queue(page).getByText('Speech synthesis failed; see the Voxwell log.')).toBeVisible();
-    await expect(queue(page).getByText(/· Done/)).toBeVisible();
+    await expect(queue(page).getByText('Done', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Clear finished' }).click();
     await expect(queue(page)).toHaveCount(0);
   });
@@ -104,7 +104,7 @@ test.describe('take queue', () => {
     speech.release();
     await expect.poll(() => speech.sent.filter((s) => s.end).length).toBe(2);
     await openFeature(page, 'Voice cloning');
-    await expect(queue(page).getByText(/· Done/)).toHaveCount(2);
+    await expect(queue(page).getByText('Done', { exact: true })).toHaveCount(2);
   });
 
   test('Ctrl+Enter adds a take; with no text it adds nothing', async ({ app: page }) => {

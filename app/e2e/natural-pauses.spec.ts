@@ -11,7 +11,7 @@ async function bodies(page: Page, path: string, method = 'POST') {
   return sent;
 }
 
-const box = (page: Page) => page.getByRole('checkbox', { name: 'Natural pauses' });
+const box = (page: Page) => page.getByRole('switch', { name: 'Natural pauses' });
 
 test.describe('natural pauses', () => {
   test.skip(({ mode }) => mode === 'real', 'checks what the pages send');

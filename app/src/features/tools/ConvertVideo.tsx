@@ -3,6 +3,7 @@ import { Download, Video } from 'lucide-react';
 import { api, apiUrl, type Voice } from '../../api';
 import { AudioResult } from '@/components/audio-result';
 import { FileDrop } from '@/components/file-drop';
+import { JobProgress } from '@/components/job-progress';
 import { ErrorAlert, Field, message, Muted } from '@/components/page';
 import { VoiceSelect } from '@/components/voice-select';
 import { Button } from '@/components/ui/button';
@@ -56,8 +57,8 @@ export function ConvertVideo({ voices }: { voices: Voice[] }) {
         <Button className="max-w-full" disabled={busy || !file || !voice} onClick={run}>
           <Video /> {busy ? 'Converting…' : 'Convert video'}
         </Button>
-        {busy && <Muted>This can take several minutes. The first time downloads the conversion and voice isolation models.</Muted>}
       </div>
+      {busy && <JobProgress step="Converting the voice" percent={null} hint="This can take several minutes. The first time downloads the conversion and voice isolation models." />}
       <ErrorAlert message={error} />
       {result?.video_url && (
         <div className="flex flex-col gap-3">

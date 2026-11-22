@@ -8,7 +8,7 @@ import { EmptyState, Muted, Section } from '@/components/page';
 import { PhoneDictation, savedPhoneAddress } from '@/components/phone-dictation';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { INSTALL_URL } from '@/lib/links';
@@ -106,8 +106,8 @@ function RunInBackground({ bridge }: { bridge: VoxwellBridge['background'] }) {
   return (
     <Section title="Desktop app">
       <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-2">
-          <Checkbox id="run-in-background" checked={on} disabled={saving} onCheckedChange={(v) => change(v === true)} />
+        <div className="flex items-center gap-3">
+          <Switch id="run-in-background" checked={on} disabled={saving} onCheckedChange={change} />
           <Label htmlFor="run-in-background">Run in background</Label>
         </div>
         <p className="text-muted-foreground text-xs">

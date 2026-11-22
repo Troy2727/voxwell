@@ -14,7 +14,7 @@ test.describe('free the gpu', () => {
       return route.fallback();
     });
     await openFeature(page, 'Voice cloning');
-    const box = page.getByRole('checkbox', { name: LABEL });
+    const box = page.getByRole('switch', { name: LABEL });
     await expect(box).not.toBeChecked();
     await expect(page.getByText('Frees graphics memory for other apps')).toBeVisible();
     for (const width of [390, 768, 1024, 1440]) {

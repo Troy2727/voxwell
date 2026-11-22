@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { api } from '../../api';
 import { ErrorAlert, message, Section } from '@/components/page';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 
 interface Setting {
@@ -38,8 +38,8 @@ export function FreeTheGpu() {
   return (
     <Section title="Free the GPU">
       <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-2">
-          <Checkbox id="free-the-gpu" checked={setting?.enabled ?? false} disabled={!setting || saving} onCheckedChange={(v) => change(v === true)} />
+        <div className="flex items-center gap-3">
+          <Switch id="free-the-gpu" checked={setting?.enabled ?? false} disabled={!setting || saving} onCheckedChange={change} />
           <Label htmlFor="free-the-gpu">Move the speech model to system RAM when idle</Label>
         </div>
         <p className="text-muted-foreground text-xs">

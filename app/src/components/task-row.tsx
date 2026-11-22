@@ -24,13 +24,14 @@ const RING: Record<TaskState, string> = {
   failed: 'text-destructive',
 };
 
-/** How far along a task is, as a ring that fills clockwise. */
+/** How far along a task is, as a ring that fills clockwise. A running task with no percent spins a quarter ring. */
 function ProgressRing({ state, percent }: { state: TaskState; percent: number }) {
   const r = 7.5;
   const c = 2 * Math.PI * r;
-  const filled = state === 'done' || state === 'failed' ? 1 : percent / 100;
+  const spinning = state === 'running' && percent <= 0;
+  const filled = state === 'done' || state === 'failed' ? 1 : spinning ? 0.25 : percent / 100;
   return (
-    <svg viewBox="0 0 18 18" className={cn('size-[18px] shrink-0', RING[state])} aria-hidden>
+    <svg viewBox="0 0 18 18" className={cn('size-[18px] shrink-0', RING[state], spinning && 'animate-spin')} aria-hidden>
       <circle cx="9" cy="9" r={r} fill="none" strokeWidth="2.4" className="stroke-border" />
       <circle
         cx="9" cy="9" r={r} fill="none" strokeWidth="2.4" stroke="currentColor" strokeLinecap="round"
@@ -42,13 +43,16 @@ function ProgressRing({ state, percent }: { state: TaskState; percent: number })
 }
 
 /** One task in a list: ring, name, status pill and details that expand. A failed task shows its
- *  error without expanding and offers Retry when `onRetry` is given. */
-export function TaskRow({ name, state, percent = 0, detail, onRetry }: {
+ *  error without expanding and offers Retry when `onRetry` is given. `status` replaces the pill's
+ *  word (e.g. "Position 2"); `action` adds a button at the end of the row. */
+export function TaskRow({ name, state, percent = 0, detail, onRetry, status, action }: {
   name: string;
   state: TaskState;
   percent?: number;
   detail?: ReactNode;
   onRetry?: () => void;
+  status?: string;
+  action?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const shown = open || state === 'failed';
@@ -63,7 +67,7 @@ export function TaskRow({ name, state, percent = 0, detail, onRetry }: {
           </Button>
         )}
         <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-xs font-medium', PILL[state])}>
-          {LABELS[state]}
+          {status ?? LABELS[state]}
           {state === 'running' && percent > 0 && <span className="tabular-nums"> {Math.round(percent)}%</span>}
         </span>
         {detail && state !== 'failed' && (
@@ -71,9 +75,10 @@ export function TaskRow({ name, state, percent = 0, detail, onRetry }: {
             <ChevronRight className={cn('transition-transform', open && 'rotate-90')} />
           </Button>
         )}
+        {action}
       </div>
       {detail && shown && (
-        <p className={cn('mt-1.5 pl-[30px] text-xs break-words', state === 'failed' ? 'text-destructive' : 'text-muted-foreground')}>{detail}</p>
+        <p role={state === 'failed' ? 'alert' : undefined} className={cn('mt-1.5 pl-[30px] text-xs break-words', state === 'failed' ? 'text-destructive' : 'text-muted-foreground')}>{detail}</p>
       )}
     </div>
   );
