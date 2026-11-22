@@ -138,7 +138,7 @@ def test_speak_text(models):
     r = client.post("/api/translation/speak", json={"text": "Hello. How are you?", "target": "de"})
     assert r.status_code == 200
     body = r.json()
-    assert body["translation"] == "Hello. How are you?-de" and body["source"] == "en"
+    assert body["translation"] == "Hello.-de How are you?-de" and body["source"] == "en"  # one sentence per piece
     assert client.get(body["url"]).content[:4] == b"RIFF"
 
 
@@ -187,3 +187,13 @@ def test_speaking_a_translation_of_only_cue_tags_is_refused_clearly(models, monk
     monkeypatch.setattr(tts, "synthesize", synthesize)
     r = client.post("/api/translation/speak", json={"text": "[laugh]", "target": "de"})
     assert r.status_code == 422 and r.json()["detail"] == "Nothing to say after removing cue tags."
+
+
+
+def test_text_is_translated_one_sentence_at_a_time(monkeypatch):
+    """Given several sentences at once, M2M100 glued them ("todos.Gracias") and mistranslated them."""
+    seen = []
+    monkeypatch.setattr(translate, "translate", lambda texts, s, t: seen.append(list(texts)) or [x.upper() for x in texts])
+    out = pipeline.translate_text("Good morning, everyone. Thanks for joining.\n\nBye now!", "en", "es")
+    assert seen == [["Good morning, everyone.", "Thanks for joining."], ["Bye now!"]]
+    assert out == "GOOD MORNING, EVERYONE. THANKS FOR JOINING.\n\nBYE NOW!"
