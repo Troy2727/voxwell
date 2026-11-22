@@ -83,7 +83,7 @@ export function usePromptMenu({ box, text, setText, sources, onSubmit }: {
     }
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && onSubmit) {
       e.preventDefault();
-      onSubmit();
+      if (!e.repeat) onSubmit(); // a held key would submit again and again
     }
   };
 
