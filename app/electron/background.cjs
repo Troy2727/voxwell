@@ -70,6 +70,8 @@ function register(mainWindow) {
   }
 
   app.on('before-quit', () => { quitting = true; });
+  // Windows logoff or shutdown: Electron emits no before-quit then, and hiding would hold the shutdown up.
+  win.on('session-end', () => { quitting = true; });
   win.on('close', (event) => {
     if (closeAction({ enabled, trayAvailable: Boolean(tray), quitting }) !== 'hide') return;
     event.preventDefault();

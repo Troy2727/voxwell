@@ -86,6 +86,7 @@ function PlayButton({ name, src, clip }: { name: string; src: string; clip: Retu
 /** Desktop app only: closing the window can hide Voxwell in the system tray instead of quitting. */
 function RunInBackground({ bridge }: { bridge: VoxwellBridge['background'] }) {
   const [on, setOn] = useState<boolean | null>(null);
+  const [saving, setSaving] = useState(false);
   useEffect(() => {
     bridge.get().then(setOn, () => setOn(false));
   }, [bridge]);
@@ -93,16 +94,20 @@ function RunInBackground({ bridge }: { bridge: VoxwellBridge['background'] }) {
 
   const change = (next: boolean) => {
     setOn(next);
-    bridge.set(next).then(setOn, (e: unknown) => {
-      setOn(!next);
-      toast.error(String(e).includes('tray icon') ? "This computer can't show a tray icon." : "Couldn't save this setting. Try again.");
-    });
+    setSaving(true);
+    bridge
+      .set(next)
+      .then(setOn, (e: unknown) => {
+        setOn(!next);
+        toast.error(String(e).includes("can't show a tray icon") ? "This computer can't show a tray icon." : "Couldn't save this setting. Try again.");
+      })
+      .finally(() => setSaving(false));
   };
   return (
     <Section title="Desktop app">
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-2">
-          <Checkbox id="run-in-background" checked={on} onCheckedChange={(v) => change(v === true)} />
+          <Checkbox id="run-in-background" checked={on} disabled={saving} onCheckedChange={(v) => change(v === true)} />
           <Label htmlFor="run-in-background">Run in background</Label>
         </div>
         <p className="text-muted-foreground text-xs">
