@@ -7,6 +7,7 @@ import { ChoiceSelect } from '@/components/choice-select';
 import { EffectsControls, isNeutral, NO_EFFECTS, reviveEffects } from '@/components/effects-controls';
 import { ApprovalCard } from '@/components/approval-card';
 import { FileDrop } from '@/components/file-drop';
+import { NaturalPauses } from '@/components/natural-pauses';
 import { ErrorAlert, Field, message, Page as PageLayout, Section } from '@/components/page';
 import { usePromptMenu, type PromptItem } from '@/components/prompt-menu';
 import { VoiceSelect } from '@/components/voice-select';
@@ -38,6 +39,7 @@ export default function Page() {
   const [text, setText] = useState('');
   const [language, setLanguage] = usePersisted('voxwell.voice_cloning.language', 'en');
   const [fx, setFx] = usePersisted('voxwell.voice_cloning.effects', NO_EFFECTS, reviveEffects);
+  const [naturalPauses, setNaturalPauses] = usePersisted('voxwell.voice_cloning.natural_pauses', false, (saved) => saved === true);
   const takes = useTakes();
   const inQueue = takes.some((t) => t.status === 'running' || t.status === 'waiting');
   const waiting = takes.filter((t) => t.status === 'waiting').length;
@@ -153,7 +155,7 @@ export default function Page() {
   function add() {
     const voiceName = voices?.find((v) => v.id === voiceId)?.name ?? 'Default voice';
     const queued = inQueue;
-    if (!addTake({ text, language, voiceId: voiceId || null, voiceName, effects: isNeutral(fx) ? null : fx })) {
+    if (!addTake({ text, language, voiceId: voiceId || null, voiceName, effects: isNeutral(fx) ? null : fx, naturalPauses })) {
       toast.warning(`The queue is full (${MAX_WAITING} takes). Wait for some to finish first.`);
       return;
     }
@@ -228,6 +230,7 @@ export default function Page() {
           ))}
           {cuesHere && <CuePicker groups={cues.groups} disabled={!cues.available} onPick={insertTag} />}
         </div>
+        <NaturalPauses checked={naturalPauses} onChange={setNaturalPauses} />
         <EffectsControls value={fx} onChange={setFx} resettable />
         <div>
           <Button disabled={!text.trim()} onClick={add}>

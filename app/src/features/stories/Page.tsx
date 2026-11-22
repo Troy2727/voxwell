@@ -6,6 +6,7 @@ import { ChoiceSelect } from '@/components/choice-select';
 import { EffectsControls, isNeutral, NO_EFFECTS, reviveEffects } from '@/components/effects-controls';
 import { FileDrop } from '@/components/file-drop';
 import { JobProgress } from '@/components/job-progress';
+import { NaturalPauses } from '@/components/natural-pauses';
 import { ErrorAlert, Field, message, Muted, Page as PageLayout, Section } from '@/components/page';
 import { VoiceSelect } from '@/components/voice-select';
 import { Button } from '@/components/ui/button';
@@ -56,6 +57,7 @@ export default function Page() {
   const [cast, setCast] = useState<Record<string, string>>({});
   const [story, setStory] = useState<Story | null>(null);
   const [fx, setFx] = usePersisted('voxwell.stories.effects', NO_EFFECTS, reviveEffects);
+  const [naturalPauses, setNaturalPauses] = usePersisted('voxwell.stories.natural_pauses', false, (saved) => saved === true);
   const [error, setError] = useState('');
   const [subtitles, setSubtitles] = useState<File | null>(null);
   const [subtitleVoice, setSubtitleVoice] = useState('');
@@ -139,7 +141,7 @@ export default function Page() {
     setStory(null);
     const chosen = Object.fromEntries(speakers.map((s) => [s, cast[s] ?? DEFAULT_VOICE]));
     try {
-      const { id } = await sendJson<{ id: string }>('/api/stories/jobs', 'POST', { title, language, script, cast: chosen, effects: isNeutral(fx) ? null : fx });
+      const { id } = await sendJson<{ id: string }>('/api/stories/jobs', 'POST', { title, language, script, cast: chosen, effects: isNeutral(fx) ? null : fx, natural_pauses: naturalPauses });
       await poll(id);
     } catch (e) {
       setError(message(e));
@@ -240,6 +242,7 @@ export default function Page() {
             </div>
           ))}
           {voices.length === 0 && <Muted className="text-xs">No saved voices yet; everyone uses the default voice.</Muted>}
+          <NaturalPauses checked={naturalPauses} onChange={setNaturalPauses} disabled={working} />
           <EffectsControls value={fx} onChange={setFx} disabled={working} resettable />
           <div>
             <Button disabled={working} onClick={generate}>

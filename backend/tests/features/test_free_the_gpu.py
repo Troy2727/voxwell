@@ -206,4 +206,4 @@ def test_turning_it_off_cancels_a_pending_move(model):
 
 def test_synthesize_keeps_its_signature():
     params = list(inspect.signature(engine.synthesize).parameters)
-    assert params == ["text", "language", "reference_audio", "exaggeration", "cfg_weight", "effects", "cues"]
+    assert params == ["text", "language", "reference_audio", "exaggeration", "cfg_weight", "effects", "cues", "natural_pauses"]

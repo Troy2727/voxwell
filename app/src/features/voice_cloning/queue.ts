@@ -11,6 +11,7 @@ export interface TakeRequest {
   voiceId: string | null;
   voiceName: string;
   effects: EffectsSettings | null;
+  naturalPauses: boolean;
 }
 
 export type TakeStatus = 'waiting' | 'running' | 'done' | 'failed';
@@ -81,7 +82,7 @@ function runNext() {
   api<{ url: string; cues_ignored?: boolean }>('/api/voice_cloning/synthesize', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text: take.text, language: take.language, voice_id: take.voiceId, effects: take.effects }),
+    body: JSON.stringify({ text: take.text, language: take.language, voice_id: take.voiceId, effects: take.effects, natural_pauses: take.naturalPauses }),
   })
     .then(
       (res) => {
