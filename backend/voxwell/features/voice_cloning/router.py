@@ -7,11 +7,11 @@ from dataclasses import asdict
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, StrictBool
 
 from voxwell import voices
 from voxwell.features.audio_effects.dsp import Effects
-from voxwell.features.voice_cloning import cues, engine, history
+from voxwell.features.voice_cloning import cues, engine, gpu, history
 from voxwell.paths import child_path, data_dir
 
 log = logging.getLogger(__name__)
@@ -37,6 +37,34 @@ def status():
         "languages": engine.LANGUAGES,
         "cues": {**cues.status(), "available": engine.turbo_available()},
     }
+
+
+class FreeTheGpuRequest(BaseModel):
+    enabled: StrictBool
+
+
+def _free_the_gpu() -> dict:
+    try:
+        device = engine._pick_device()
+    except Exception:  # no torch, or the GPU runtime would not start
+        device = "cpu"
+    return {"enabled": gpu.enabled(), "device": device}
+
+
+@router.get("/free-the-gpu")
+def free_the_gpu():
+    return _free_the_gpu()
+
+
+@router.put("/free-the-gpu")
+def set_free_the_gpu(req: FreeTheGpuRequest):
+    try:
+        gpu.set_enabled(req.enabled)
+    except OSError as exc:
+        log.exception("Saving Free the GPU failed")
+        raise HTTPException(500, "Couldn't save this setting.") from exc
+    gpu.arm()  # on: starts the idle countdown now; off: cancels a pending move
+    return _free_the_gpu()
 
 
 @router.post("/voices")

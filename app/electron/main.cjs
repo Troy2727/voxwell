@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, net, protocol, shell } = require('electron'
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { spawn } = require('node:child_process');
+const background = require('./background.cjs');
 const dictation = require('./dictation.cjs');
 const { enginePaths, install, isReady } = require('./backend-setup.cjs');
 
@@ -49,10 +50,7 @@ function deliverAuthUrl(url) {
     win.webContents.send('auth:callback', pendingAuthUrl);
     pendingAuthUrl = null;
   }
-  if (win) {
-    if (win.isMinimized()) win.restore();
-    win.focus();
-  }
+  background.show();
 }
 
 // One instance owns the window and the backend port; later launches pass their link to it and exit.
@@ -61,7 +59,7 @@ if (!primary) app.quit();
 app.on('second-instance', (_event, argv) => {
   const url = authUrlIn(argv);
   if (url) deliverAuthUrl(url);
-  else if (win) win.focus();
+  else background.show(); // also brings back a window hidden in the tray
 });
 app.on('open-url', (event, url) => {
   event.preventDefault();
@@ -135,8 +133,10 @@ app.whenReady().then(async () => {
   protocol.handle(APP_SCHEME, serveDist);
   const setupWin = engine && !isReady(engine) ? await runSetup() : null;
   startBackend();
+  const mainWindow = createWindow();
+  background.register(mainWindow);
   dictation.register(
-    createWindow(),
+    mainWindow,
     process.env.VOXWELL_DEV ? 'http://localhost:5173/overlay.html' : `${APP_SCHEME}://voxwell/overlay.html`,
   );
   setupWin?.close(); // after the main window opens, or closing the last window would quit
@@ -145,6 +145,7 @@ app.whenReady().then(async () => {
 });
 
 app.on('will-quit', () => {
+  background.unregister();
   dictation.unregister();
   setupChild?.kill();
   if (backend) {
@@ -152,6 +153,9 @@ app.on('will-quit', () => {
     backend.kill();
   }
 });
+
+// macOS Dock click while the window is hidden in the tray.
+app.on('activate', () => background.show());
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();

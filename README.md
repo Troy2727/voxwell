@@ -151,11 +151,17 @@ Voxwell is **MIT licensed**, and every model it runs allows commercial use ([one
 | **Mic check** | Dictation | If your microphone hears nothing, you're warned while you're still recording. |
 | **Dictation clean-up** | Dictation | A local AI model removes filler words, fixes punctuation, or makes the text formal or concise, with the original one click away. |
 
+### New: everyday work
+
+| Feature | Where | What it does |
+| --- | --- | --- |
+| **Run in background** | Home (desktop app) | Turn it on and closing the window keeps Voxwell working from the system tray, so running jobs and the dictation shortcut carry on. Quit from the tray menu. |
+
 ### Voices
 
 | Feature | What it does |
 | --- | --- |
-| **Voice cloning** | Clone a voice from a few seconds of clean speech. Saved voices work everywhere in the app. Add <img src="docs/readme/labels/short.svg" alt="Short" height="24" align="absmiddle" />, <img src="docs/readme/labels/medium.svg" alt="Medium" height="24" align="absmiddle" /> and <img src="docs/readme/labels/long.svg" alt="Long" height="24" align="absmiddle" /> pauses with a click, and set the speech with <img src="docs/readme/labels/speed.svg" alt="Speed" height="24" align="absmiddle" /> and <img src="docs/readme/labels/pitch.svg" alt="Pitch" height="24" align="absmiddle" /> sliders. |
+| **Voice cloning** | Clone a voice from a few seconds of clean speech. Saved voices work everywhere in the app. Add <img src="docs/readme/labels/short.svg" alt="Short" height="24" align="absmiddle" />, <img src="docs/readme/labels/medium.svg" alt="Medium" height="24" align="absmiddle" /> and <img src="docs/readme/labels/long.svg" alt="Long" height="24" align="absmiddle" /> pauses with a click, and set the speech with <img src="docs/readme/labels/speed.svg" alt="Speed" height="24" align="absmiddle" /> and <img src="docs/readme/labels/pitch.svg" alt="Pitch" height="24" align="absmiddle" /> sliders. Keep adding takes while one renders: they wait in a queue and run one after another, even while you use other pages. |
 | **Voice design** | Describe a voice ("warm, low, slight British accent") and Voxwell creates it. |
 | **Voice remix** | Turn a saved voice into a new one by describing it, from a light touch (Low) to a full change (Max). The original stays as it is. |
 | **Gallery** | Start from one of 40 ready-made voices. <img src="docs/readme/labels/search.svg" alt="Search" height="24" align="absmiddle" /> by name or description ("whispering" finds Sleep Story), filter by <img src="docs/readme/labels/category.svg" alt="category" height="24" align="absmiddle" /> and <img src="docs/readme/labels/gender.svg" alt="gender" height="24" align="absmiddle" /> (Wellness + Female shows 3 voices), or star your favorites. |
@@ -170,6 +176,7 @@ Voxwell is **MIT licensed**, and every model it runs allows commercial use ([one
 | **Audiobook** | Drop in an EPUB, <img src="docs/readme/labels/pdf.svg" alt="PDF" height="24" align="absmiddle" />, <img src="docs/readme/labels/word-docx.svg" alt="Word (.docx)" height="24" align="absmiddle" />, TXT or Markdown file and narrate it chapter by chapter. You can stop and resume. Scanned PDFs can't be read. With **Tone memory** on, a local AI keeps the narration's tone steady from paragraph to paragraph. |
 | **Effects** | Use the <img src="docs/readme/labels/speed.svg" alt="Speed" height="24" align="absmiddle" /> and <img src="docs/readme/labels/pitch.svg" alt="Pitch" height="24" align="absmiddle" /> sliders, or add reverb, distance, background noise or stereo pan, to any recording or while generating in Voice cloning and Stories. |
 | **Pauses** | Put `[pause]` or `[pause 2.5]` in any text to add silence, up to 10 seconds. The Voice cloning page has <img src="docs/readme/labels/short.svg" alt="Short" height="24" align="absmiddle" />, <img src="docs/readme/labels/medium.svg" alt="Medium" height="24" align="absmiddle" /> and <img src="docs/readme/labels/long.svg" alt="Long" height="24" align="absmiddle" /> buttons for it. In English, text with cue tags such as `[laugh]` or `[sigh]` is spoken by Chatterbox-Turbo, the model that defines them; its Cues menu inserts them, and so does typing `/` in the text box, as in `/sigh`. |
+| **Free the GPU** | Optional, on the Voice cloning page: once Voxwell has finished speaking, the speech model moves to system RAM so other apps can use the graphics card. The next take moves it back first, so it starts a little slower. |
 | **Sound effects** | Describe a sound and generate it with Stable Audio Open. Needs a free Hugging Face token and accepting the model's terms. |
 | **Music** | Songs with sung lyrics, or instrumentals, from a description (ACE-Step 1.5). AI can write the lyrics; regenerate any section, follow a style reference, or split a track into vocals and instrumental. Installs once from the Music page (about 12 GB). |
 
