@@ -628,11 +628,11 @@ def test_mcp_convert_video(mcp, monkeypatch, tmp_path, isolated_data_dir):
     clip = tmp_path / "clip.mp4"
     clip.write_bytes(b"\x00\x00 a video")
     voices.save_voice("Anna", wav_bytes(), "upload")
-    monkeypatch.setattr(tools_engine, "video_streams", lambda path: (True, True))
+    monkeypatch.setattr(tools_engine, "video_streams", lambda path: (0, True))
     monkeypatch.setattr(tools_engine, "extract_soundtrack", lambda video, out, limit: out.write_bytes(wav_bytes()))
     monkeypatch.setattr(isolation, "isolate", lambda s, v, b: (v.write_bytes(wav_bytes()), b.write_bytes(wav_bytes())))
     monkeypatch.setattr(tools_engine, "convert", lambda source, target: wav_bytes())
-    monkeypatch.setattr(tools_engine, "rebuild_video", lambda video, track, out: out.write_bytes(b"an mp4"))
+    monkeypatch.setattr(tools_engine, "rebuild_video", lambda video, track, out, picture: out.write_bytes(b"an mp4"))
     result = tool(mcp, "convert_video", file_path=str(clip), voice="anna")
     assert result["isError"] is False
     assert (isolated_data_dir / "mcp" / "clip.converted.mp4").read_bytes() == b"an mp4"

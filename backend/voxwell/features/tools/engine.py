@@ -122,8 +122,9 @@ VOICE_GAIN = 1.1  # the new voice sits slightly in front of the background (abou
 MIX_CEILING = 0.98
 
 
-def video_streams(source: Path) -> tuple[bool, bool]:
-    """(has a picture, has sound) for an uploaded video; DubbingError when it can't be read as one.
+def video_streams(source: Path) -> tuple[int | None, bool]:
+    """(index of the first real picture stream or None, has sound) for an uploaded video; DubbingError
+    when it can't be read as one.
 
     Text is never a video: a playlist or a list of other files is refused before ffprobe reads it,
     so it can't make ffprobe open anything else. ffprobe is also limited to local files.
@@ -142,8 +143,8 @@ def video_streams(source: Path) -> tuple[bool, bool]:
         raise DubbingError(NOT_A_VIDEO)
     streams = json.loads(proc.stdout or "{}").get("streams", [])
     # An attached picture (an album cover in an audio file) is not a video.
-    picture = any(s.get("codec_type") == "video" and not s.get("disposition", {}).get("attached_pic") for s in streams)
-    return picture, any(s.get("codec_type") == "audio" for s in streams)
+    pictures = [s.get("index") for s in streams if s.get("codec_type") == "video" and not s.get("disposition", {}).get("attached_pic")]
+    return (pictures[0] if pictures else None), any(s.get("codec_type") == "audio" for s in streams)
 
 
 def extract_soundtrack(video: Path, out: Path, max_seconds: float) -> None:
@@ -194,8 +195,8 @@ def convert_long(source: Path, target_voice: Path, work: Path):
 def mix_voice(background: Path, voice, voice_rate: int, out: Path) -> None:
     """The new voice (mono, centred) over the background at its own level, as one 16-bit WAV.
 
-    Nothing is turned down to make room; only when the sum would clip is the whole mix lowered to
-    MIX_CEILING.
+    Nothing is turned down to make room: the background keeps its level, and only the samples the sum
+    pushes past MIX_CEILING are held there.
     """
     import math
 
@@ -210,16 +211,14 @@ def mix_voice(background: Path, voice, voice_rate: int, out: Path) -> None:
     mix = np.zeros((max(len(bed), len(voice)), bed.shape[1]), dtype=np.float32)
     mix[: len(bed)] += bed
     mix[: len(voice)] += (np.asarray(voice, dtype=np.float32) * VOICE_GAIN)[:, None]
-    peak = float(np.abs(mix).max()) if len(mix) else 0.0
-    if peak > MIX_CEILING:
-        mix *= MIX_CEILING / peak
+    np.clip(mix, -MIX_CEILING, MIX_CEILING, out=mix)
     sf.write(str(out), mix, rate, subtype="PCM_16")
 
 
-def rebuild_video(video: Path, track: Path, out: Path) -> None:
-    """The original picture, copied as is, with track as its only sound (AAC), as an MP4.
+def rebuild_video(video: Path, track: Path, out: Path, picture: int = 0) -> None:
+    """The original picture (stream number picture), copied as is, with track as its only sound (AAC), as an MP4.
 
     The sound is padded with silence and cut at the end of the picture.
     """
-    run_ffmpeg(["-protocol_whitelist", "file", "-i", str(video), "-i", str(track), "-map", "0:v:0", "-map", "1:a:0",
+    run_ffmpeg(["-protocol_whitelist", "file", "-i", str(video), "-i", str(track), "-map", f"0:{picture}", "-map", "1:a:0",
                 "-c:v", "copy", "-af", "apad", "-c:a", "aac", "-shortest", "-movflags", "+faststart", str(out)])

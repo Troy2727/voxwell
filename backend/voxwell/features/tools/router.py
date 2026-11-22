@@ -128,7 +128,7 @@ def convert_video(file: UploadFile = File(...), voice_id: str = Form(...)):
             picture, sound = engine.video_streams(upload)
         except DubbingError as exc:
             raise HTTPException(422, str(exc))
-        if not picture:
+        if picture is None:
             raise HTTPException(422, "This file has no video picture. Use Convert voice for audio files.")
         if not sound:
             raise HTTPException(422, "This video has no audio track to convert.")
@@ -165,8 +165,8 @@ def convert_video(file: UploadFile = File(...), voice_id: str = Form(...)):
 
         video_out = out.with_suffix(".mp4")
         try:
-            engine.rebuild_video(upload, out, video_out)
-        except DubbingError:  # e.g. a picture codec MP4 can't hold
+            engine.rebuild_video(upload, out, video_out, picture)
+        except Exception:  # e.g. a picture codec MP4 can't hold, or a full disk: the audio still comes back
             log.exception("Could not rebuild the video")
             video_out.unlink(missing_ok=True)
             notes.append(NOTE_AUDIO_ONLY)

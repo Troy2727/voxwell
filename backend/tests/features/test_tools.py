@@ -315,7 +315,7 @@ def stereo_wav(seconds: float, level: float = 0.1, rate: int = 44100) -> bytes:
 def fake_video(monkeypatch):
     """Everything around the models faked: a 2 s video with sound, isolation and conversion."""
     calls = {"convert": [], "isolate": 0, "rebuild": 0}
-    monkeypatch.setattr(engine, "video_streams", lambda path: (True, True))
+    monkeypatch.setattr(engine, "video_streams", lambda path: (0, True))
     monkeypatch.setattr(engine, "extract_soundtrack", lambda video, out, limit: out.write_bytes(stereo_wav(2)))
 
     def fake_isolate(source, voice_out, background_out):
@@ -328,7 +328,7 @@ def fake_video(monkeypatch):
         calls["convert"].append(duration(source.read_bytes()))
         return wav_bytes(duration(source.read_bytes()), 24000)
 
-    def fake_rebuild(video, track, out):
+    def fake_rebuild(video, track, out, picture):
         calls["rebuild"] += 1
         out.write_bytes(b"an mp4")
 
@@ -372,6 +372,12 @@ def test_mixing_keeps_the_background_level_and_never_clips(tmp_path):
     assert abs(20 * np.log10(np.abs(mixed).max() / np.abs(original).max())) < 1
     engine.mix_voice(bed, np.ones(24000, dtype="float32"), 24000, out)
     assert np.abs(sf.read(str(out), dtype="float32")[0]).max() <= engine.MIX_CEILING + 1e-3
+    # A loud voice doesn't turn the background down where the voice is silent.
+    voice = np.zeros(44100, dtype="float32")
+    voice[:4410] = 1.0
+    engine.mix_voice(bed, voice, 44100, out)
+    tail = sf.read(str(out), dtype="float32")[0][22050:]
+    np.testing.assert_allclose(tail, original[22050:], atol=1e-3)
 
 
 def test_convert_video_swaps_the_voice_and_keeps_the_picture(fake_video):
@@ -395,9 +401,10 @@ def test_without_isolation_the_whole_soundtrack_is_converted(fake_video, monkeyp
     assert len(fake_video["convert"]) == 1
 
 
-def test_a_video_that_cannot_be_rebuilt_comes_back_as_audio(fake_video, monkeypatch):
+@pytest.mark.parametrize("error", [DubbingError("ffmpeg could not process the file; see the Voxwell log."), OSError("disk full")])
+def test_a_video_that_cannot_be_rebuilt_comes_back_as_audio(fake_video, monkeypatch, error):
     def cannot(*a):
-        raise DubbingError("ffmpeg could not process the file; see the Voxwell log.")
+        raise error
 
     monkeypatch.setattr(engine, "rebuild_video", cannot)
     body = convert_video(voices.save_voice("Target", wav_bytes(1), "upload").id).json()
@@ -408,11 +415,11 @@ def test_a_video_that_cannot_be_rebuilt_comes_back_as_audio(fake_video, monkeypa
 def test_convert_video_refusals(fake_video, monkeypatch):
     voice = voices.save_voice("Target", wav_bytes(1), "upload").id
     assert convert_video("000000000000").json() == {"detail": "Pick a saved voice."}
-    monkeypatch.setattr(engine, "video_streams", lambda path: (False, True))
+    monkeypatch.setattr(engine, "video_streams", lambda path: (None, True))
     assert convert_video(voice).json()["detail"] == "This file has no video picture. Use Convert voice for audio files."
-    monkeypatch.setattr(engine, "video_streams", lambda path: (True, False))
+    monkeypatch.setattr(engine, "video_streams", lambda path: (0, False))
     assert convert_video(voice).json()["detail"] == "This video has no audio track to convert."
-    monkeypatch.setattr(engine, "video_streams", lambda path: (True, True))
+    monkeypatch.setattr(engine, "video_streams", lambda path: (0, True))
     monkeypatch.setattr(tools_router, "MAX_ISOLATE_SECONDS", 1)
     assert convert_video(voice).json()["detail"] == "Use a video of up to 0 minutes."
     monkeypatch.setattr(tools_router, "MAX_ISOLATE_SECONDS", 600)
