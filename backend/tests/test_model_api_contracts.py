@@ -5,6 +5,7 @@ in an unreleased version) would only surface on first real use. These tests repl
 classes with autospecs, which raise TypeError on any call the real API would reject.
 """
 
+import inspect
 from pathlib import Path
 from unittest import mock
 
@@ -369,3 +370,12 @@ def test_cue_vocabulary_matches_the_turbo_tokenizer():
     with open(added, encoding="utf-8") as f:
         tokens = json.load(f)
     assert {f"[{tag}]" for tag in cues.VOCABULARY} == set(tokens)
+
+
+def test_chatterbox_models_have_the_parts_free_the_gpu_moves():
+    """gpu._move moves t3, s3gen, ve and the conds (which need their own .to) and sets .device."""
+    for name, cls in (("chatterbox.mtl_tts", "ChatterboxMultilingualTTS"), ("chatterbox.tts_turbo", "ChatterboxTurboTTS")):
+        module = pytest.importorskip(name)
+        params = set(inspect.signature(getattr(module, cls).__init__).parameters)
+        assert {"t3", "s3gen", "ve", "conds", "device"} <= params, name
+        assert callable(getattr(module.Conditionals, "to", None)), name

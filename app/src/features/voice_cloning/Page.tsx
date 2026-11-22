@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { usePersisted } from '@/lib/persisted';
 import { CuePicker, Cues } from './CuePicker';
+import { FreeTheGpu } from './FreeTheGpu';
 import { LANGUAGES } from './languages';
 
 const PAUSES: [string, number][] = [['Short', 0.5], ['Medium', 1], ['Long', 2]];
@@ -231,6 +232,8 @@ export default function Page() {
         {cueNote && <p className="text-sm text-muted-foreground">{cueNote}</p>}
         {audioUrl && <AudioResult src={audioUrl} download="voxwell-speech.wav" />}
       </Section>
+
+      <FreeTheGpu />
     </PageLayout>
   );
 }
