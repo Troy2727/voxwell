@@ -71,11 +71,11 @@ export default function Page() {
         setAudioUrl(apiUrl(take.url!));
         setCueNote(!take.cuesIgnored
           ? ''
-          : cuesHere
+          : cues?.languages.includes(take.language)
             ? 'The cues were left out this time: they need a voice clip longer than five seconds and the cue model, which could not be used. See the Voxwell log.'
             : 'Cues work in English only, so they were left out.');
       }),
-    [cuesHere],
+    [cues],
   );
 
   // A remembered voice may have been deleted since.
@@ -156,7 +156,7 @@ export default function Page() {
       toast.warning(`The queue is full (${MAX_WAITING} takes). Wait for some to finish first.`);
       return;
     }
-    if (queued) toast.info(`Added to the queue. ${waitingCount()} waiting.`);
+    if (queued) toast.info(`Queued. ${waitingCount()} waiting.`);
   }
 
   return (
@@ -230,7 +230,7 @@ export default function Page() {
         <EffectsControls value={fx} onChange={setFx} resettable />
         <div>
           <Button disabled={!text.trim()} onClick={add}>
-            <Volume2 /> {inQueue ? 'Add to queue' : 'Generate'}
+            <Volume2 /> {inQueue ? 'Queue this take' : 'Generate'}
             {waiting > 0 && <Badge variant="secondary" aria-label={`${waiting} waiting`}>{waiting}</Badge>}
           </Button>
         </div>

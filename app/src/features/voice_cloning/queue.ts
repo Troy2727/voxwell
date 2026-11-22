@@ -36,8 +36,8 @@ const isFinished = (t: Take) => t.status === 'done' || t.status === 'failed';
 
 /** The text on one line, cut to 80 characters. */
 export function takeLabel(text: string) {
-  const line = text.replace(/\s+/g, ' ').trim();
-  return line.length > 80 ? `${line.slice(0, 79)}…` : line;
+  const chars = Array.from(text.replace(/\s+/g, ' ').trim()); // whole characters, never half an emoji
+  return chars.length > 80 ? `${chars.slice(0, 79).join('')}…` : chars.join('');
 }
 
 function update(next: Take[]) {
@@ -90,7 +90,10 @@ function runNext() {
         toast.success(`Take ready: ${takeLabel(take.text)}`);
         if (done) finishListeners.forEach((listener) => listener(done));
       },
-      (e: unknown) => change(take.id, { status: 'failed', error: message(e) }),
+      (e: unknown) => {
+        change(take.id, { status: 'failed', error: message(e) });
+        toast.error(`Take failed: ${takeLabel(take.text)}`); // the page may not be open
+      },
     )
     .finally(runNext);
 }

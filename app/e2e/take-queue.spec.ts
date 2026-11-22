@@ -27,11 +27,11 @@ async function slowSpeech(page: Page, { held = true } = {}) {
 }
 
 const textBox = (page: Page) => page.locator('#clone-text');
-const queue = (page: Page) => page.getByRole('list').filter({ has: page.getByText(/in line|Generating|Done|Failed/) });
+const queue = (page: Page) => page.getByRole('list').filter({ has: page.getByText(/Position \d|Generating|Done|Failed/) });
 
 async function add(page: Page, text: string) {
   await textBox(page).fill(text);
-  await page.getByRole('button', { name: /^(Generate|Add to queue)/ }).click();
+  await page.getByRole('button', { name: /^(Generate|Queue this take)/ }).click();
 }
 
 test.describe('take queue', () => {
@@ -39,13 +39,13 @@ test.describe('take queue', () => {
     const speech = await slowSpeech(page);
     await openFeature(page, 'Voice cloning');
     await add(page, 'First take.');
-    await expect(page.getByRole('button', { name: /^Add to queue/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Queue this take/ })).toBeVisible();
     await add(page, 'Second take.');
     await add(page, 'Third take.');
-    await expect(page.getByText('Added to the queue. 2 waiting.')).toBeVisible();
-    await expect(queue(page).getByText('#1 in line')).toBeVisible();
-    await expect(queue(page).getByText('#2 in line')).toBeVisible();
-    await expect(page.getByRole('button', { name: /^Add to queue/ }).getByText('2')).toBeVisible();
+    await expect(page.getByText('Queued. 2 waiting.')).toBeVisible();
+    await expect(queue(page).getByText('Position 1')).toBeVisible();
+    await expect(queue(page).getByText('Position 2')).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Queue this take/ }).getByText('2')).toBeVisible();
     expect(speech.sent.map((s) => s.text)).toEqual(['First take.']);
 
     speech.release();
@@ -60,7 +60,7 @@ test.describe('take queue', () => {
     const speech = await slowSpeech(page);
     await openFeature(page, 'Voice cloning');
     for (const text of ['Keep me.', 'Drop me.', 'Drop me too.', 'And me.']) await add(page, text);
-    await page.getByRole('button', { name: 'Remove from queue: Drop me.' }).click();
+    await page.getByRole('button', { name: 'Drop this take: Drop me.' }).click();
     await expect(queue(page).getByText('Drop me.', { exact: true })).toHaveCount(0);
     await page.getByRole('button', { name: 'Remove waiting' }).click();
     await expect(queue(page)).toHaveCount(0); // one take left, still running: no list
@@ -89,7 +89,7 @@ test.describe('take queue', () => {
       await textBox(page).fill(`Waiting ${i}.`);
       await textBox(page).press('Control+Enter');
     }
-    await expect(page.getByRole('button', { name: /^Add to queue/ }).getByText('50')).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Queue this take/ }).getByText('50')).toBeVisible();
     await add(page, 'One too many.');
     await expect(page.getByText('The queue is full (50 takes). Wait for some to finish first.')).toBeVisible();
     await expect(queue(page).getByText('One too many.')).toHaveCount(0);
@@ -121,7 +121,7 @@ test.describe('take queue', () => {
     await openFeature(page, 'Voice cloning');
     await add(page, 'x'.repeat(300));
     await add(page, 'y'.repeat(300));
-    await expect(queue(page).getByText('#1 in line')).toBeVisible();
+    await expect(queue(page).getByText('Position 1')).toBeVisible();
     for (const width of [390, 768, 1024, 1440]) {
       await page.setViewportSize({ width, height: 900 });
       expect(await page.evaluate(() => document.documentElement.scrollWidth === window.innerWidth), `no sideways scroll at ${width} px`).toBe(true);

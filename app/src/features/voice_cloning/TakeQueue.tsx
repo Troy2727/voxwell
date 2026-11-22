@@ -36,7 +36,7 @@ export function TakeQueue({ takes }: { takes: Take[] }) {
         {takes.map((t) => {
           const { icon: Icon, className } = ICONS[t.status];
           const label = takeLabel(t.text);
-          const state = t.status === 'waiting' ? `#${++place} in line` : WORDS[t.status];
+          const state = t.status === 'waiting' ? `Position ${++place}` : WORDS[t.status];
           return (
             <li key={t.id} className="flex items-start gap-3 py-2">
               <Icon className={cn('mt-0.5 size-4 shrink-0', className)} aria-hidden />
@@ -46,7 +46,7 @@ export function TakeQueue({ takes }: { takes: Take[] }) {
                 {t.error && <span role="alert" className="text-destructive line-clamp-2 text-xs break-words">{t.error}</span>}
               </div>
               {t.status === 'waiting' && (
-                <Button variant="ghost" size="icon" className="size-8 shrink-0" aria-label={`Remove from queue: ${label}`} onClick={() => removeTake(t.id)}>
+                <Button variant="ghost" size="icon" className="size-8 shrink-0" aria-label={`Drop this take: ${label}`} onClick={() => removeTake(t.id)}>
                   <X />
                 </Button>
               )}
