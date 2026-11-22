@@ -61,7 +61,7 @@ export default function Page() {
         if (shownList.current !== asked) return;
         setEntries([]);
         setError(e.message);
-        if (owner) setOwner(''); // e.g. the voice was deleted meanwhile: back to every voice
+        if (owner && e.message === 'Unknown voice.') setOwner(''); // deleted meanwhile: back to every voice
       },
     );
   }, [listQuery, owner]);

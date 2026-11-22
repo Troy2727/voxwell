@@ -72,7 +72,7 @@ def rename_voice(voice_id: str, name: str) -> Voice:
 
 def delete_voice(voice_id: str) -> None:
     audio = voice_audio_path(voice_id)
+    pronunciation.delete_voice_entries(voice_id)  # first, so a failure here leaves the voice to delete again
     audio.with_suffix(".json").unlink(missing_ok=True)
     audio.unlink()
     voice_collections.remove_voice_everywhere(voice_id)
-    pronunciation.delete_voice_entries(voice_id)
