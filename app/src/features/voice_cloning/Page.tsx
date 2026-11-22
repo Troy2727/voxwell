@@ -45,6 +45,7 @@ export default function Page() {
   const waiting = takes.filter((t) => t.status === 'waiting').length;
   const [error, setError] = useState('');
   const [audioUrl, setAudioUrl] = useState('');
+  const [audioTitle, setAudioTitle] = useState(''); // the text that was spoken, for the Now playing bar
   const [cues, setCues] = useState<Cues | null>(null);
   const [cueNote, setCueNote] = useState('');
   const textBox = useRef<HTMLTextAreaElement>(null);
@@ -72,6 +73,7 @@ export default function Page() {
     () =>
       onFinished((take) => {
         setAudioUrl(apiUrl(take.url!));
+        setAudioTitle(take.text.trim().slice(0, 60));
         setCueNote(!take.cuesIgnored
           ? ''
           : cues?.languages.includes(take.language)
@@ -240,7 +242,7 @@ export default function Page() {
         </div>
         <ErrorAlert message={error} />
         {cueNote && <p className="text-sm text-muted-foreground">{cueNote}</p>}
-        {audioUrl && <AudioResult src={audioUrl} download="voxwell-speech.wav" />}
+        {audioUrl && <AudioResult src={audioUrl} download="voxwell-speech.wav" barTitle={audioTitle} barSource="Voice cloning" />}
       </Section>
 
       <TakeQueue takes={takes} />
