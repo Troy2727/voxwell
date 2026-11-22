@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { AlertCircle, ArrowRight, FolderOpen, Languages, LayoutGrid, Pause, Play, Unplug } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, apiUrl, listVoices, onPhoneOrTablet, voiceSourceLabel, type Voice } from '../api';
@@ -81,6 +81,29 @@ function PlayButton({ name, src, clip }: { name: string; src: string; clip: Retu
   );
 }
 
+/** Letters drift in out of a blur, one after another. Screen readers get the plain text. */
+function VaporText({ text }: { text: string }) {
+  let n = 0;
+  return (
+    <>
+      <span className="sr-only">{text} </span>
+      <span aria-hidden className="font-serif italic">
+        {text.split(' ').map((word, w) => (
+          <Fragment key={w}>
+            <span className="inline-block whitespace-nowrap">
+              {[...word].map((ch, i) => (
+                <span key={i} className="vapor-letter" style={{ animationDelay: `${200 + n++ * 80}ms` }}>
+                  {ch}
+                </span>
+              ))}
+            </span>{' '}
+          </Fragment>
+        ))}
+      </span>
+    </>
+  );
+}
+
 /** The landing page: a welcome, the main tools one click away, and what you made lately. */
 export function HomePage({ name, online, onOpen, onRetry }: { name?: string; online: boolean | null; onOpen: (id: string) => void; onRetry: () => Promise<boolean> }) {
   const [projects, setProjects] = useState<Loaded<Project>>(null);
@@ -120,7 +143,7 @@ export function HomePage({ name, online, onOpen, onRetry }: { name?: string; onl
       <div className="bg-card grid overflow-hidden rounded-2xl border md:grid-cols-[1.15fr_1fr]">
         <div className="flex flex-col gap-5 p-6 sm:p-8 lg:p-10">
           <h1 className="text-3xl leading-tight font-bold tracking-tight sm:text-4xl">
-            {first && `Welcome back, ${first}. `}
+            {first && <VaporText text={`Welcome back, ${first}.`} />}
             <span className="text-primary">
               What will you make?
             </span>
