@@ -210,3 +210,56 @@ def test_a_line_with_only_cue_tags_is_skipped_and_the_story_goes_on(monkeypatch)
     with wave.open(io.BytesIO(client.get(f"/api/stories/jobs/{r.json()['id']}/audio").content)) as w:
         seconds = w.getnframes() / w.getframerate()
     assert seconds == pytest.approx(2 * 1.0 + engine.SKIPPED_LINE + 2 * jobs.PAUSE_SECONDS, abs=0.01)
+
+
+def join(script, first, last):
+    r = client.post("/api/stories/join", json={"script": script, "first_line": first, "last_line": last})
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+def test_join_two_lines_of_one_speaker():
+    res = join("Anna: Did you hear that?\nAnna: Over there.\nTom: No.", 1, 2)
+    assert res == {"script": "Anna: Did you hear that? Over there.\nTom: No.", "joined": 1, "too_long": 0, "line": 1}
+    assert parse(res["script"])[0] == Line("Anna", "Did you hear that? Over there.")
+
+
+def test_join_needs_the_same_speaker_and_counts_narration_as_the_narrator():
+    assert join("Anna: Hi.\nTom: Hello.", 1, 2)["joined"] == 0
+    assert join("anna: Hi.\nAnna: Hello.", 1, 2)["joined"] == 0  # names compare exactly, as in the cast
+    assert join("It was dark.\nNarrator: And cold.", 1, 2)["script"] == "It was dark. And cold."
+
+
+def test_join_collapses_a_run_and_leaves_other_lines_alone():
+    script = "Tom: Before.\nAnna: One.\nAnna: Two.\nAnna: Three.\nAnna: After."
+    res = join(script, 2, 4)
+    assert res["script"] == "Tom: Before.\nAnna: One. Two. Three.\nAnna: After."
+    assert (res["joined"], res["line"]) == (2, 2)
+
+
+def test_blank_and_label_only_lines_are_never_joined():
+    assert join("Anna: One.\n\nAnna: Two.", 1, 3)["joined"] == 0
+    assert join("Anna: One.\nAnna:\nAnna: Two.", 1, 3)["joined"] == 0
+
+
+def test_a_pair_too_long_to_join_is_left_apart_and_counted():
+    long = "word " * 50  # 250 characters before the strip
+    res = join(f"Anna: {long}\nAnna: {long}\nTom: A.\nTom: B.", 1, 4)
+    assert (res["joined"], res["too_long"]) == (1, 1)
+    assert res["script"].endswith("Tom: A. B.")
+
+
+def test_join_keeps_a_final_line_break():
+    assert join("Anna: One.\nAnna: Two.\n", 1, 2)["script"] == "Anna: One. Two.\n"
+
+
+@pytest.mark.parametrize("first,last", [(0, 1), (2, 1), (1, 4)])
+def test_join_rejects_lines_outside_the_script(first, last):
+    r = client.post("/api/stories/join", json={"script": "Anna: One.\nAnna: Two.\nTom: Three.", "first_line": first, "last_line": last})
+    assert r.status_code == 422 and r.json()["detail"] == "Pick lines inside the script."
+
+
+def test_joined_lines_are_spoken_as_one_clip(fake):
+    script = join("Anna: Did you hear that?\nAnna: Over there.", 1, 2)["script"]
+    create(script=script)
+    assert [text for text, _, _ in fake] == ["Did you hear that? Over there."]
