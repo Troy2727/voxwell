@@ -152,7 +152,8 @@ def test_speak_text_errors(models):
 def test_translate_file(models):
     r = client.post("/api/translation/file", files={"file": ("../talk.wav", wav_bytes(), "audio/wav")}, data={"target": "it"})
     assert r.status_code == 200 and r.json()["transcript"] == "one" and r.json()["translation"] == "one-it"
-    assert [p.suffix for p in data_dir("translation").iterdir()] == [".wav"]  # the upload is gone
+    # The upload is gone; the result and the record that keeps it in Projects stay.
+    assert sorted(p.suffix for p in data_dir("translation").iterdir()) == [".json", ".wav"]
 
 
 def test_audio_ids_are_checked():

@@ -6,7 +6,6 @@ import logging
 import os
 import re
 import tempfile
-import time
 import uuid
 from pathlib import Path
 
@@ -14,7 +13,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile, WebSocket
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from voxwell import live_audio
+from voxwell import live_audio, results
 from voxwell.features.dictation import engine as stt
 from voxwell.features.translation import pipeline
 from voxwell.features.voice_cloning.engine import NothingToSay
@@ -26,7 +25,6 @@ router = APIRouter(tags=["translation"])
 
 MAX_TEXT = 4096
 MAX_UPLOAD = 50 * 1024 * 1024
-OUTPUT_TTL_SECONDS = 24 * 60 * 60  # results are scratch files, as in Tools
 _OUTPUT_ID = re.compile(r"^[0-9a-f]{32}$")
 
 
@@ -44,8 +42,8 @@ def _check(source: str | None, target: str, voice: str | None):
         raise HTTPException(422, str(exc))
 
 
-def _translate_and_speak(text: str, source: str, target: str, reference) -> dict:
-    """Translate `text`, speak it and keep the WAV as a scratch file; the response gives its URL."""
+def _translate_and_speak(text: str, source: str, target: str, reference, voice: str | None) -> dict:
+    """Translate `text`, speak it and keep the WAV in Projects; the response gives its URL."""
     if len(text) > MAX_TEXT:
         raise HTTPException(422, f"The text is too long ({MAX_TEXT} characters max).")
     try:
@@ -62,13 +60,11 @@ def _translate_and_speak(text: str, source: str, target: str, reference) -> dict
     except Exception as exc:
         log.exception("Speech synthesis failed")
         raise HTTPException(500, "Speech synthesis failed; see the Voxwell log.") from exc
-    folder = data_dir("translation")
-    cutoff = time.time() - OUTPUT_TTL_SECONDS
-    for old in folder.glob("*.wav"):
-        if old.stat().st_mtime < cutoff:
-            old.unlink(missing_ok=True)
+    results.prune("translation")
     output_id = uuid.uuid4().hex
-    (folder / f"{output_id}.wav").write_bytes(wav)
+    (data_dir("translation") / f"{output_id}.wav").write_bytes(wav)
+    title = results.title_from(text, "Translation")
+    results.keep("translation", output_id, "translation", title, {"Audio": f"{output_id}.wav"}, voice=voice or "", language=target, text=translation)
     return {"transcript": text, "source": source, "translation": translation, "url": f"/api/translation/audio/{output_id}"}
 
 
@@ -85,7 +81,7 @@ def speak(req: SpeakRequest):
     reference = _check(req.source, req.target, req.voice)
     if not req.text.strip():
         raise HTTPException(422, "The text is empty.")
-    return _translate_and_speak(req.text.strip(), req.source, req.target, reference)
+    return _translate_and_speak(req.text.strip(), req.source, req.target, reference, req.voice)
 
 
 @router.post("/file")
@@ -120,7 +116,7 @@ async def translate_file(
         path.unlink(missing_ok=True)
     if not heard.text:
         raise HTTPException(422, "No speech found in the recording.")
-    return _translate_and_speak(heard.text, heard.language, target, reference)
+    return _translate_and_speak(heard.text, heard.language, target, reference, voice or None)
 
 
 @router.get("/audio/{output_id}")

@@ -3,13 +3,14 @@
 import asyncio
 import logging
 import re
-import time
 import uuid
+from pathlib import Path
 from typing import Literal
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, Response
 
+from voxwell import results
 from voxwell.features.audio_effects import dsp
 from voxwell.paths import child_path, data_dir
 
@@ -20,7 +21,6 @@ router = APIRouter(tags=["audio_effects"])
 MAX_UPLOAD = 50 * 1024 * 1024
 MAX_MP3_UPLOAD = 1024 * 1024 * 1024  # a whole audiobook chapter as WAV can be this long
 MAX_SECONDS = 30 * 60
-OUTPUT_TTL_SECONDS = 24 * 60 * 60  # results are scratch files; download what you want to keep
 _OUTPUT_ID = re.compile(r"^[0-9a-f]{32}$")
 
 
@@ -54,11 +54,8 @@ async def apply(
         raise HTTPException(422, "Could not read the file as audio. Use WAV, MP3, FLAC or OGG.")
     if len(audio) / rate > MAX_SECONDS:
         raise HTTPException(422, f"Use a recording of up to {MAX_SECONDS // 60} minutes.")
+    results.prune("audio_effects")
     folder = data_dir("audio_effects")
-    cutoff = time.time() - OUTPUT_TTL_SECONDS
-    for old in folder.glob("*.wav"):
-        if old.stat().st_mtime < cutoff:
-            old.unlink(missing_ok=True)
     output_id = uuid.uuid4().hex
     try:
         wav = await asyncio.to_thread(lambda: dsp.encode_wav(dsp.process(audio, rate, fx), rate))
@@ -66,6 +63,8 @@ async def apply(
     except Exception as exc:
         log.exception("Applying the effects failed")
         raise HTTPException(500, "Applying the effects failed; see the Voxwell log.") from exc
+    title = results.title_from(Path(file.filename or "").stem, "Audio effects")  # display only, never a path
+    results.keep("audio_effects", output_id, "effects", title, {"Audio": f"{output_id}.wav"})
     return {"id": output_id, "url": f"/api/audio_effects/audio/{output_id}"}
 
 
