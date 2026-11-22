@@ -1,7 +1,8 @@
 """Pronunciation dictionaries: words and how to respell them for the speech model.
 
 Entries live in one JSON file per language under data_dir("pronunciation"), plus shared.json for the
-words that apply in every language (Shared words, the scope ALL). apply() rewrites a
+words that apply in every language (Shared words, the scope ALL), plus voices/<voice id>.<language>.json
+for the words of one saved voice (Voice pronunciation), which win when that voice speaks. apply() rewrites a
 text before it reaches the model; voice_cloning.engine.synthesize() calls it, so every path that
 makes speech (cloning, stories, audiobook, dubbing, tools, the OpenAI-compatible API) gets it.
 """
@@ -19,6 +20,7 @@ MAX_RESPELLING = 200
 MAX_ENTRIES = 2000
 
 _LANGUAGE = re.compile(r"^[a-z]{2,3}$")
+_VOICE = re.compile(r"^[0-9a-f]{12}$")  # a saved voice's id, as voxwell.voices makes them
 ALL = "all"  # the scope of the shared list; not a language
 _lock = threading.Lock()
 
@@ -36,7 +38,11 @@ class Entry:
     whole_word: bool = True
 
 
-def _path(language: str):
+def _path(language: str, voice_id: str | None = None):
+    if voice_id:
+        if not _VOICE.match(voice_id) or not _LANGUAGE.match(language):  # both name the file
+            raise ValueError("Voice words need a saved voice and a language.")
+        return child_path(data_dir("pronunciation", "voices"), f"{voice_id}.{language}.json")
     if language == ALL:
         return child_path(data_dir("pronunciation"), "shared.json")
     if not _LANGUAGE.match(language):  # the language names a file, so never trust it as a path
@@ -44,8 +50,8 @@ def _path(language: str):
     return child_path(data_dir("pronunciation"), f"{language}.json")
 
 
-def list_entries(language: str) -> list[Entry]:
-    path = _path(language)
+def list_entries(language: str, voice_id: str | None = None) -> list[Entry]:
+    path = _path(language, voice_id)
     if not path.exists():
         return []
     try:
@@ -54,8 +60,8 @@ def list_entries(language: str) -> list[Entry]:
         return []
 
 
-def _save(language: str, entries: list[Entry]) -> None:
-    path = _path(language)
+def _save(language: str, entries: list[Entry], voice_id: str | None = None) -> None:
+    path = _path(language, voice_id)
     tmp = path.with_name(f"{path.name}.{uuid.uuid4().hex}.tmp")
     tmp.write_text(json.dumps([asdict(e) for e in entries], ensure_ascii=False, indent=2), encoding="utf-8")
     replace_file(tmp, path)
@@ -80,25 +86,25 @@ def _same_word(entry: Entry, word: str, case_sensitive: bool) -> bool:
     return entry.word.lower() == word.lower()
 
 
-def add_entry(language: str, word: str, respelling: str, case_sensitive: bool = False, whole_word: bool = True) -> Entry:
-    """Raises ValueError for invalid input and DuplicateWord when the word already has an entry."""
+def add_entry(language: str, word: str, respelling: str, case_sensitive: bool = False, whole_word: bool = True, voice_id: str | None = None) -> Entry:
+    """Raises ValueError for invalid input and DuplicateWord when the word already has an entry in that list."""
     word, respelling = _clean(word, respelling)
     with _lock:
-        entries = list_entries(language)
+        entries = list_entries(language, voice_id)
         if len(entries) >= MAX_ENTRIES:
             raise ValueError(f"Too many entries ({MAX_ENTRIES} max per list).")
         if any(_same_word(e, word, case_sensitive) for e in entries):
             raise DuplicateWord(word)
         entry = Entry(uuid.uuid4().hex, word, respelling, case_sensitive, whole_word)
-        _save(language, [*entries, entry])
+        _save(language, [*entries, entry], voice_id)
         return entry
 
 
-def update_entry(language: str, entry_id: str, word: str, respelling: str, case_sensitive: bool, whole_word: bool) -> Entry:
+def update_entry(language: str, entry_id: str, word: str, respelling: str, case_sensitive: bool, whole_word: bool, voice_id: str | None = None) -> Entry:
     """Raises ValueError for invalid input, LookupError for an unknown id, DuplicateWord for a duplicate word."""
     word, respelling = _clean(word, respelling)
     with _lock:
-        entries = list_entries(language)
+        entries = list_entries(language, voice_id)
         target = next((e for e in entries if e.id == entry_id), None)
         if target is None:
             raise LookupError(entry_id)
@@ -106,18 +112,27 @@ def update_entry(language: str, entry_id: str, word: str, respelling: str, case_
             raise DuplicateWord(word)
         target.word, target.respelling = word, respelling
         target.case_sensitive, target.whole_word = case_sensitive, whole_word
-        _save(language, entries)
+        _save(language, entries, voice_id)
         return target
 
 
-def delete_entry(language: str, entry_id: str) -> None:
+def delete_entry(language: str, entry_id: str, voice_id: str | None = None) -> None:
     """Raises LookupError for an unknown id."""
     with _lock:
-        entries = list_entries(language)
+        entries = list_entries(language, voice_id)
         kept = [e for e in entries if e.id != entry_id]
         if len(kept) == len(entries):
             raise LookupError(entry_id)
-        _save(language, kept)
+        _save(language, kept, voice_id)
+
+
+def delete_voice_entries(voice_id: str) -> None:
+    """Remove every list of a saved voice (when the voice itself is deleted)."""
+    if not _VOICE.match(voice_id):
+        raise ValueError(f"Invalid voice id '{voice_id}'.")
+    with _lock:
+        for path in data_dir("pronunciation", "voices").glob(f"{voice_id}.*.json"):
+            path.unlink(missing_ok=True)
 
 
 def _pattern(entry: Entry) -> re.Pattern:
@@ -150,15 +165,19 @@ def rewrite(text: str, entries: list[Entry]) -> str:
     return "".join(out)
 
 
-def apply(text: str, language: str) -> str:
-    """`text` rewritten with the language's entries and the shared ones (unchanged when there are none).
+def apply(text: str, language: str, voice_id: str | None = None) -> str:
+    """`text` rewritten with the voice's, the language's and the shared entries (unchanged when there are none).
 
-    The language's entries come first, so for the same matched text they win over shared ones
-    (rewrite's sort is stable); otherwise the longest match wins whatever its list.
+    With `voice_id` (a saved voice), that voice's words come first and replace any language or shared
+    entry for the same word, whatever its capitals. The language's entries come before the shared ones,
+    so for the same matched text they win (rewrite's sort is stable); otherwise the longest match wins
+    whatever its list.
     """
     if language == ALL:
         raise ValueError("Speech needs a language; the shared words apply within it.")
-    entries = [*list_entries(language), *list_entries(ALL)]
+    own = list_entries(language, voice_id) if voice_id else []
+    taken = {e.word.lower() for e in own}
+    entries = [*own, *(e for e in [*list_entries(language), *list_entries(ALL)] if e.word.lower() not in taken)]
     return rewrite(text, entries) if entries else text
 
 

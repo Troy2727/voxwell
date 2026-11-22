@@ -189,6 +189,7 @@ TOOLS = [
             "language": {**_LANGUAGE, "description": "ISO 639-1 code, or all for a word used in every language (a language's own entry wins there). Default en."},
             "case_sensitive": {"type": "boolean", "description": "Match only this capitalization (add). Default false."},
             "whole_word": {"type": "boolean", "description": "Match whole words only (add). Default true."},
+            "voice": {**_VOICE, "description": "A saved voice name or id: list, add or remove that voice's own words in the language. They win over the language's list when that voice speaks."},
         }, ["action"]),
     },
     {
@@ -371,7 +372,7 @@ def manage_pronunciations(args: dict) -> str:
         raise ToolError("action must be list, add or remove.")
     return _run(cli.cmd_pronounce, action=action, word=args.get("word"), respelling=args.get("respelling"),
                 language=args.get("language") or "en", case_sensitive=bool(args.get("case_sensitive")),
-                partial=args.get("whole_word") is False)
+                partial=args.get("whole_word") is False, voice=args.get("voice"))
 
 
 def translate_speech(args: dict) -> str:

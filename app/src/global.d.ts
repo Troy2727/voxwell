@@ -19,6 +19,11 @@ interface VoxwellBridge {
     onStatus(callback: (status: DictationStatus) => void): () => void;
     overlayAction(action: DictationOverlayAction): void;
   };
+  /** Run in background. Both resolve to the saved value; set rejects when it could not be saved. */
+  background: {
+    get(): Promise<boolean>;
+    set(enabled: boolean): Promise<boolean>;
+  };
   auth: {
     onCallback(callback: (url: string) => void): () => void;
     openExternal(url: string): Promise<void>;

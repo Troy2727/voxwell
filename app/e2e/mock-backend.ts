@@ -55,7 +55,7 @@ function track(status: string, progress: number) {
 
 function book(state: string, done: boolean, include = [true, true]) {
   return {
-    id: 'b-1', title: 'The Lighthouse', created: NOW, language: 'en', voice: 'default', tone_memory: false, state, step: 'Chapter 1 of 1', percent: done ? 100 : 40, error: null,
+    id: 'b-1', title: 'The Lighthouse', created: NOW, language: 'en', voice: 'default', tone_memory: false, natural_pauses: false, state, step: 'Chapter 1 of 1', percent: done ? 100 : 40, error: null,
     chapters: [
       { title: 'The Storm', chars: 300, include: include[0], status: done && include[0] ? 'done' : 'pending', audio_url: done && include[0] ? TONE_URL : null },
       { title: 'Morning', chars: 250, include: include[1], status: done && include[1] ? 'done' : 'pending', audio_url: done && include[1] ? TONE_URL : null },
@@ -74,6 +74,7 @@ function routes(): [string | RegExp, Reply][] {
   let books: object[] = [];
   let include = [true, true];
   let toneMemory = false;
+  let naturalPauses = false;
   let rendering: (() => object) | null = null;
   let transcribed: (() => object) | null = null;
   let entries: object[] = [];
@@ -99,6 +100,8 @@ function routes(): [string | RegExp, Reply][] {
     [/^(PATCH|DELETE) \/api\/voices\/[^/]+$/, {}],
 
     ['POST /api/voice_cloning/voices', { id: 'v-new', name: 'E2E voice', source: 'upload' }],
+    ['GET /api/voice_cloning/free-the-gpu', { enabled: false, device: 'cuda' }],
+    ['PUT /api/voice_cloning/free-the-gpu', (_url: URL, request: Request) => ({ enabled: request.postDataJSON().enabled, device: 'cuda' })],
     ['GET /api/voice_cloning/status', { ready: true, languages: { en: 'English', es: 'Spanish', fr: 'French' }, cues: CUES }],
     // Like the server: cue tags in a language without cues come back flagged as left out.
     ['POST /api/voice_cloning/synthesize', (_url: URL, request: Request) => {
@@ -158,7 +161,8 @@ function routes(): [string | RegExp, Reply][] {
       const chapters: { include: boolean }[] | undefined = request.postDataJSON().chapters;
       if (chapters) include = chapters.map((c) => c.include);
       toneMemory = request.postDataJSON().tone_memory ?? toneMemory;
-      books = [{ ...book('draft', false, include), tone_memory: toneMemory }];
+      naturalPauses = request.postDataJSON().natural_pauses ?? naturalPauses;
+      books = [{ ...book('draft', false, include), tone_memory: toneMemory, natural_pauses: naturalPauses }];
       return books[0];
     }],
     ['POST /api/audiobook/books/b-1/preview', { url: TONE_URL }],
