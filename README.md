@@ -151,6 +151,21 @@ Voxwell is **MIT licensed**, and every model it runs allows commercial use ([one
 | **Mic check** | Dictation | If your microphone hears nothing, you're warned while you're still recording. |
 | **Dictation clean-up** | Dictation | A local AI model removes filler words, fixes punctuation, or makes the text formal or concise, with the original one click away. |
 
+### New: voice cloning
+
+| Feature | Where | What it does |
+| --- | --- | --- |
+| **`@` and `/` menus** | Voice cloning | In the text box, type `@` to pick a voice or `/` to add a pause or a cue tag. Ctrl/Cmd+Enter generates. |
+| **Whose voice?** | Voice cloning | Before a clip is cloned, Voxwell asks whose voice it is, and won't clone someone who hasn't agreed. |
+| **Take queue** | Voice cloning | Keep adding takes while one renders; they run one after another, even while you use other pages. |
+| **Natural pauses** | Voice cloning, Stories, Audiobook | Pauses are filled with the recording's own quiet background instead of silence. |
+| **Free the GPU** | Voice cloning | Once Voxwell has finished speaking, the speech model moves to system RAM so other apps can use the graphics card. |
+| **Now playing bar** | Voice cloning, Projects | A clip keeps playing in a bar at the bottom of the app while you change pages. |
+| **Voice pronunciation** | Pronunciation | A word list for one saved voice, used whenever that voice speaks. |
+| **Join lines** | Stories | Merge neighbouring lines of the same speaker so they're spoken without a break. |
+| **Line moods** | Stories | Start a line with `[mood calm]`, `[mood lively]`, `[mood dramatic]` or `[mood intense]` to change how strongly it's delivered. |
+| **Convert video** | Tools | Swap the voice in a video for a saved one; the picture and background stay. |
+
 ### New: everyday work
 
 | Feature | Where | What it does |
@@ -161,7 +176,7 @@ Voxwell is **MIT licensed**, and every model it runs allows commercial use ([one
 
 | Feature | What it does |
 | --- | --- |
-| **Voice cloning** | Clone a voice from a few seconds of clean speech. Saved voices work everywhere in the app. Add <img src="docs/readme/labels/short.svg" alt="Short" height="24" align="absmiddle" />, <img src="docs/readme/labels/medium.svg" alt="Medium" height="24" align="absmiddle" /> and <img src="docs/readme/labels/long.svg" alt="Long" height="24" align="absmiddle" /> pauses with a click, and set the speech with <img src="docs/readme/labels/speed.svg" alt="Speed" height="24" align="absmiddle" /> and <img src="docs/readme/labels/pitch.svg" alt="Pitch" height="24" align="absmiddle" /> sliders. **Take queue**: keep adding takes while one renders; they wait and run one after another, even while you use other pages. |
+| **Voice cloning** | Clone a voice from a few seconds of clean speech. Saved voices work everywhere in the app. Add <img src="docs/readme/labels/short.svg" alt="Short" height="24" align="absmiddle" />, <img src="docs/readme/labels/medium.svg" alt="Medium" height="24" align="absmiddle" /> and <img src="docs/readme/labels/long.svg" alt="Long" height="24" align="absmiddle" /> pauses with a click, and set the speech with <img src="docs/readme/labels/speed.svg" alt="Speed" height="24" align="absmiddle" /> and <img src="docs/readme/labels/pitch.svg" alt="Pitch" height="24" align="absmiddle" /> sliders. **Take queue**: keep adding takes while one renders; they wait and run one after another, even while you use other pages. In the text box, `@` picks a voice and `/` adds a pause. **Whose voice?**: before a clip is cloned, Voxwell asks whose voice it is, and won't clone someone who hasn't agreed. |
 | **Voice design** | Describe a voice ("warm, low, slight British accent") and Voxwell creates it. |
 | **Voice remix** | Turn a saved voice into a new one by describing it, from a light touch (Low) to a full change (Max). The original stays as it is. |
 | **Gallery** | Start from one of 40 ready-made voices. <img src="docs/readme/labels/search.svg" alt="Search" height="24" align="absmiddle" /> by name or description ("whispering" finds Sleep Story), filter by <img src="docs/readme/labels/category.svg" alt="category" height="24" align="absmiddle" /> and <img src="docs/readme/labels/gender.svg" alt="gender" height="24" align="absmiddle" /> (Wellness + Female shows 3 voices), or star your favorites. |
