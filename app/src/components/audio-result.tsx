@@ -82,7 +82,13 @@ function Player({ src, download, autoPlay, lazy, barTitle, barSource }: Props) {
     if (lazy) return;
     // Loads metadata so the duration shows before playing.
     // A blocked autoplay just leaves the play button to press.
-    void player.setActiveItem(item).then(() => (autoPlay ? player.play(item) : undefined)).catch(() => {});
+    // A cancelled run (unmount, new src, StrictMode's discarded first run) must not start playback:
+    // a late second play() restarts the clip and pauses whatever the user started since.
+    let cancelled = false;
+    void player.setActiveItem(item).then(() => (autoPlay && !cancelled ? player.play(item) : undefined)).catch(() => {});
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [src]);
 
