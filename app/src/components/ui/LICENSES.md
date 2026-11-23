@@ -1,11 +1,12 @@
 # UI components: licenses
 
-The files in this folder are copied into Voxwell (not installed as packages), as both projects intend. Both are MIT, like Voxwell.
+The files in this folder are copied into Voxwell (not installed as packages), as both projects intend. All sources below are MIT, like Voxwell.
 
 | Files | Source | License |
 |---|---|---|
 | `alert`, `alert-dialog`, `badge`, `button`, `card`, `checkbox`, `command`, `dialog`, `dropdown-menu`, `input`, `label`, `popover`, `progress`, `select`, `separator`, `sheet`, `sidebar`, `skeleton`, `slider`, `sonner`, `tabs`, `textarea`, `tooltip` (and `../../hooks/use-mobile.ts`) | [shadcn/ui](https://github.com/shadcn-ui/ui), added with `npx shadcn add` | MIT, Copyright (c) 2023 shadcn |
 | `audio-player`, `live-waveform`, `mic-selector`, `scrub-bar`, `transcript-viewer`, `voice-picker`, `waveform` (and `../../hooks/use-transcript-viewer.ts`) | [ElevenLabs UI](https://github.com/elevenlabs/ui) | MIT, Copyright (c) 2025 Eleven Labs Inc. |
+| `switch` | Written in Voxwell on the Radix Switch; the track and thumb sizes and the thumb's easing follow [Beautiful UI](https://github.com/slev12397/beautiful-ui)'s Switch | MIT, Copyright (c) 2026 Shane Levine |
 
 Changes made in Voxwell (marked `Voxwell:` in the code):
 
